@@ -10,3 +10,6 @@
 [submodule "m1-orientationmanager"]
 	path = m1-orientationmanager
 	url = git@github.com:Mach1Studios/m1-orientationmanager.git
+[submodule "m1-transcoder"]
+	path = m1-transcoder
+	url = git@github.com:Mach1Studios/m1-transcoder.git
