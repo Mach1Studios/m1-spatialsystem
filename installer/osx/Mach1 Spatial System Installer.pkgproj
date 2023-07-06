@@ -3729,35 +3729,14 @@
 								<key>CHILDREN</key>
 								<array/>
 								<key>DESCRIPTION</key>
-								<array/>
-								<key>OPTIONS</key>
-								<dict>
-									<key>HIDDEN</key>
-									<false/>
-									<key>STATE</key>
-									<integer>0</integer>
-								</dict>
-								<key>PACKAGE_UUID</key>
-								<string>444E427C-993E-42DB-8BF7-A46BE1460139</string>
-								<key>TITLE</key>
 								<array>
 									<dict>
 										<key>LANGUAGE</key>
 										<string>English</string>
 										<key>VALUE</key>
-										<string>M1-OrientationManager</string>
+										<string>Export utility tool to transcode a Mach1Spatial mixe to common deliverable formats (Audio/Video). Can also be used for converting formats and laying back to 360 videos.</string>
 									</dict>
 								</array>
-								<key>TYPE</key>
-								<integer>0</integer>
-								<key>UUID</key>
-								<string>F7C60EBB-81B1-43E7-B6E9-82CAFF240DC9</string>
-							</dict>
-							<dict>
-								<key>CHILDREN</key>
-								<array/>
-								<key>DESCRIPTION</key>
-								<array/>
 								<key>OPTIONS</key>
 								<dict>
 									<key>HIDDEN</key>
@@ -3785,7 +3764,14 @@
 								<key>CHILDREN</key>
 								<array/>
 								<key>DESCRIPTION</key>
-								<array/>
+								<array>
+									<dict>
+										<key>LANGUAGE</key>
+										<string>English</string>
+										<key>VALUE</key>
+										<string>A standalone app for reviewing 360 videos in sync with a DAW session or for externally reviewing spatial audio/video files.</string>
+									</dict>
+								</array>
 								<key>OPTIONS</key>
 								<dict>
 									<key>HIDDEN</key>
@@ -3813,7 +3799,14 @@
 								<key>CHILDREN</key>
 								<array/>
 								<key>DESCRIPTION</key>
-								<array/>
+								<array>
+									<dict>
+										<key>LANGUAGE</key>
+										<string>English</string>
+										<key>VALUE</key>
+										<string>AAX plugins for ProTools on macOS. Includes ProTools template sessions.</string>
+									</dict>
+								</array>
 								<key>OPTIONS</key>
 								<dict>
 									<key>HIDDEN</key>
@@ -3841,7 +3834,14 @@
 								<key>CHILDREN</key>
 								<array/>
 								<key>DESCRIPTION</key>
-								<array/>
+								<array>
+									<dict>
+										<key>LANGUAGE</key>
+										<string>English</string>
+										<key>VALUE</key>
+										<string>VST plugins. Includes Reaper session templates. </string>
+									</dict>
+								</array>
 								<key>OPTIONS</key>
 								<dict>
 									<key>HIDDEN</key>
@@ -3869,7 +3869,14 @@
 								<key>CHILDREN</key>
 								<array/>
 								<key>DESCRIPTION</key>
-								<array/>
+								<array>
+									<dict>
+										<key>LANGUAGE</key>
+										<string>English</string>
+										<key>VALUE</key>
+										<string>VST3 plugins. Not recommended unless required by a specific DAW host</string>
+									</dict>
+								</array>
 								<key>OPTIONS</key>
 								<dict>
 									<key>HIDDEN</key>
@@ -3897,13 +3904,20 @@
 								<key>CHILDREN</key>
 								<array/>
 								<key>DESCRIPTION</key>
-								<array/>
+								<array>
+									<dict>
+										<key>LANGUAGE</key>
+										<string>English</string>
+										<key>VALUE</key>
+										<string>AU plugins</string>
+									</dict>
+								</array>
 								<key>OPTIONS</key>
 								<dict>
 									<key>HIDDEN</key>
 									<false/>
 									<key>STATE</key>
-									<integer>2</integer>
+									<integer>1</integer>
 								</dict>
 								<key>PACKAGE_UUID</key>
 								<string>5B8636D6-2B7F-486F-940B-2907882C296A</string>
@@ -3920,6 +3934,41 @@
 								<integer>0</integer>
 								<key>UUID</key>
 								<string>1A8F3AA2-2896-4119-B1E8-AAF0D1C51130</string>
+							</dict>
+							<dict>
+								<key>CHILDREN</key>
+								<array/>
+								<key>DESCRIPTION</key>
+								<array>
+									<dict>
+										<key>LANGUAGE</key>
+										<string>English</string>
+										<key>VALUE</key>
+										<string>A background tool for finding and connecting to 3rd party IMU / orientation devices to send orientation control data to any orientation client enabled app/plugin such as M1-Player or M1-Monitor</string>
+									</dict>
+								</array>
+								<key>OPTIONS</key>
+								<dict>
+									<key>HIDDEN</key>
+									<false/>
+									<key>STATE</key>
+									<integer>0</integer>
+								</dict>
+								<key>PACKAGE_UUID</key>
+								<string>444E427C-993E-42DB-8BF7-A46BE1460139</string>
+								<key>TITLE</key>
+								<array>
+									<dict>
+										<key>LANGUAGE</key>
+										<string>English</string>
+										<key>VALUE</key>
+										<string>M1-OrientationManager</string>
+									</dict>
+								</array>
+								<key>TYPE</key>
+								<integer>0</integer>
+								<key>UUID</key>
+								<string>F7C60EBB-81B1-43E7-B6E9-82CAFF240DC9</string>
 							</dict>
 						</array>
 						<key>REMOVED</key>
