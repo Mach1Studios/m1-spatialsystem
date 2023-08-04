@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<JUCERPROJECT id="AZ50Pu" name="M1-SystemWatcher" projectType="consoleapp"
+              useAppConfig="0" addUsingNamespaceToJuceHeader="0" displaySplashScreen="0"
+              jucerFormatVersion="1" companyName="Mach1" companyCopyright="Mach1, Corp."
+              companyWebsite="https://www.mach1.tech" companyEmail="whatsup@mach1.tech"
+              bundleIdentifier="com.mach1.watcher">
+  <MAINGROUP id="sBdoFC" name="M1-SystemWatcher">
+    <GROUP id="{D60319C6-7226-8830-DC8E-E7FECD092A63}" name="Source">
+      <FILE id="L7Jt8S" name="Main.cpp" compile="1" resource="0" file="Source/Main.cpp"/>
+    </GROUP>
+  </MAINGROUP>
+  <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1"/>
+  <EXPORTFORMATS>
+    <XCODE_MAC targetFolder="Builds/MacOSX">
+      <CONFIGURATIONS>
+        <CONFIGURATION isDebug="1" name="Debug"/>
+        <CONFIGURATION isDebug="0" name="Release"/>
+      </CONFIGURATIONS>
+      <MODULEPATHS>
+        <MODULEPATH id="juce_osc" path="../../JUCE/modules"/>
+        <MODULEPATH id="juce_gui_basics" path="../../JUCE/modules"/>
+        <MODULEPATH id="juce_graphics" path="../../JUCE/modules"/>
+        <MODULEPATH id="juce_events" path="../../JUCE/modules"/>
+        <MODULEPATH id="juce_data_structures" path="../../JUCE/modules"/>
+        <MODULEPATH id="juce_core" path="../../JUCE/modules"/>
+      </MODULEPATHS>
+    </XCODE_MAC>
+    <VS2017 targetFolder="Builds/VisualStudio2017">
+      <CONFIGURATIONS>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="M1-SystemWatcher"/>
+        <CONFIGURATION isDebug="0" name="Release" targetName="M1-SystemWatcher"/>
+      </CONFIGURATIONS>
+      <MODULEPATHS>
+        <MODULEPATH id="juce_core" path="../../JUCE/modules"/>
+        <MODULEPATH id="juce_data_structures" path="../../JUCE/modules"/>
+        <MODULEPATH id="juce_events" path="../../JUCE/modules"/>
+        <MODULEPATH id="juce_graphics" path="../../JUCE/modules"/>
+        <MODULEPATH id="juce_gui_basics" path="../../JUCE/modules"/>
+        <MODULEPATH id="juce_osc" path="../../JUCE/modules"/>
+      </MODULEPATHS>
+    </VS2017>
+  </EXPORTFORMATS>
+  <MODULES>
+    <MODULE id="juce_core" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="juce_data_structures" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="juce_events" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="juce_graphics" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="juce_gui_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="juce_osc" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+  </MODULES>
+</JUCERPROJECT>

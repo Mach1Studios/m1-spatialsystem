@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.mach1.watcher</string>
+	<key>KeepAlive</key>
+	<true/>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/Library/Application Support/Mach1/M1-SystemWatcher</string>
+	</array>
+	<key>AssociatedBundleIdentifiers</key>
+	<string>com.mach1.spatial.orientationmanager</string>
+	<string>com.mach1.spatial.monitor</string>
+	<string>com.mach1.spatial.player</string>
+</dict>
+</plist>
