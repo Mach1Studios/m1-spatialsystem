@@ -29,7 +29,7 @@ option(JUCE_ENABLE_MODULE_SOURCE_GROUPS "Show all module sources in IDE projects
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
 # add JUCE and other custom modules
-add_subdirectory(../../JUCE "${CMAKE_CURRENT_BINARY_DIR}/JUCE_build")
+add_subdirectory(../../m1-orientationmanager/JUCE "${CMAKE_CURRENT_BINARY_DIR}/JUCE_build")
 
 # PLUGIN/APP NAME & ID  (for dynamic naming schemes)
 set(CUSTOM_BUNDLE_ID "com.mach1.watcher")
@@ -113,3 +113,6 @@ if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
    add_compile_options(-fcolor-diagnostics)
 endif()
+
+install(TARGETS ${CMAKE_PROJECT_NAME}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX})

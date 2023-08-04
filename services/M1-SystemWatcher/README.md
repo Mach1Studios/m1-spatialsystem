@@ -10,3 +10,14 @@ A background executable that checks if the server is still active and operating 
 
 ### Build via .jucer
 - Open the `M1-OrientationManager-Watcher.jucer` and compile as needed
+
+## Install
+Currently this helper service executable is expected in a common data directory of each local machine, and where applicable to be managed by a service agent or LaunchAgent.
+
+### OSX
+- `cmake -Bbuild -G "Xcode" -DCMAKE_INSTALL_PREFIX="/Library/Application Support/Mach1"`
+- `cmake --build --configuration Release --install`
+
+### WIN
+- `cmake -Bbuild -G "Visual Studio 16 2019" -DCMAKE_INSTALL_PREFIX="%APP_DATA%\Mach1"`
+- `cmake --build --configuration Release --install`

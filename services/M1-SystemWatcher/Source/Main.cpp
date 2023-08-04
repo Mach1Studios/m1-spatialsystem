@@ -64,7 +64,7 @@ void startOrientationManager()
         //??????.setAsCurrentWorkingDirectory();
 
         juce::StringArray arguments;
-        arguments.add(exeFile.getFullPathName());
+        arguments.add(orientationManagerExe);
         arguments.add("--no-gui");
 
 		if (orientationManagerProcess.start(arguments)) {
