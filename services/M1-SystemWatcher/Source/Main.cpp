@@ -16,6 +16,7 @@
 int serverPort = 6345;
 int watcherPort = 6346;
 
+int activeClients = 1; // default with 1 so we do not auto shutdown on launch
 juce::int64 pingTime = 0;
 
 // run process M1-OrientationManager.exe from the same folder
@@ -90,8 +91,13 @@ public:
 
     void oscMessageReceived(const juce::OSCMessage& message) override
     {
+        if (message.getAddressPattern() == "/Mach1/ActiveClients") {
+            activeClients = message[0].getInt32();
+        } else {
+            DBG("WARNING: Missing number of active clients in ping!");
+        }
         pingTime = juce::Time::currentTimeMillis();
-        DBG("Received message from " + message.getAddressPattern().toString());
+        DBG("Received message from " + message.getAddressPattern().toString() + ", with " + std::to_string(message[0].getInt32()) + " active clients");
     }
 
     void initialise(const juce::String&) override
@@ -162,6 +168,12 @@ public:
 
             killProcessByName("M1-OrientationManager");
             startOrientationManager();
+        }
+        
+        // shutdown if active clients are 0 or less
+        if (activeClients == 0) {
+            shutdown();
+            JUCEApplicationBase::quit();
         }
     }
 };
