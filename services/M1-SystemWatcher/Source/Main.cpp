@@ -42,30 +42,25 @@ void startOrientationManager()
     if (socket.bindToPort(serverPort)) {
         socket.shutdown();
 
-        // TODO: make this file path search for `Mach1` dir
         // We will assume the folders are properly created during the installation step
-    
         // Using common support files installation location
         juce::File m1SupportDirectory = juce::File::getSpecialLocation(juce::File::commonApplicationDataDirectory);
 
         // run process M1-OrientationManager
-        std::string orientationManagerExe;
-        if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::Windows) != 0) {
-            // test for any windows OS
-            orientationManagerExe = (m1SupportDirectory.getFullPathName()+"/Mach1/M1-OrientationManager.exe").toStdString();
-        } else if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::MacOSX) != 0) {
+        juce::File orientationManagerExe;
+        if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::MacOSX) != 0) {
             // test for any mac OS
-            orientationManagerExe = (m1SupportDirectory.getFullPathName()+"/Application Support/Mach1/M1-OrientationManager").toStdString();
+            orientationManagerExe = m1SupportDirectory.getChildFile("Application Support").getChildFile("Mach1").getChildFile("M1-OrientationManager");
+        } else if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::Windows) != 0) {
+            // test for any windows OS
+            orientationManagerExe = m1SupportDirectory.getChildFile("Mach1").getChildFile("M1-OrientationManager.exe");
         } else {
-            orientationManagerExe = (m1SupportDirectory.getFullPathName()+"/Mach1/M1-OrientationManager").toStdString();
+            orientationManagerExe = m1SupportDirectory.getChildFile("Mach1").getChildFile("M1-OrientationManager");
         }
-        DBG("Starting M1-OrientationManager: " + orientationManagerExe);
-
-        // TODO: Check if string path above is a juce::File safe directory
-        //??????.setAsCurrentWorkingDirectory();
+        DBG("Starting M1-OrientationManager: " + orientationManagerExe.getFullPathName());
 
         juce::StringArray arguments;
-        arguments.add(orientationManagerExe);
+        arguments.add(orientationManagerExe.getFullPathName().quoted());
         arguments.add("--no-gui");
 
 		if (orientationManagerProcess.start(arguments)) {
@@ -92,12 +87,16 @@ public:
     void oscMessageReceived(const juce::OSCMessage& message) override
     {
         if (message.getAddressPattern() == "/Mach1/ActiveClients") {
-            activeClients = message[0].getInt32();
+            if (message.size() > 0) {
+                activeClients = message[0].getInt32();
+                DBG("Received message from " + message.getAddressPattern().toString() + ", with " + std::to_string(message[0].getInt32()) + " active clients");
+            } else {
+                DBG("Received message from " + message.getAddressPattern().toString() + ", with 0 active clients");
+            }
         } else {
             DBG("WARNING: Missing number of active clients in ping!");
         }
         pingTime = juce::Time::currentTimeMillis();
-        DBG("Received message from " + message.getAddressPattern().toString() + ", with " + std::to_string(message[0].getInt32()) + " active clients");
     }
 
     void initialise(const juce::String&) override
@@ -170,11 +169,11 @@ public:
             startOrientationManager();
         }
         
-        // shutdown if active clients are 0 or less
-        if (activeClients == 0) {
-            shutdown();
-            JUCEApplicationBase::quit();
-        }
+        // TODO: shutdown if last active client quite
+        //if () {
+        //    shutdown();
+        //    JUCEApplicationBase::quit();
+        //}
     }
 };
 
