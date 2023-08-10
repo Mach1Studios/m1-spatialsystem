@@ -11,8 +11,6 @@
 		<string>/Library/Application Support/Mach1/M1-SystemWatcher</string>
 	</array>
 	<key>AssociatedBundleIdentifiers</key>
-	<string>com.mach1.spatial.orientationmanager</string>
-	<string>com.mach1.spatial.monitor</string>
-	<string>com.mach1.spatial.player</string>
+	<string>com.mach1.orientationserver</string>
 </dict>
 </plist>
