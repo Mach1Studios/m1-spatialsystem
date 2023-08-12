@@ -33,27 +33,22 @@ void killProcessByName(const char *name)
     
     DBG("Killing "+std::string(name)+"...");
     
+    std::string command;
     if ((juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_7) ||
         (juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_8) ||
         (juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_9)) {
         // MacOS 10.7-10.9, launchd v1.0
-        std::string command =  "launchctl unload -w /Library/LaunchAgents/com."+service_name+".plist";
-        DBG("Executing: " + command);
-        system(command.c_str());
+        command =  "launchctl unload -w /Library/LaunchAgents/com."+service_name+".plist";
     } else if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::MacOSX) != 0) {
         // All newer MacOS, launchd v2.0
-        std::string command = "launchctl kill 9 gui/$UID/com."+service_name;
-        DBG("Executing: " + command);
-        system(command.c_str());
+        command = "launchctl kill 9 gui/$UID/com."+service_name;
     } else if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::Windows) != 0) {
-        std::string command = "taskkill /IM " + std::string(name) + " /F";
-        DBG("Executing: " + command);
-        system(command.c_str());
+        command = "taskkill /IM "+std::string(name)+" /F";
     } else {
-        std::string command = "pkill " + std::string(name);
-        DBG("Executing: " + command);
-        system(command.c_str());
+        command = "pkill "+std::string(name);
     }
+    DBG("Executing: " + command);
+    system(command.c_str());
 }
 
 void startOrientationManager()
@@ -63,12 +58,12 @@ void startOrientationManager()
     socket.setEnablePortReuse(false);
     if (socket.bindToPort(serverPort)) {
         socket.shutdown();
-
+        
         // We will assume the folders are properly created during the installation step
         // Using common support files installation location
         juce::File m1SupportDirectory = juce::File::getSpecialLocation(juce::File::commonApplicationDataDirectory);
         juce::File orientationManagerExe; // for linux and win
-
+        
         if ((juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_7) ||
             (juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_8) ||
             (juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_9)) {
@@ -84,7 +79,7 @@ void startOrientationManager()
         } else if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::MacOSX) != 0) {
             // All newer MacOS, launchd v2.0
             // load process M1-OrientationManager
-            std::string load_command = "launchctl load gui/$UID /Library/LaunchAgents/com.mach1.orientationserver.plist";
+            std::string load_command = "launchctl bootstrap gui/$UID /Library/LaunchAgents/com.mach1.orientationserver.plist";
             DBG("Executing: " + load_command);
             system(load_command.c_str());
             // start process M1-OrientationManager
