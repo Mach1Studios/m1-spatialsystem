@@ -36,8 +36,8 @@ build:
 
 setup-dev:
 ifeq ($(detected_OS),Darwin)
-	cmake m1-monitor -BBm1-monitor/build -G "Xcode" -DBUILD_VST3=ON -DBUILD_STANDALONE=ON
-	cmake m1-panner -Bm1-panner/build -G "Xcode" -DBUILD_VST3=ON -DBUILD_STANDALONE=ON
+	cmake m1-monitor -Bm1-monitor/build -G "Xcode" -DBUILD_VST3=ON -DBUILD_AAX=ON -DAAX_PATH=$(AAX_PATH) -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DBUILD_STANDALONE=ON
+	cmake m1-panner -Bm1-panner/build -G "Xcode" -DBUILD_VST3=ON -DBUILD_AAX=ON -DAAX_PATH=$(AAX_PATH) -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DBUILD_STANDALONE=ON
 	cmake m1-player -Bm1-player/build -G "Xcode"
 	cmake m1-orientationmanager -Bm1-orientationmanager/build -G "Xcode" -DCMAKE_INSTALL_PREFIX="/Library/Application Support/Mach1"
 	cmake services/M1-SystemWatcher -Bservices/M1-SystemWatcher/build -G "Xcode" -DCMAKE_INSTALL_PREFIX="/Library/Application Support/Mach1"
