@@ -5,6 +5,13 @@
 # Make sure you fill all the variables and paths
 include ./Makefile.variables
 
+# getting OS type
+ifeq ($(OS),Windows_NT)
+	detected_OS := Windows
+else
+	detected_OS := $(shell uname)
+endif
+
 pull:
 	git pull --recurse-submodules
 
