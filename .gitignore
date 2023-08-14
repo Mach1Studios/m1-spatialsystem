@@ -1,4 +1,5 @@
 # MACH1
+Makefile.variables
 installer/config.sh
 m1transcoder/dist
 M1notifier/dist
