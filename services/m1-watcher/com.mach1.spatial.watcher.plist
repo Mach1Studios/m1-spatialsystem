@@ -10,7 +10,7 @@
 		<false/>
 	</dict>
 	<key>Label</key>
-	<string>com.mach1.watcher</string>
+	<string>com.mach1.spatial.watcher</string>
 	<key>ProgramArguments</key>
 	<array>
 		<string>/Library/Application Support/Mach1/M1-SystemWatcher</string>

@@ -32,7 +32,7 @@ set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 add_subdirectory(../../m1-orientationmanager/JUCE "${CMAKE_CURRENT_BINARY_DIR}/JUCE_build")
 
 # PLUGIN/APP NAME & ID  (for dynamic naming schemes)
-set(CUSTOM_BUNDLE_ID "com.mach1.watcher")
+set(CUSTOM_BUNDLE_ID "com.mach1.spatial.watcher")
 set(CUSTOM_APP_CODE "M1SW")
 
 # add the plugin targets

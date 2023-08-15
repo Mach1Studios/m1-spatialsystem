@@ -7,7 +7,9 @@
 */
 #include <JuceHeader.h>
 
-#ifndef JUCE_WINDOWS
+#ifdef JUCE_WINDOWS
+#include <winsvc.h>
+#else
 #include <signal.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -101,8 +103,10 @@ void startOrientationManager()
                 DBG("Failed to start the M1-OrientationManager");
                 exit(1);
             }
-        } else {
+        } else if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::Linux)) {
             // TODO: factor out linux using systemd service
+
+        } else {
             orientationManagerExe = m1SupportDirectory.getChildFile("Mach1").getChildFile("M1-OrientationManager");
             juce::StringArray arguments;
             arguments.add(orientationManagerExe.getFullPathName().quoted());

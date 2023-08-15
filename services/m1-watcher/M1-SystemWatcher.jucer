@@ -4,7 +4,7 @@
               useAppConfig="0" addUsingNamespaceToJuceHeader="0" displaySplashScreen="0"
               jucerFormatVersion="1" companyName="Mach1" companyCopyright="Mach1, Corp."
               companyWebsite="https://www.mach1.tech" companyEmail="whatsup@mach1.tech"
-              bundleIdentifier="com.mach1.watcher">
+              bundleIdentifier="com.mach1.spatial.watcher">
   <MAINGROUP id="sBdoFC" name="M1-SystemWatcher">
     <GROUP id="{D60319C6-7226-8830-DC8E-E7FECD092A63}" name="Source">
       <FILE id="L7Jt8S" name="Main.cpp" compile="1" resource="0" file="Source/Main.cpp"/>
