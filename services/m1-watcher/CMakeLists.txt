@@ -82,9 +82,6 @@ target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE
         juce::juce_osc
         )
 
-# MacOS: Add privacy permissions for access to bluetooth
-target_link_options(${CMAKE_PROJECT_NAME} PRIVATE LINKER:-sectcreate,__TEXT,__info_plist,${CMAKE_CURRENT_SOURCE_DIR}/Info.plist)
-
 ### IDE Generator post-config ###
 # IDEs:  Move the "shared code" source group (main target) out of the "Targets" folder
 #        to the top level.
