@@ -6,6 +6,7 @@
   ==============================================================================
 */
 #include <JuceHeader.h>
+#include <string>
 
 #ifdef JUCE_WINDOWS
 #include <winsvc.h>
@@ -15,15 +16,26 @@
 #include <unistd.h>
 #endif
 
-int serverPort = 6345;
-int watcherPort = 6346;
-
+int serverPort, watcherPort;
 int activeClients = 1; // default with 1 so we do not auto shutdown on launch
 juce::int64 shutdownCounterTime = 0;
 juce::int64 pingTime = 0;
 
 // run process M1-OrientationManager.exe from the same folder
 juce::ChildProcess orientationManagerProcess;
+
+bool initFromSettings(std::string jsonSettingsFilePath) {
+    juce::File settingsFile = juce::File(jsonSettingsFilePath);
+    if (!settingsFile.exists()) {
+        return false;
+    } else {
+        // Found the settings.json
+        juce::var mainVar = juce::JSON::parse(juce::File(jsonSettingsFilePath));
+        serverPort = mainVar["serverPort"];
+        watcherPort = mainVar["watcherPort"];
+    }
+    return true;
+}
 
 void killProcessByName(const char *name)
 {
@@ -55,6 +67,25 @@ void killProcessByName(const char *name)
 
 void startOrientationManager()
 {
+    // We will assume the folders are properly created during the installation step
+    juce::File settingsFile;
+    // Using common support files installation location
+    juce::File m1SupportDirectory = juce::File::getSpecialLocation(juce::File::commonApplicationDataDirectory);
+
+    if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::MacOSX) != 0) {
+        // test for any mac OS
+        settingsFile = m1SupportDirectory.getChildFile("Application Support").getChildFile("Mach1");
+    } else if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::Windows) != 0) {
+        // test for any windows OS
+        settingsFile = m1SupportDirectory.getChildFile("Mach1");
+    } else {
+        settingsFile = m1SupportDirectory.getChildFile("Mach1");
+    }
+    settingsFile = settingsFile.getChildFile("settings.json");
+    DBG("Opening settings file: " + settingsFile.getFullPathName().quoted());
+    
+    initFromSettings(settingsFile.getFullPathName().toStdString());
+    
     // Create a DatagramSocket to check the availability of port serverPort
     juce::DatagramSocket socket(false);
     socket.setEnablePortReuse(false);
