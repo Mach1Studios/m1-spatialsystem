@@ -16,6 +16,7 @@ pull:
 	git pull --recurse-submodules
 
 clear:
+	rm -rf installer/osx/build
 	rm -rf m1-monitor/build
 	rm -rf m1-panner/build
 	rm -rf m1-player/build
@@ -28,17 +29,19 @@ ifeq ($(detected_OS),Darwin)
 	xcrun notarytool store-credentials 'notarize-app' --apple-id $(APPLE_ID) --team-id $(APPLE_TEAM_CODE)
 endif 
 
-# configure and build in one call
-build:
+# configure 
+configure:
 	cmake m1-monitor -Bm1-monitor/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DAAX_PATH=$(AAX_PATH) -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF
-	cmake --build m1-monitor/build
 	cmake m1-panner -Bm1-panner/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DAAX_PATH=$(AAX_PATH) -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF
-	cmake --build m1-panner/build
 	cmake m1-player -Bm1-player/build
-	cmake --build m1-player/build
 	cmake m1-orientationmanager -Bm1-orientationmanager/build
-	cmake --build m1-orientationmanager/build
 	cmake services/m1-watcher -Bservices/m1-watcher/build
+
+build: 
+	cmake --build m1-monitor/build
+	cmake --build m1-panner/build
+	cmake --build m1-player/build
+	cmake --build m1-orientationmanager/build
 	cmake --build services/m1-watcher/build
 
 # setup dev envs with common IDEs
@@ -65,17 +68,32 @@ endif
 
 codesign:
 ifeq ($(detected_OS),Darwin)
-	codesign --deep --force --options=runtime --entitlements m1-player/entitlements.plist --sign $(APPLE_TEAM_CODE) --timestamp m1-player/build/M1-Player_artefacts/M1-Player.app
-	#codesign --deep --force --options=runtime --entitlements m1-transcoder/entitlements.plist --sign $(APPLE_TEAM_CODE) --timestamp m1-transcoder/build/M1-Transcoder.app
-	#codesign --deep --force --options=runtime --entitlements m1-orientationmanager/entitlements.plist --sign $(APPLE_TEAM_CODE) --timestamp m1-orientationmanager/build/M1-OrientationManager_artefacts/M1-OrientationManager
-	#codesign --deep --force --options=runtime --entitlements services/m1-watcher/entitlements.plist --sign $(APPLE_TEAM_CODE) --timestamp services/m1-watcher/build/M1-SystemWatcher_artefacts/M1-SystemWatcher
+	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-monitor/build/M1-Monitor_artefacts/AAX/M1-Monitor.aaxplugin
+	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-monitor/build/M1-Monitor_artefacts/AU/M1-Monitor.component
+	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-monitor/build/M1-Monitor_artefacts/VST/M1-Monitor.vst
+	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-monitor/build/M1-Monitor_artefacts/VST3/M1-Monitor.vst3
+	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-panner/build/M1-Panner_artefacts/AAX/M1-Panner.aaxplugin
+	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-panner/build/M1-Panner_artefacts/AU/M1-Panner.component
+	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-panner/build/M1-Panner_artefacts/VST/M1-Panner.vst
+	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-panner/build/M1-Panner_artefacts/VST3/M1-Panner.vst3
+	codesign --deep --force --options=runtime --entitlements m1-player/Resources/M1-Player-Info.plist --sign $(APPLE_CODESIGN_CODE) --timestamp m1-player/build/M1-Player_artefacts/M1-Player.app
+	#codesign --deep --force --options=runtime --entitlements m1-transcoder/entitlements.plist --sign $(APPLE_TEAM_CODE) --timestamp m1-transcoder/dist/M1-Transcoder.app
+	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-orientationmanager/build/M1-OrientationManager_artefacts/M1-OrientationManager
+	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp services/m1-watcher/build/M1-SystemWatcher_artefacts/M1-SystemWatcher
+endif
+
+notarize:
+ifeq ($(detected_OS),Darwin)
+	# m1-player
+	zip -r m1-player/build/M1-Player_artefacts/M1-Player.app.zip m1-player/build/M1-Player_artefacts/M1-Player.app -x "*.DS_Store"
+	./installer/osx/macos_utilities.sh -f M1-Player -e app -p m1-player/build/M1-Player_artefacts -k 'notarize-app' --apple-id $(APPLE_USERNAME) --apple-app-pass $(ALTOOL_APPPASS) -t $(APPLE_TEAM_CODE)
+
 endif
 
 package:
 ifeq ($(detected_OS),Darwin)
 	packagesbuild -v installer/osx/Mach1\ Spatial\ System\ Installer.pkgproj
-	mkdir -p installer/osx/build/signed
-	productsign --sign $(APPLE_CODESIGN_INSTALLER_ID) "installer/osx/build/Mach1 Spatial System Installer.pkg" "installer/osx/build/signed/Mach1 Spatial System Installer.pkg"
+	productsign --sign $(APPLE_CODESIGN_INSTALLER_ID) "installer/osx/build/Mach1 Spatial System Installer.pkg" "installer/osx/build/Mach1 Spatial System Installer.pkg"
 	xcrun notarytool submit --wait --keychain-profile 'notarize-app' --apple-id $(APPLE_USERNAME) --password $(ALTOOL_APPPASS) --team-id $(APPLE_TEAM_CODE) "installer/osx/build/signed/Mach1 Spatial System Installer.pkg";
 	xcrun stapler staple installer/osx/build/signed/Mach1\ Spatial\ System\ Installer.pkg
 endif

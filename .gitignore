@@ -1,5 +1,7 @@
 # MACH1
 Makefile.variables
+tmp
+notarize.json
 installer/config.sh
 m1transcoder/dist
 M1notifier/dist
