@@ -21,7 +21,7 @@ then
 fi
 
 # delete the old local app data folder
-if [ -d "$M1LocalDataDir" ]
-then 
-	rm -Rf $M1LocalDataDir
-fi
+# if [ -d "$M1LocalDataDir" ]
+# then 
+# 	rm -Rf $M1LocalDataDir
+# fi

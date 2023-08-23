@@ -20,6 +20,7 @@ clear:
 	rm -rf m1-monitor/build
 	rm -rf m1-panner/build
 	rm -rf m1-player/build
+	rm -rf m1-transcoder/dist
 	rm -rf m1-orientationmanager/build
 	rm -rf services/m1-watcher/build
 
@@ -36,6 +37,7 @@ configure:
 	cmake m1-player -Bm1-player/build
 	cmake m1-orientationmanager -Bm1-orientationmanager/build
 	cmake services/m1-watcher -Bservices/m1-watcher/build
+	cd m1-transcoder && npm install
 
 build: 
 	cmake --build m1-monitor/build
@@ -43,6 +45,7 @@ build:
 	cmake --build m1-player/build
 	cmake --build m1-orientationmanager/build
 	cmake --build services/m1-watcher/build
+	cd m1-transcoder && npm run package-mac
 
 # setup dev envs with common IDEs
 dev: clear
@@ -52,18 +55,21 @@ ifeq ($(detected_OS),Darwin)
 	cmake m1-player -Bm1-player/build -G "Xcode"
 	cmake m1-orientationmanager -Bm1-orientationmanager/build -G "Xcode" -DCMAKE_INSTALL_PREFIX="/Library/Application Support/Mach1"
 	cmake services/m1-watcher -Bservices/m1-watcher/build -G "Xcode" -DCMAKE_INSTALL_PREFIX="/Library/Application Support/Mach1"
+	cd m1-transcoder && npm install
 else ifeq ($(detected_OS),Windows)
 	cmake m1-monitor -Bm1-monitor/build -G "Visual Studio 16 2019" -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF -DBUILD_VST3=ON -DBUILD_STANDALONE=ON
 	cmake m1-panner -Bm1-panner/build -G "Visual Studio 16 2019" -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF -DBUILD_VST3=ON -DBUILD_STANDALONE=ON
 	cmake m1-player -Bm1-player/build -G "Visual Studio 16 2019"
 	cmake m1-orientationmanager -Bm1-orientationmanager/build -G "Visual Studio 16 2019" -DCMAKE_INSTALL_PREFIX="\Documents and Settings\All Users\Application Data\Mach1"
 	cmake services/m1-watcher -Bservices/m1-watcher/build -G "Visual Studio 16 2019" -DCMAKE_INSTALL_PREFIX="\Documents and Settings\All Users\Application Data\Mach1"
+	cd m1-transcoder && npm install
 else
 	cmake m1-monitor -Bm1-monitor/build -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_STANDALONE=ON
 	cmake m1-panner -Bm1-panner/build -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_STANDALONE=ON
 	cmake m1-player -Bm1-player/build
 	cmake m1-orientationmanager -Bm1-orientationmanager/build -DCMAKE_INSTALL_PREFIX="/opt/Mach1"
 	cmake services/m1-watcher -Bservices/m1-watcher/build -DCMAKE_INSTALL_PREFIX="/opt/Mach1"
+	cd m1-transcoder && npm install
 endif
 
 codesign:
@@ -77,24 +83,45 @@ ifeq ($(detected_OS),Darwin)
 	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-panner/build/M1-Panner_artefacts/VST/M1-Panner.vst
 	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-panner/build/M1-Panner_artefacts/VST3/M1-Panner.vst3
 	codesign --deep --force --options=runtime --entitlements m1-player/Resources/M1-Player-Info.plist --sign $(APPLE_CODESIGN_CODE) --timestamp m1-player/build/M1-Player_artefacts/M1-Player.app
-	#codesign --deep --force --options=runtime --entitlements m1-transcoder/entitlements.plist --sign $(APPLE_TEAM_CODE) --timestamp m1-transcoder/dist/M1-Transcoder.app
-	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-orientationmanager/build/M1-OrientationManager_artefacts/M1-OrientationManager
-	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp services/m1-watcher/build/M1-SystemWatcher_artefacts/M1-SystemWatcher
+	codesign --deep --force --options=runtime --entitlements m1-transcoder/entitlements.mac.plist --sign $(APPLE_CODESIGN_CODE) --timestamp m1-transcoder/dist/mac-universal/M1-Transcoder.app
+	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-transcoder/dist/mac-universal/M1-Transcoder.app/Contents/MacOS/M1-Transcoder
+	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-transcoder/dist/mac-universal/M1-Transcoder.app/Contents/Frameworks/M1-Transcoder\ Helper.app
+	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-transcoder/dist/mac-universal/M1-Transcoder.app/Contents/Frameworks/M1-Transcoder\ Helper\ \(GPU\).app
+	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-transcoder/dist/mac-universal/M1-Transcoder.app/Contents/Frameworks/M1-Transcoder\ Helper\ \(Plugin\).app
+	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-transcoder/dist/mac-universal/M1-Transcoder.app/Contents/Frameworks/M1-Transcoder\ Helper\ \(Renderer\).app
+	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-transcoder/dist/mac-universal/M1-Transcoder.app/Contents/Frameworks/Mantle.framework/Versions/Current/Mantle
+	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-transcoder/dist/mac-universal/M1-Transcoder.app/Contents/Frameworks/ReactiveObjC.framework/Versions/Current/ReactiveObjC
+	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-transcoder/dist/mac-universal/M1-Transcoder.app/Contents/Frameworks/Squirrel.framework/Versions/Current/Squirrel
+	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-transcoder/dist/mac-universal/M1-Transcoder.app/Contents/Frameworks/Electron\ Framework.framework/Versions/Current/Helpers/chrome_crashpad_handler
+	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-transcoder/dist/mac-universal/M1-Transcoder.app/Contents/Frameworks/Electron\ Framework.framework/Versions/Current/Electron\ Framework
+	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-transcoder/dist/mac-universal/M1-Transcoder.app/Contents/Frameworks/Electron\ Framework.framework/Versions/Current/Libraries/libEGL.dylib
+	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-transcoder/dist/mac-universal/M1-Transcoder.app/Contents/Frameworks/Electron\ Framework.framework/Versions/Current/Libraries/libffmpeg.dylib
+	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-transcoder/dist/mac-universal/M1-Transcoder.app/Contents/Frameworks/Electron\ Framework.framework/Versions/Current/Libraries/libGLESv2.dylib
+	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-transcoder/dist/mac-universal/M1-Transcoder.app/Contents/Frameworks/Electron\ Framework.framework/Versions/Current/Libraries/libvk_swiftshader.dylib
+	codesign --deep --force --options=runtime --entitlements m1-orientationmanager/Resources/entitlements.mac.plist --sign $(APPLE_CODESIGN_CODE) --timestamp m1-orientationmanager/build/M1-OrientationManager_artefacts/M1-OrientationManager
+	codesign --deep --force --options=runtime --entitlements services/m1-watcher/entitlements.mac.plist --sign $(APPLE_CODESIGN_CODE) --timestamp services/m1-watcher/build/M1-SystemWatcher_artefacts/M1-SystemWatcher
 endif
 
 notarize:
 ifeq ($(detected_OS),Darwin)
 	# m1-player
-	zip -r m1-player/build/M1-Player_artefacts/M1-Player.app.zip m1-player/build/M1-Player_artefacts/M1-Player.app -x "*.DS_Store"
-	./installer/osx/macos_utilities.sh -f M1-Player -e app -p m1-player/build/M1-Player_artefacts -k 'notarize-app' --apple-id $(APPLE_USERNAME) --apple-app-pass $(ALTOOL_APPPASS) -t $(APPLE_TEAM_CODE)
-
+	cd "m1-player/build/M1-Player_artefacts" && zip -qr M1-Player.app.zip M1-Player.app -x "*.DS_Store"
+	./installer/osx/macos_utilities.sh -f M1-Player -e .app -z .zip -p m1-player/build/M1-Player_artefacts -k 'notarize-app' --apple-id $(APPLE_USERNAME) --apple-app-pass $(ALTOOL_APPPASS) -t $(APPLE_TEAM_CODE)
+	# m1-transcoder
+	cd "m1-transcoder/dist/mac-universal" && zip -r M1-Transcoder.app.zip M1-Transcoder.app -x "*.DS_Store"
+	./installer/osx/macos_utilities.sh -f M1-Transcoder -e .app -z .zip -p m1-transcoder/dist/mac-universal -k 'notarize-app' --apple-id $(APPLE_USERNAME) --apple-app-pass $(ALTOOL_APPPASS) -t $(APPLE_TEAM_CODE)
+	# m1-orientationmanager
+	#cd "m1-orientationmanager/build/M1-OrientationManager_artefacts" && zip -qr M1-OrientationManager.zip M1-OrientationManager -x "*.DS_Store"
+	#./installer/osx/macos_utilities.sh -f M1-OrientationManager -z .zip -p m1-orientationmanager/build/M1-OrientationManager_artefacts -k 'notarize-app' --apple-id $(APPLE_USERNAME) --apple-app-pass $(ALTOOL_APPPASS) -t $(APPLE_TEAM_CODE)
+	# m1-watcher
+	#cd "services/m1-watcher/build/M1-SystemWatcher" && zip -qr M1-SystemWatcher.zip M1-SystemWatcher -x "*.DS_Store"
+	#./installer/osx/macos_utilities.sh -f M1-SystemWatcher -z .zip -p services/m1-watcher/build/M1-SystemWatcher_artefacts -k 'notarize-app' --apple-id $(APPLE_USERNAME) --apple-app-pass $(ALTOOL_APPPASS) -t $(APPLE_TEAM_CODE)
 endif
 
 package:
 ifeq ($(detected_OS),Darwin)
 	packagesbuild -v installer/osx/Mach1\ Spatial\ System\ Installer.pkgproj
-	mkdir -p installer/osx/build/signed
-	productsign --sign $(APPLE_CODESIGN_INSTALLER_ID) "installer/osx/build/Mach1 Spatial System Installer.pkg" "installer/osx/build/signed/Mach1 Spatial System Installer.pkg"
-	xcrun notarytool submit --wait --keychain-profile 'notarize-app' --apple-id $(APPLE_USERNAME) --password $(ALTOOL_APPPASS) --team-id $(APPLE_TEAM_CODE) "installer/osx/build/signed/Mach1 Spatial System Installer.pkg";
+	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp "installer/osx/build/Mach1 Spatial System Installer.pkg"
+	xcrun notarytool submit --wait --keychain-profile 'notarize-app' --apple-id $(APPLE_USERNAME) --password $(ALTOOL_APPPASS) --team-id $(APPLE_TEAM_CODE) "installer/osx/build/Mach1 Spatial System Installer.pkg"
 	xcrun stapler staple installer/osx/build/signed/Mach1\ Spatial\ System\ Installer.pkg
 endif

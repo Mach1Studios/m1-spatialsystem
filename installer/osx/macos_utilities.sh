@@ -42,6 +42,11 @@ while [[ $# -gt 0 ]]; do
       shift # past argument
       shift # past value
       ;;
+    -z|--zip)
+      ZIP="$2"
+      shift # past argument
+      shift # past value
+      ;;
     -*|--*)
       echo "Unknown option $1"
       exit 1
@@ -60,9 +65,9 @@ if [[ -n $1 ]]; then
     tail -1 "$1"
 fi
 
-echo "Notarizing: ${PATH}/${NAME}.${EXT}..."
+echo "Notarizing: ${PATH}/${NAME}${EXT}..."
 
-/usr/bin/xcrun notarytool submit --wait --timeout 10m --keychain-profile ${KEYCHAINPROFILE} --apple-id ${APPLE_ID} --password ${APPLE_APP_PASS} --team-id ${APPLE_TEAM} ${PATH}/${NAME}.${EXT}.zip
+/usr/bin/xcrun notarytool submit --wait --timeout 10m --keychain-profile ${KEYCHAINPROFILE} --apple-id ${APPLE_ID} --password ${APPLE_APP_PASS} --team-id ${APPLE_TEAM} ${PATH}/${NAME}${EXT}${ZIP}
 
 # if ! /usr/bin/grep -q '"status":"Accepted"' notarize.json; then
 #     echo "Notarization failed"
@@ -75,4 +80,4 @@ echo "Notarizing: ${PATH}/${NAME}.${EXT}..."
 
 echo "Notarization success, now stapling the installer ..."
 
-/usr/bin/xcrun stapler staple ${PATH}/${NAME}.${EXT}
+/usr/bin/xcrun stapler staple ${PATH}/${NAME}${EXT}
