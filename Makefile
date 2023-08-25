@@ -83,33 +83,16 @@ ifeq ($(detected_OS),Darwin)
 	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-panner/build/M1-Panner_artefacts/VST/M1-Panner.vst
 	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-panner/build/M1-Panner_artefacts/VST3/M1-Panner.vst3
 	codesign --deep --force --options=runtime --entitlements m1-player/Resources/M1-Player-Info.plist --sign $(APPLE_CODESIGN_CODE) --timestamp m1-player/build/M1-Player_artefacts/M1-Player.app
-	codesign --deep --force --options=runtime --entitlements m1-transcoder/entitlements.mac.plist --sign $(APPLE_CODESIGN_CODE) --timestamp m1-transcoder/dist/mac-universal/M1-Transcoder.app
-	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-transcoder/dist/mac-universal/M1-Transcoder.app/Contents/MacOS/M1-Transcoder
-	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-transcoder/dist/mac-universal/M1-Transcoder.app/Contents/Frameworks/M1-Transcoder\ Helper.app
-	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-transcoder/dist/mac-universal/M1-Transcoder.app/Contents/Frameworks/M1-Transcoder\ Helper\ \(GPU\).app
-	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-transcoder/dist/mac-universal/M1-Transcoder.app/Contents/Frameworks/M1-Transcoder\ Helper\ \(Plugin\).app
-	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-transcoder/dist/mac-universal/M1-Transcoder.app/Contents/Frameworks/M1-Transcoder\ Helper\ \(Renderer\).app
-	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-transcoder/dist/mac-universal/M1-Transcoder.app/Contents/Frameworks/Mantle.framework/Versions/Current/Mantle
-	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-transcoder/dist/mac-universal/M1-Transcoder.app/Contents/Frameworks/ReactiveObjC.framework/Versions/Current/ReactiveObjC
-	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-transcoder/dist/mac-universal/M1-Transcoder.app/Contents/Frameworks/Squirrel.framework/Versions/Current/Squirrel
-	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-transcoder/dist/mac-universal/M1-Transcoder.app/Contents/Frameworks/Electron\ Framework.framework/Versions/Current/Helpers/chrome_crashpad_handler
-	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-transcoder/dist/mac-universal/M1-Transcoder.app/Contents/Frameworks/Electron\ Framework.framework/Versions/Current/Electron\ Framework
-	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-transcoder/dist/mac-universal/M1-Transcoder.app/Contents/Frameworks/Electron\ Framework.framework/Versions/Current/Libraries/libEGL.dylib
-	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-transcoder/dist/mac-universal/M1-Transcoder.app/Contents/Frameworks/Electron\ Framework.framework/Versions/Current/Libraries/libffmpeg.dylib
-	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-transcoder/dist/mac-universal/M1-Transcoder.app/Contents/Frameworks/Electron\ Framework.framework/Versions/Current/Libraries/libGLESv2.dylib
-	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-transcoder/dist/mac-universal/M1-Transcoder.app/Contents/Frameworks/Electron\ Framework.framework/Versions/Current/Libraries/libvk_swiftshader.dylib
 	codesign --deep --force --options=runtime --entitlements m1-orientationmanager/Resources/entitlements.mac.plist --sign $(APPLE_CODESIGN_CODE) --timestamp m1-orientationmanager/build/M1-OrientationManager_artefacts/M1-OrientationManager
 	codesign --deep --force --options=runtime --entitlements services/m1-watcher/entitlements.mac.plist --sign $(APPLE_CODESIGN_CODE) --timestamp services/m1-watcher/build/M1-SystemWatcher_artefacts/M1-SystemWatcher
 endif
 
+# codesigning and notarizing m1-transcoder is done via electron-builder
 notarize:
 ifeq ($(detected_OS),Darwin)
 	# m1-player
 	cd "m1-player/build/M1-Player_artefacts" && zip -qr M1-Player.app.zip M1-Player.app -x "*.DS_Store"
 	./installer/osx/macos_utilities.sh -f M1-Player -e .app -z .zip -p m1-player/build/M1-Player_artefacts -k 'notarize-app' --apple-id $(APPLE_USERNAME) --apple-app-pass $(ALTOOL_APPPASS) -t $(APPLE_TEAM_CODE)
-	# m1-transcoder
-	cd "m1-transcoder/dist/mac-universal" && zip -r M1-Transcoder.app.zip M1-Transcoder.app -x "*.DS_Store"
-	./installer/osx/macos_utilities.sh -f M1-Transcoder -e .app -z .zip -p m1-transcoder/dist/mac-universal -k 'notarize-app' --apple-id $(APPLE_USERNAME) --apple-app-pass $(ALTOOL_APPPASS) -t $(APPLE_TEAM_CODE)
 	# m1-orientationmanager
 	#cd "m1-orientationmanager/build/M1-OrientationManager_artefacts" && zip -qr M1-OrientationManager.zip M1-OrientationManager -x "*.DS_Store"
 	#./installer/osx/macos_utilities.sh -f M1-OrientationManager -z .zip -p m1-orientationmanager/build/M1-OrientationManager_artefacts -k 'notarize-app' --apple-id $(APPLE_USERNAME) --apple-app-pass $(ALTOOL_APPPASS) -t $(APPLE_TEAM_CODE)
@@ -122,6 +105,6 @@ package:
 ifeq ($(detected_OS),Darwin)
 	packagesbuild -v installer/osx/Mach1\ Spatial\ System\ Installer.pkgproj
 	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp "installer/osx/build/Mach1 Spatial System Installer.pkg"
-	xcrun notarytool submit --wait --keychain-profile 'notarize-app' --apple-id $(APPLE_USERNAME) --password $(ALTOOL_APPPASS) --team-id $(APPLE_TEAM_CODE) "installer/osx/build/Mach1 Spatial System Installer.pkg"
+	xcrun notarytool submit --wait --keychain-profile 'notarize-app' --apple-id $(APPLE_USERNAME) --password $(ALTOOL_APPPASS) --team-id $(APPLE_TEAM_CODE) "installer/osx/buildx/Mach1 Spatial System Installer.pkg"
 	xcrun stapler staple installer/osx/build/signed/Mach1\ Spatial\ System\ Installer.pkg
 endif
