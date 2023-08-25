@@ -105,6 +105,6 @@ package:
 ifeq ($(detected_OS),Darwin)
 	packagesbuild -v installer/osx/Mach1\ Spatial\ System\ Installer.pkgproj
 	codesign --deep --force --sign $(APPLE_CODESIGN_CODE) --timestamp "installer/osx/build/Mach1 Spatial System Installer.pkg"
-	xcrun notarytool submit --wait --keychain-profile 'notarize-app' --apple-id $(APPLE_USERNAME) --password $(ALTOOL_APPPASS) --team-id $(APPLE_TEAM_CODE) "installer/osx/buildx/Mach1 Spatial System Installer.pkg"
+	xcrun notarytool submit --wait --keychain-profile 'notarize-app' --apple-id $(APPLE_USERNAME) --password $(ALTOOL_APPPASS) --team-id $(APPLE_TEAM_CODE) "installer/osx/build/Mach1 Spatial System Installer.pkg"
 	xcrun stapler staple installer/osx/build/signed/Mach1\ Spatial\ System\ Installer.pkg
 endif
