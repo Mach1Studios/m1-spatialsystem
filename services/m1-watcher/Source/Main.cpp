@@ -42,7 +42,7 @@ void killProcessByName(const char *name)
     std::string service_name;
     if (std::string(name) == "M1-OrientationManager") {
         // for launchctl we need to use the service name instead of the executable name
-        service_name = "mach1.spatial.orientationmanager";
+        service_name = "com.mach1.spatial.orientationmanager";
     }
     
     DBG("Killing "+std::string(name)+"...");
@@ -52,10 +52,10 @@ void killProcessByName(const char *name)
         (juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_8) ||
         (juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_9)) {
         // MacOS 10.7-10.9, launchd v1.0
-        command =  "launchctl unload -w /Library/LaunchAgents/com."+service_name+".plist";
+        command =  "launchctl unload -w /Library/LaunchAgents/"+service_name+".plist";
     } else if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::MacOSX) != 0) {
         // All newer MacOS, launchd v2.0
-        command = "launchctl kill 9 gui/$UID/com."+service_name;
+        command = "launchctl kill 9 gui/$UID/"+service_name;
     } else if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::Windows) != 0) {
         command = "taskkill /IM "+std::string(name)+" /F";
     } else {

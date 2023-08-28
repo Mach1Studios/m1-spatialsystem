@@ -24,11 +24,41 @@ clear:
 	rm -rf m1-orientationmanager/build
 	rm -rf services/m1-watcher/build
 
+clear-installs:
+ifeq ($(detected_OS),Darwin)
+	sudo rm -rf "/Applications/Mach1 Spatial System/M1-Transcoder.app"
+	sudo rm -rf "/Applications/Mach1 Spatial System/M1-VideoPlayer.app"
+	sudo rm -rf "/Applications/Mach1/M1-Transcoder.app"
+	sudo rm -rf "/Applications/Mach1/M1-Player.app"
+	sudo rm -rf "/Library/LaunchAgents/com.mach1.spatial.*.plist"
+	sudo rm -rf "/Library/Application Support/Mach1/*"
+	# removing global
+	sudo rm -rf "/Library/Application Support/Avid/Audio/Plug-Ins/M1-Monitor.aaxplugin"
+	sudo rm -rf "/Library/Application Support/Avid/Audio/Plug-Ins/M1-Panner.aaxplugin"
+	sudo rm -rf "/Library/Audio/Plug-Ins/VST/M1-Monitor.vst"
+	sudo rm -rf "/Library/Audio/Plug-Ins/VST/M1-Panner.vst"
+	sudo rm -rf "/Library/Audio/Plug-Ins/VST3/M1-Monitor.vst3"
+	sudo rm -rf "/Library/Audio/Plug-Ins/VST3/M1-Panner.vst3"
+	sudo rm -rf "/Library/Audio/Plug-Ins/Components/M1-Monitor.component"
+	sudo rm -rf "/Library/Audio/Plug-Ins/Components/M1-Panner.component"
+	# removing local user
+	sudo rm -rf "~/Library/Application Support/Avid/Audio/Plug-Ins/M1-Monitor.aaxplugin"
+	sudo rm -rf "~/Library/Application Support/Avid/Audio/Plug-Ins/M1-Panner.aaxplugin"
+	sudo rm -rf "~/Library/Audio/Plug-Ins/VST/M1-Monitor.vst"
+	sudo rm -rf "~/Library/Audio/Plug-Ins/VST/M1-Panner.vst"
+	sudo rm -rf "~/Library/Audio/Plug-Ins/VST3/M1-Monitor.vst3"
+	sudo rm -rf "~/Library/Audio/Plug-Ins/VST3/M1-Panner.vst3"
+	sudo rm -rf "~/Library/Audio/Plug-Ins/Components/M1-Monitor.component"
+	sudo rm -rf "~/Library/Audio/Plug-Ins/Components/M1-Panner.component"
+endif
+
 setup-codeisgning:
 ifeq ($(detected_OS),Darwin)
 	security find-identity -p basic -v
 	xcrun notarytool store-credentials 'notarize-app' --apple-id $(APPLE_ID) --team-id $(APPLE_TEAM_CODE)
 endif 
+
+build-all: clear configure build codesign notarize package
 
 # configure 
 configure:
@@ -40,12 +70,16 @@ configure:
 	cd m1-transcoder && npm install
 
 build: 
-	cmake --build m1-monitor/build
-	cmake --build m1-panner/build
-	cmake --build m1-player/build
-	cmake --build m1-orientationmanager/build
-	cmake --build services/m1-watcher/build
+	cmake --build m1-monitor/build --config "Release"
+	cmake --build m1-panner/build --config "Release"
+	cmake --build m1-player/build --config "Release"
+	cmake --build m1-orientationmanager/build --config "Release"
+	cmake --build services/m1-watcher/build --config "Release"
+ifeq ($(detected_OS),Darwin)
 	cd m1-transcoder && npm run package-mac
+else ifeq ($(detected_OS),Windows)
+	cd m1-transcoder && npm run package-win
+endif
 
 # setup dev envs with common IDEs
 dev: clear
@@ -75,10 +109,12 @@ endif
 codesign:
 ifeq ($(detected_OS),Darwin)
 	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-monitor/build/M1-Monitor_artefacts/AAX/M1-Monitor.aaxplugin
+	$(WRAPTOOL) sign --verbose --account $(PACE_ID) --wcguid "$(M1_GLOBAL_GUID)" --signid $(APPLE_CODESIGN_ID) --in m1-monitor/build/M1-Monitor_artefacts/AAX/M1-Monitor.aaxplugin --out m1-monitor/build/M1-Monitor_artefacts/AAX/M1-Monitor.aaxplugin
 	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-monitor/build/M1-Monitor_artefacts/AU/M1-Monitor.component
 	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-monitor/build/M1-Monitor_artefacts/VST/M1-Monitor.vst
 	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-monitor/build/M1-Monitor_artefacts/VST3/M1-Monitor.vst3
 	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-panner/build/M1-Panner_artefacts/AAX/M1-Panner.aaxplugin
+	$(WRAPTOOL) sign --verbose --account $(PACE_ID) --wcguid "$(M1_GLOBAL_GUID)" --signid $(APPLE_CODESIGN_ID) --in m1-panner/build/M1-Panner_artefacts/AAX/M1-Panner.aaxplugin --out m1-panner/build/M1-Panner_artefacts/AAX/M1-Panner.aaxplugin
 	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-panner/build/M1-Panner_artefacts/AU/M1-Panner.component
 	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-panner/build/M1-Panner_artefacts/VST/M1-Panner.vst
 	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-panner/build/M1-Panner_artefacts/VST3/M1-Panner.vst3
