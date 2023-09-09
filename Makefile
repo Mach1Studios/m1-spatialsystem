@@ -64,7 +64,11 @@ build-all: clear configure build codesign notarize package
 configure:
 	cmake m1-monitor -Bm1-monitor/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DAAX_PATH=$(AAX_PATH) -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF
 	cmake m1-panner -Bm1-panner/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DAAX_PATH=$(AAX_PATH) -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF
+ifeq ($(detected_OS),Darwin)
+	cmake m1-player -Bm1-player/build -G "Xcode"
+else
 	cmake m1-player -Bm1-player/build
+endif
 	cmake m1-orientationmanager -Bm1-orientationmanager/build
 	cmake services/m1-watcher -Bservices/m1-watcher/build
 	cd m1-transcoder && npm install
@@ -118,7 +122,7 @@ ifeq ($(detected_OS),Darwin)
 	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-panner/build/M1-Panner_artefacts/AU/M1-Panner.component
 	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-panner/build/M1-Panner_artefacts/VST/M1-Panner.vst
 	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-panner/build/M1-Panner_artefacts/VST3/M1-Panner.vst3
-	codesign --force --options=runtime --entitlements m1-player/Resources/M1-Player-Info.plist --sign $(APPLE_CODESIGN_CODE) --timestamp m1-player/build/M1-Player_artefacts/M1-Player.app
+	codesign --force --options=runtime --entitlements m1-player/Resources/M1-Player-Info.plist --sign $(APPLE_CODESIGN_CODE) --timestamp m1-player/build/M1-Player_artefacts/Release/M1-Player.app
 	codesign --force --options=runtime --entitlements m1-orientationmanager/Resources/entitlements.mac.plist --sign $(APPLE_CODESIGN_CODE) --timestamp m1-orientationmanager/build/M1-OrientationManager_artefacts/M1-OrientationManager
 	codesign --force --options=runtime --entitlements services/m1-watcher/entitlements.mac.plist --sign $(APPLE_CODESIGN_CODE) --timestamp services/m1-watcher/build/M1-SystemWatcher_artefacts/M1-SystemWatcher
 endif
@@ -127,12 +131,15 @@ endif
 notarize:
 ifeq ($(detected_OS),Darwin)
 	# m1-player
-	cd "m1-player/build/M1-Player_artefacts" && zip -qr M1-Player.app.zip M1-Player.app -x "*.DS_Store"
-	./installer/osx/macos_utilities.sh -f M1-Player -e .app -z .zip -p m1-player/build/M1-Player_artefacts -k 'notarize-app' --apple-id $(APPLE_USERNAME) --apple-app-pass $(ALTOOL_APPPASS) -t $(APPLE_TEAM_CODE)
+	ditto -c -k --keepParent "$(PWD)/m1-player/build/M1-Player_artefacts/Release/M1-Player.app" "$(PWD)/m1-player/build/M1-Player_artefacts/Release/M1-Player.app.zip"
+	#cd "m1-player/build/M1-Player_artefacts" && zip -qr M1-Player.app.zip M1-Player.app -x "*.DS_Store"
+	./installer/osx/macos_utilities.sh -f M1-Player -e .app -z .zip -p m1-player/build/M1-Player_artefacts/Release -k 'notarize-app' --apple-id $(APPLE_USERNAME) --apple-app-pass $(ALTOOL_APPPASS) -t $(APPLE_TEAM_CODE)
 	# m1-orientationmanager
+	#ditto -c -k --keepParent "$(PWD)/m1-orientationmanager/build/M1-OrientationManager_artefacts/M1-OrientationManager" "$(PWD)/m1-orientationmanager/build/M1-OrientationManager_artefacts/M1-OrientationManager.zip"
 	#cd "m1-orientationmanager/build/M1-OrientationManager_artefacts" && zip -qr M1-OrientationManager.zip M1-OrientationManager -x "*.DS_Store"
 	#./installer/osx/macos_utilities.sh -f M1-OrientationManager -z .zip -p m1-orientationmanager/build/M1-OrientationManager_artefacts -k 'notarize-app' --apple-id $(APPLE_USERNAME) --apple-app-pass $(ALTOOL_APPPASS) -t $(APPLE_TEAM_CODE)
 	# m1-watcher
+	#ditto -c -k --keepParent "$(PWD)/services/m1-watcher/build/M1-SystemWatcher_artefacts/M1-SystemWatcher" "$(PWD)/services/m1-watcher/build/M1-SystemWatcher_artefacts/M1-SystemWatcher.zip"
 	#cd "services/m1-watcher/build/M1-SystemWatcher" && zip -qr M1-SystemWatcher.zip M1-SystemWatcher -x "*.DS_Store"
 	#./installer/osx/macos_utilities.sh -f M1-SystemWatcher -z .zip -p services/m1-watcher/build/M1-SystemWatcher_artefacts -k 'notarize-app' --apple-id $(APPLE_USERNAME) --apple-app-pass $(ALTOOL_APPPASS) -t $(APPLE_TEAM_CODE)
 endif
