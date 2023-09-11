@@ -6,7 +6,7 @@
 # delete the old app folder
 if [ -d "/Applications/Mach1 Spatial System" ]
 then 
-	rm -rf "/Applications/Mach1 Spatial System"
+	sudo rm -rf "/Applications/Mach1 Spatial System"
 fi
 
 # delete the old local app data folder
