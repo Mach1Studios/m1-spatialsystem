@@ -3,17 +3,14 @@
 # MACH1 SPATIAL SYSTEM
 # Previous version cleanup
 
-M1SpatialSystemApplicationDir=/Applications/Mach1\ Spatial\ System
-M1LocalDataDir=\~/Application\ Support/Mach1\ Spatial\ System
-
 # delete the old app folder
-if [ -d "$M1SpatialSystemApplicationDir" ]
+if [ -d "/Applications/Mach1 Spatial System" ]
 then 
-	sudo rm -Rf $M1SpatialSystemApplicationDir
+	rm -rf "/Applications/Mach1 Spatial System"
 fi
 
 # delete the old local app data folder
-# if [ -d "$M1LocalDataDir" ]
+# if [ -d "~/Application Support/Mach1 Spatial System" ]
 # then 
-# 	sudo rm -Rf $M1LocalDataDir
+# 	rm -rf "~/Application Support/Mach1 Spatial System"
 # fi

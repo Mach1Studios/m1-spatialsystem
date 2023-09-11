@@ -3,12 +3,9 @@
 # MACH1 SPATIAL SYSTEM
 # Previous videoplayer cleanup
 
-M1SpatialSystemApplicationDir=/Applications/Mach1\ Spatial\ System
-M1LegacyVideoPlayer=$M1SpatialSystemApplicationDir/M1-VideoPlayer.app
-
 # move the old videoplayer
-if [ -d "$M1LegacyVideoPlayer" ]
+if [ -d "/Applications/Mach1 Spatial System" ]
 then
-	mkdir -p /Applications/Mach1/legacy
-	sudo mv $M1LegacyVideoPlayer /Applications/Mach1/legacy/M1-VideoPlayer.app
+	mkdir -p "/Applications/Mach1/legacy"
+	mv "/Applications/Mach1 Spatial System/M1-VideoPlayer.app" "/Applications/Mach1/legacy/M1-VideoPlayer.app"
 fi
