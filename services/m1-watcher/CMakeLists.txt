@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 file(STRINGS VERSION CURRENT_VERSION)
-project(M1-SystemWatcher VERSION ${CURRENT_VERSION})
+project(m1-systemwatcher VERSION ${CURRENT_VERSION})
 
 # Avoid warning about DOWNLOAD_EXTRACT_TIMESTAMP in CMake 3.24:
 if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.24.0")
@@ -19,7 +19,8 @@ set(CMAKE_XCODE_GENERATE_SCHEME OFF)
 # Enable to build universal binaries on macOS, increasing build time
 # This only affects local builds, GitHub actions always builds Universals
 set(CMAKE_OSX_ARCHITECTURES arm64 x86_64)
-set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13" CACHE STRING "Support macOS down to High Sierra")
+set(CMAKE_OSX_DEPLOYMENT_TARGET "10.14" CACHE STRING "Minimum macOS suppored" FORCE)
+set(CMAKE_XCODE_ATTRIBUTE_MACOSX_DEPLOYMENT_TARGET[arch=arm64] "11.0" CACHE STRING "arm 64 minimum deployment target" FORCE)
 # IDEs:  Enable grouping of source files into folders in IDEs.
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 # IDEs:  Create a folder in the IDE with the JUCE Module code.
@@ -41,6 +42,8 @@ juce_add_console_app(${CMAKE_PROJECT_NAME}
                 COMPANY_NAME "Mach1"
                 COMPANY_WEBSITE "https://mach1.tech"
                 COMPANY_EMAIL "whatsup@mach1.tech"
+                ICON_BIG "${CMAKE_CURRENT_SOURCE_DIR}/../../installer/resources/icon.png"
+                ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/../../installer/resources/icon.png"
                 PLUGIN_MANUFACTURER_CODE "Mac1"
                 PLUGIN_CODE ${CUSTOM_APP_CODE}
                 BUNDLE_ID ${CUSTOM_BUNDLE_ID}
@@ -81,6 +84,19 @@ target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE
         juce::juce_gui_basics
         juce::juce_osc
         )
+
+### setup info.plist and entitlements for macos
+if(APPLE)
+    set_target_properties("${CMAKE_PROJECT_NAME}" PROPERTIES
+        MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info.plist"
+        MACOSX_BUNDLE_BUNDLE_NAME ${CMAKE_PROJECT_NAME}
+        MACOSX_FRAMEWORK_IDENTIFIER ${CUSTOM_BUNDLE_ID}
+        XCODE_ATTRIBUTE_ENABLE_HARDENED_RUNTIME YES
+        XCODE_ATTRIBUTE_CODE_SIGN_ENTITLEMENTS "${CMAKE_CURRENT_SOURCE_DIR}/entitlements.mac.plist"
+        XCODE_ATTRIBUTE_INFOPLIST_KEY_LSApplicationCategoryType "public.app-category.utilities"
+    )
+    target_link_options(${CMAKE_PROJECT_NAME} PRIVATE LINKER:-sectcreate,__TEXT,__info_plist,${CMAKE_CURRENT_SOURCE_DIR}/Info.plist)
+endif()
 
 ### IDE Generator post-config ###
 # IDEs:  Move the "shared code" source group (main target) out of the "Targets" folder

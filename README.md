@@ -11,7 +11,7 @@ DAW focused plugins and apps relating to mixing Mach1 Spatial multichannel mixes
 
 
 ## Known Issues
-- [MacOS] M1-OrientationManager and external BLE device handling issues in macOS versions 12.0, 12.1 and 12.2
+- [MacOS] m1-orientationmanager and external BLE device handling issues in macOS versions 12.0, 12.1 and 12.2
 
 ## TODO
 - Add "Sync Panner instances to Monitor" button this updates all panners to monitor's current outputMode

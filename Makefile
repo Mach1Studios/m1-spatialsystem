@@ -30,10 +30,10 @@ ifeq ($(detected_OS),Darwin)
 	sudo rm -rf "/Applications/Mach1 Spatial System/M1-VideoPlayer.app"
 	sudo rm -rf "/Applications/Mach1/M1-Transcoder.app"
 	sudo rm -rf "/Applications/Mach1/M1-Player.app"
-	sudo rm -rf "/Library/LaunchAgents/com.mach1.spatial.orientationmanager.plist"
-	sudo rm -rf "/Library/LaunchAgents/com.mach1.spatial.watcher.plist"
-	sudo rm -rf "/Library/Application Support/Mach1/M1-OrientationManager"
-	sudo rm -rf "/Library/Application Support/Mach1/M1-SystemWatcher"
+	sudo rm -rf "/Library/LaunchDaemons/com.mach1.spatial.orientationmanager.plist"
+	sudo rm -rf "/Library/LaunchDaemons/com.mach1.spatial.watcher.plist"
+	sudo rm -rf "/Library/Application Support/Mach1/m1-orientationmanager"
+	sudo rm -rf "/Library/Application Support/Mach1/m1-systemwatcher"
 	# removing global
 	sudo rm -rf "/Library/Application Support/Avid/Audio/Plug-Ins/M1-Monitor.aaxplugin"
 	sudo rm -rf "/Library/Application Support/Avid/Audio/Plug-Ins/M1-Panner.aaxplugin"
@@ -125,8 +125,8 @@ ifeq ($(detected_OS),Darwin)
 	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-panner/build/M1-Panner_artefacts/VST/M1-Panner.vst
 	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-panner/build/M1-Panner_artefacts/VST3/M1-Panner.vst3
 	codesign -v --force -o runtime --entitlements m1-player/Resources/M1-Player.entitlements --sign $(APPLE_CODESIGN_CODE) --timestamp m1-player/build/M1-Player_artefacts/Release/M1-Player.app
-	codesign -v --force -o runtime --entitlements m1-orientationmanager/Resources/entitlements.mac.plist --sign $(APPLE_CODESIGN_CODE) --timestamp m1-orientationmanager/build/M1-OrientationManager_artefacts/M1-OrientationManager
-	codesign -v --force -o runtime --entitlements services/m1-watcher/entitlements.mac.plist --sign $(APPLE_CODESIGN_CODE) --timestamp services/m1-watcher/build/M1-SystemWatcher_artefacts/M1-SystemWatcher
+	codesign -v --force -o runtime --entitlements m1-orientationmanager/Resources/entitlements.mac.plist --sign $(APPLE_CODESIGN_CODE) --timestamp m1-orientationmanager/build/m1-orientationmanager_artefacts/m1-orientationmanager
+	codesign -v --force -o runtime --entitlements services/m1-watcher/entitlements.mac.plist --sign $(APPLE_CODESIGN_CODE) --timestamp services/m1-watcher/build/m1-systemwatcher_artefacts/m1-systemwatcher
 endif
 
 # codesigning and notarizing m1-transcoder is done via electron-builder
@@ -137,13 +137,13 @@ ifeq ($(detected_OS),Darwin)
 	#cd "m1-player/build/M1-Player_artefacts" && zip -qr M1-Player.app.zip M1-Player.app -x "*.DS_Store"
 	./installer/osx/macos_utilities.sh -f M1-Player -e .app -z .zip -p m1-player/build/M1-Player_artefacts/Release -k 'notarize-app' --apple-id $(APPLE_USERNAME) --apple-app-pass $(ALTOOL_APPPASS) -t $(APPLE_TEAM_CODE)
 	# m1-orientationmanager
-	#ditto -c -k --keepParent "$(PWD)/m1-orientationmanager/build/M1-OrientationManager_artefacts/M1-OrientationManager" "$(PWD)/m1-orientationmanager/build/M1-OrientationManager_artefacts/M1-OrientationManager.zip"
-	#cd "m1-orientationmanager/build/M1-OrientationManager_artefacts" && zip -qr M1-OrientationManager.zip M1-OrientationManager -x "*.DS_Store"
-	#./installer/osx/macos_utilities.sh -f M1-OrientationManager -z .zip -p m1-orientationmanager/build/M1-OrientationManager_artefacts -k 'notarize-app' --apple-id $(APPLE_USERNAME) --apple-app-pass $(ALTOOL_APPPASS) -t $(APPLE_TEAM_CODE)
+	#ditto -c -k --keepParent "$(PWD)/m1-orientationmanager/build/m1-orientationmanager_artefacts/m1-orientationmanager" "$(PWD)/m1-orientationmanager/build/m1-orientationmanager_artefacts/m1-orientationmanager.zip"
+	#cd "m1-orientationmanager/build/m1-orientationmanager_artefacts" && zip -qr m1-orientationmanager.zip m1-orientationmanager -x "*.DS_Store"
+	#./installer/osx/macos_utilities.sh -f m1-orientationmanager -z .zip -p m1-orientationmanager/build/m1-orientationmanager_artefacts -k 'notarize-app' --apple-id $(APPLE_USERNAME) --apple-app-pass $(ALTOOL_APPPASS) -t $(APPLE_TEAM_CODE)
 	# m1-watcher
-	#ditto -c -k --keepParent "$(PWD)/services/m1-watcher/build/M1-SystemWatcher_artefacts/M1-SystemWatcher" "$(PWD)/services/m1-watcher/build/M1-SystemWatcher_artefacts/M1-SystemWatcher.zip"
-	#cd "services/m1-watcher/build/M1-SystemWatcher" && zip -qr M1-SystemWatcher.zip M1-SystemWatcher -x "*.DS_Store"
-	#./installer/osx/macos_utilities.sh -f M1-SystemWatcher -z .zip -p services/m1-watcher/build/M1-SystemWatcher_artefacts -k 'notarize-app' --apple-id $(APPLE_USERNAME) --apple-app-pass $(ALTOOL_APPPASS) -t $(APPLE_TEAM_CODE)
+	#ditto -c -k --keepParent "$(PWD)/services/m1-watcher/build/m1-systemwatcher_artefacts/m1-systemwatcher" "$(PWD)/services/m1-watcher/build/m1-systemwatcher_artefacts/m1-systemwatcher.zip"
+	#cd "services/m1-watcher/build/m1-systemwatcher" && zip -qr m1-systemwatcher.zip m1-systemwatcher -x "*.DS_Store"
+	#./installer/osx/macos_utilities.sh -f m1-systemwatcher -z .zip -p services/m1-watcher/build/m1-systemwatcher_artefacts -k 'notarize-app' --apple-id $(APPLE_USERNAME) --apple-app-pass $(ALTOOL_APPPASS) -t $(APPLE_TEAM_CODE)
 endif
 
 package:
