@@ -67,25 +67,6 @@ void killProcessByName(const char *name)
 
 void startOrientationManager()
 {
-    // We will assume the folders are properly created during the installation step
-    juce::File settingsFile;
-    // Using common support files installation location
-    juce::File m1SupportDirectory = juce::File::getSpecialLocation(juce::File::commonApplicationDataDirectory);
-
-    if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::MacOSX) != 0) {
-        // test for any mac OS
-        settingsFile = m1SupportDirectory.getChildFile("Application Support").getChildFile("Mach1");
-    } else if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::Windows) != 0) {
-        // test for any windows OS
-        settingsFile = m1SupportDirectory.getChildFile("Mach1");
-    } else {
-        settingsFile = m1SupportDirectory.getChildFile("Mach1");
-    }
-    settingsFile = settingsFile.getChildFile("settings.json");
-    DBG("Opening settings file: " + settingsFile.getFullPathName().quoted());
-    
-    initFromSettings(settingsFile.getFullPathName().toStdString());
-    
     // Create a DatagramSocket to check the availability of port serverPort
     juce::DatagramSocket socket(false);
     socket.setEnablePortReuse(false);
@@ -174,23 +155,47 @@ public:
 
     void oscMessageReceived(const juce::OSCMessage& message) override
     {
+        // restart the ping timer because we received a ping
+        pingTime = juce::Time::currentTimeMillis();
+        
         if (message.getAddressPattern() == "/Mach1/ActiveClients") {
             if (message.size() > 0) {
-                // restart the shutdown timer becaue discovery of new client
-                shutdownCounterTime = juce::Time::currentTimeMillis();
                 activeClients = message[0].getInt32();
                 DBG("Received message from " + message.getAddressPattern().toString() + ", with " + std::to_string(message[0].getInt32()) + " active clients");
+                
+                if (activeClients > 0) {
+                    // restart the shutdown timer because clients
+                    shutdownCounterTime = juce::Time::currentTimeMillis();
+                }
             } else {
                 DBG("Received message from " + message.getAddressPattern().toString() + ", with 0 active clients");
             }
         } else {
             DBG("WARNING: Missing number of active clients in ping!");
         }
-        pingTime = juce::Time::currentTimeMillis();
     }
 
     void initialise(const juce::String&) override
     {
+        // We will assume the folders are properly created during the installation step
+        juce::File settingsFile;
+        // Using common support files installation location
+        juce::File m1SupportDirectory = juce::File::getSpecialLocation(juce::File::commonApplicationDataDirectory);
+
+        if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::MacOSX) != 0) {
+            // test for any mac OS
+            settingsFile = m1SupportDirectory.getChildFile("Application Support").getChildFile("Mach1");
+        } else if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::Windows) != 0) {
+            // test for any windows OS
+            settingsFile = m1SupportDirectory.getChildFile("Mach1");
+        } else {
+            settingsFile = m1SupportDirectory.getChildFile("Mach1");
+        }
+        settingsFile = settingsFile.getChildFile("settings.json");
+        DBG("Opening settings file: " + settingsFile.getFullPathName().quoted());
+        
+        initFromSettings(settingsFile.getFullPathName().toStdString());
+        
         juce::DatagramSocket socket(false); 
         socket.setEnablePortReuse(false);
         if (!socket.bindToPort(watcherPort)) {
@@ -255,15 +260,17 @@ public:
     
     void timerCallback(int timerID) override
     {
+
+        juce::int64 currentTime = juce::Time::currentTimeMillis();
+
         // TIMER 0 = m1-orientationmanager ping timer
         // this is used to blindly check if the m1-orientationmanager has crashed and attempt to relaunch it
         
         if (timerID == 0) {
             // pings and keeps m1-orientationmanager alive
-            juce::int64 currentTime = juce::Time::currentTimeMillis();
             DBG("TIMER[0]: " + std::to_string(currentTime - pingTime));
             if (currentTime > pingTime && currentTime - pingTime > 1000) {
-                pingTime = juce::Time::currentTimeMillis() + 10000; // wait 10 seconds
+                pingTime = juce::Time::currentTimeMillis() + 15000; // push time check for 10 seconds to wait for service restart
 
                 killProcessByName("m1-orientationmanager");
                 startOrientationManager();
@@ -275,7 +282,6 @@ public:
         // services including this one
 
         if (timerID == 1) {
-            juce::int64 currentTime = juce::Time::currentTimeMillis();
             DBG("TIMER[1]: " + std::to_string(currentTime - shutdownCounterTime));
             if (currentTime > shutdownCounterTime && currentTime - shutdownCounterTime > 60000) {
                 killProcessByName("m1-orientationmanager");
