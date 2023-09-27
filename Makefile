@@ -24,6 +24,15 @@ clear:
 	rm -rf m1-orientationmanager/build
 	rm -rf services/m1-watcher/build
 
+clear-dev:
+	rm -rf installer/osx/build
+	rm -rf m1-monitor/build-dev
+	rm -rf m1-panner/build-dev
+	rm -rf m1-player/build-dev
+	rm -rf m1-transcoder/dist
+	rm -rf m1-orientationmanager/build-dev
+	rm -rf services/m1-watcher/build-dev
+
 clear-installs:
 ifeq ($(detected_OS),Darwin)
 	sudo rm -rf "/Applications/Mach1 Spatial System/M1-Transcoder.app"
@@ -60,7 +69,7 @@ ifeq ($(detected_OS),Darwin)
 	xcrun notarytool store-credentials 'notarize-app' --apple-id $(APPLE_ID) --team-id $(APPLE_TEAM_CODE)
 endif 
 
-build-all: clear configure build codesign notarize package
+build-all: configure build codesign notarize package
 
 # configure 
 configure:
@@ -88,27 +97,27 @@ else ifeq ($(detected_OS),Windows)
 endif
 
 # setup dev envs with common IDEs
-dev: clear
+dev:
 ifeq ($(detected_OS),Darwin)
-	cmake m1-monitor -Bm1-monitor/build -G "Xcode" -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_AAX=ON -DAAX_PATH=$(AAX_PATH) -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DBUILD_STANDALONE=ON
-	cmake m1-panner -Bm1-panner/build -G "Xcode" -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_AAX=ON -DAAX_PATH=$(AAX_PATH) -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DBUILD_STANDALONE=ON
-	cmake m1-player -Bm1-player/build -G "Xcode"
-	cmake m1-orientationmanager -Bm1-orientationmanager/build -G "Xcode" -DCMAKE_INSTALL_PREFIX="/Library/Application Support/Mach1"
-	cmake services/m1-watcher -Bservices/m1-watcher/build -G "Xcode" -DCMAKE_INSTALL_PREFIX="/Library/Application Support/Mach1"
+	cmake m1-monitor -Bm1-monitor/build-dev -G "Xcode" -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_AAX=ON -DAAX_PATH=$(AAX_PATH) -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DBUILD_STANDALONE=ON
+	cmake m1-panner -Bm1-panner/build-dev -G "Xcode" -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_AAX=ON -DAAX_PATH=$(AAX_PATH) -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DBUILD_STANDALONE=ON
+	cmake m1-player -Bm1-player/build-dev -G "Xcode"
+	cmake m1-orientationmanager -Bm1-orientationmanager/build-dev -G "Xcode" -DCMAKE_INSTALL_PREFIX="/Library/Application Support/Mach1"
+	cmake services/m1-watcher -Bservices/m1-watcher/build-dev -G "Xcode" -DCMAKE_INSTALL_PREFIX="/Library/Application Support/Mach1"
 	cd m1-transcoder && npm install
 else ifeq ($(detected_OS),Windows)
-	cmake m1-monitor -Bm1-monitor/build -G "Visual Studio 16 2019" -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF -DBUILD_VST3=ON -DBUILD_STANDALONE=ON
-	cmake m1-panner -Bm1-panner/build -G "Visual Studio 16 2019" -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF -DBUILD_VST3=ON -DBUILD_STANDALONE=ON
-	cmake m1-player -Bm1-player/build -G "Visual Studio 16 2019"
-	cmake m1-orientationmanager -Bm1-orientationmanager/build -G "Visual Studio 16 2019" -DCMAKE_INSTALL_PREFIX="\Documents and Settings\All Users\Application Data\Mach1"
-	cmake services/m1-watcher -Bservices/m1-watcher/build -G "Visual Studio 16 2019" -DCMAKE_INSTALL_PREFIX="\Documents and Settings\All Users\Application Data\Mach1"
+	cmake m1-monitor -Bm1-monitor/build-dev -G "Visual Studio 16 2019" -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF -DBUILD_VST3=ON -DBUILD_STANDALONE=ON
+	cmake m1-panner -Bm1-panner/build-dev -G "Visual Studio 16 2019" -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF -DBUILD_VST3=ON -DBUILD_STANDALONE=ON
+	cmake m1-player -Bm1-player/build-dev -G "Visual Studio 16 2019"
+	cmake m1-orientationmanager -Bm1-orientationmanager/build-dev -G "Visual Studio 16 2019" -DCMAKE_INSTALL_PREFIX="\Documents and Settings\All Users\Application Data\Mach1"
+	cmake services/m1-watcher -Bservices/m1-watcher/build-dev -G "Visual Studio 16 2019" -DCMAKE_INSTALL_PREFIX="\Documents and Settings\All Users\Application Data\Mach1"
 	cd m1-transcoder && npm install
 else
-	cmake m1-monitor -Bm1-monitor/build -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_STANDALONE=ON
-	cmake m1-panner -Bm1-panner/build -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_STANDALONE=ON
-	cmake m1-player -Bm1-player/build
-	cmake m1-orientationmanager -Bm1-orientationmanager/build -DCMAKE_INSTALL_PREFIX="/opt/Mach1"
-	cmake services/m1-watcher -Bservices/m1-watcher/build -DCMAKE_INSTALL_PREFIX="/opt/Mach1"
+	cmake m1-monitor -Bm1-monitor/build-dev -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_STANDALONE=ON
+	cmake m1-panner -Bm1-panner/build-dev -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_STANDALONE=ON
+	cmake m1-player -Bm1-player/build-dev
+	cmake m1-orientationmanager -Bm1-orientationmanager/build-dev -DCMAKE_INSTALL_PREFIX="/opt/Mach1"
+	cmake services/m1-watcher -Bservices/m1-watcher/build-dev -DCMAKE_INSTALL_PREFIX="/opt/Mach1"
 	cd m1-transcoder && npm install
 endif
 
