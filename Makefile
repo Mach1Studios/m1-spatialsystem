@@ -69,10 +69,11 @@ ifeq ($(detected_OS),Darwin)
 	xcrun notarytool store-credentials 'notarize-app' --apple-id $(APPLE_ID) --team-id $(APPLE_TEAM_CODE)
 endif 
 
-build-all: configure build codesign notarize package
+# run configure first
+build-all: build codesign notarize package
 
-# configure 
-configure:
+# clear and configure 
+configure: clear
 	cmake m1-monitor -Bm1-monitor/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DAAX_PATH=$(AAX_PATH) -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF
 	cmake m1-panner -Bm1-panner/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DAAX_PATH=$(AAX_PATH) -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF
 ifeq ($(detected_OS),Darwin)
