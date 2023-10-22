@@ -115,10 +115,8 @@ void startOrientationManager()
                 DBG("Failed to start the m1-orientationmanager");
                 exit(1);
             }
-        } else if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::Linux)) {
-            // TODO: factor out linux using systemd service
-
         } else {
+            // TODO: factor out linux using systemd service
             orientationManagerExe = m1SupportDirectory.getChildFile("Mach1").getChildFile("m1-orientationmanager");
             juce::StringArray arguments;
             arguments.add(orientationManagerExe.getFullPathName().quoted());
