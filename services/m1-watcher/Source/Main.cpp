@@ -9,7 +9,7 @@
 #include <string>
 
 #ifdef JUCE_WINDOWS
-#include <winsvc.h>
+
 #else
 #include <signal.h>
 #include <sys/types.h>
@@ -45,24 +45,54 @@ void killProcessByName(const char *name)
         service_name = "com.mach1.spatial.orientationmanager";
     }
     
-    DBG("Killing "+std::string(name)+"...");
-    
-    std::string command;
-    if ((juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_7) ||
-        (juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_8) ||
-        (juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_9)) {
-        // MacOS 10.7-10.9, launchd v1.0
-        command =  "launchctl stop /Library/LaunchDaemons/"+service_name+".plist";
-    } else if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::MacOSX) != 0) {
-        // All newer MacOS, launchd v2.0
-        command = "launchctl kill 9 gui/$UID/"+service_name;
-    } else if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::Windows) != 0) {
-        command = "taskkill /IM "+std::string(name)+" /F";
-    } else {
-        command = "pkill "+std::string(name);
-    }
-    DBG("Executing: " + command);
-    system(command.c_str());
+	if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::MacOSX) != 0) {
+		DBG("Killing " + std::string(name) + "...");
+
+		std::string command;
+		if ((juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_7) ||
+			(juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_8) ||
+			(juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_9)) {
+			// MacOS 10.7-10.9, launchd v1.0
+			command = "launchctl stop /Library/LaunchDaemons/" + service_name + ".plist";
+		}
+		else if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::MacOSX) != 0) {
+			// All newer MacOS, launchd v2.0
+			command = "launchctl kill 9 gui/$UID/" + service_name;
+		}
+		else if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::Windows) != 0) {
+			command = "taskkill /IM " + std::string(name) + " /F";
+		}
+		else {
+			command = "pkill " + std::string(name);
+		}
+		DBG("Executing: " + command);
+		system(command.c_str());
+	}
+	else if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::Windows) != 0) {
+		// Any windows OS
+		// Windows Service Manager
+		DBG("Stopping m1-orientationmanager service");
+		int res = system("sc stop M1Service");
+		if (res == 0) {
+			DBG("Stopped m1-orientationmanager server");
+		}
+		else if (res == 1060) {
+			DBG("not found service");
+		}
+		else if (res == 1062) {
+			DBG("service not running");
+		}
+		else if (res == 1053) {
+			DBG("start failed");
+		}
+		else if (res == 5) {
+			DBG("need run from administartor");
+		}
+		else {
+			DBG("some error");
+		}
+	}
+
 }
 
 void startOrientationManager()
@@ -103,20 +133,29 @@ void startOrientationManager()
             system(command.c_str());
         } else if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::Windows) != 0) {
             // Any windows OS
-            // TODO: migrate to Windows Service Manager
-            orientationManagerExe = m1SupportDirectory.getChildFile("Mach1").getChildFile("m1-orientationmanager.exe");
-            juce::StringArray arguments;
-            arguments.add(orientationManagerExe.getFullPathName().quoted());
-            arguments.add("--no-gui");
-            DBG("Starting m1-orientationmanager: " + orientationManagerExe.getFullPathName());
-            if (orientationManagerProcess.start(arguments)) {
-                DBG("Started m1-orientationmanager server");
-            } else {
-                // Failed to start the process
-                DBG("Failed to start the m1-orientationmanager");
-                exit(1);
-            }
-        } else {
+            // Windows Service Manager
+			DBG("Starting m1-orientationmanager service");
+			int res = system("sc start M1Service");
+			if (res == 0) {
+				DBG("Started m1-orientationmanager server");
+			}
+			else if (res == 1060) {
+				DBG("not found service");
+				exit(1);
+			}
+			else if (res == 1053) {
+				DBG("start failed");
+				exit(1);
+			}
+			else if (res == 5) {
+				DBG("need run from administartor");
+				exit(1);
+			}
+			else {
+				DBG("some error");
+				exit(1);
+			}
+		} else {
             // TODO: factor out linux using systemd service
             orientationManagerExe = m1SupportDirectory.getChildFile("Mach1").getChildFile("m1-orientationmanager");
             juce::StringArray arguments;
@@ -148,10 +187,9 @@ public:
     M1SystemWatcherApplication() {}
     ~M1SystemWatcherApplication() {}
     
-    int64 timeWhenWatcherLastSeenAClient = 0;
-    int64 timeWhenWeLastStartedAManager = -10000;
+	juce::int64 timeWhenWatcherLastSeenAClient = 0;
+	juce::int64 timeWhenWeLastStartedAManager = -10000;
     bool clientRequestsServer = false;
-    
 
     void oscMessageReceived(const juce::OSCMessage& message) override
     {
@@ -189,7 +227,7 @@ public:
         initFromSettings(settingsFile.getFullPathName().toStdString());
         
         juce::DatagramSocket socket(false); 
-        socket.setEnablePortReuse(false);
+        socket.setEnablePortReuse(true);
         if (!socket.bindToPort(watcherPort)) {
             socket.shutdown();
 
