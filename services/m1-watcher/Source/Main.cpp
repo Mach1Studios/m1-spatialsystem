@@ -52,7 +52,7 @@ void killProcessByName(const char *name)
         (juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_8) ||
         (juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_9)) {
         // MacOS 10.7-10.9, launchd v1.0
-        command =  "launchctl unload -w /Library/LaunchDaemons/"+service_name+".plist";
+        command =  "launchctl stop /Library/LaunchDaemons/"+service_name+".plist";
     } else if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::MacOSX) != 0) {
         // All newer MacOS, launchd v2.0
         command = "launchctl kill 9 gui/$UID/"+service_name;
@@ -78,15 +78,14 @@ void startOrientationManager()
         juce::File m1SupportDirectory = juce::File::getSpecialLocation(juce::File::commonApplicationDataDirectory);
         juce::File orientationManagerExe; // for linux and win
         
-        
         if ((juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_7) ||
             (juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_8) ||
             (juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_9)) {
             // MacOS 10.7-10.9, launchd v1.0
             // load process m1-orientationmanager
-            std::string load_command = "launchctl load -w /Library/LaunchDaemons/com.mach1.spatial.orientationmanager.plist";
-            DBG("Executing: " + load_command);
-            system(load_command.c_str());
+//            std::string load_command = "launchctl load -w /Library/LaunchDaemons/com.mach1.spatial.orientationmanager.plist";
+//            DBG("Executing: " + load_command);
+//            system(load_command.c_str());
             // start process m1-orientationmanager
             std::string command = "launchctl start com.mach1.spatial.orientationmanager";
             DBG("Executing: " + command);
@@ -95,9 +94,9 @@ void startOrientationManager()
         if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::MacOSX) != 0) {
             // All newer MacOS, launchd v2.0
             // load process m1-orientationmanager
-            std::string load_command = "launchctl bootstrap gui/$UID /Library/LaunchDaemons/com.mach1.spatial.orientationmanager.plist";
-            DBG("Executing: " + load_command);
-            system(load_command.c_str());
+//            std::string load_command = "launchctl bootstrap gui/$UID /Library/LaunchDaemons/com.mach1.spatial.orientationmanager.plist";
+//            DBG("Executing: " + load_command);
+//            system(load_command.c_str());
             // start process m1-orientationmanager
             std::string command = "launchctl kickstart -p gui/$UID/com.mach1.spatial.orientationmanager";
             DBG("Executing: " + command);
@@ -137,17 +136,13 @@ void startOrientationManager()
 
 //==============================================================================
 class M1SystemWatcherApplication : public juce::JUCEApplication,
-    private juce::MultiTimer,
+    private juce::Timer,
     public juce::OSCReceiver::Listener<juce::OSCReceiver::RealtimeCallback>
 {
     juce::OSCReceiver receiver;
 
-    // TIMER 0 = m1-orientationmanager ping timer
+    // TIMER = m1-orientationmanager ping timer
     // this is used to blindly check if the m1-orientationmanager has crashed and attempt to relaunch it
-    //
-    // TIMER 1 = Shutdown timer
-    // this is used when there are no m1_orientation_client's found to start a countdown to shutdown all
-    // services including this one
     
 public:
     M1SystemWatcherApplication() {}
@@ -223,16 +218,13 @@ public:
             shutdownCounterTime = juce::Time::currentTimeMillis();
 
             // starts the m1-orientationmanager ping timer
-            startTimer(0, 1000);
-            // starts the shutdown countdown timer
-//            startTimer(1, 1000);
+            startTimer(1000);
         }
     }
 
     void shutdown() override
     {
-        stopTimer(0);
-        stopTimer(1);
+        stopTimer();
         receiver.removeListener(this);
         receiver.disconnect();
         DBG("m1-systemwatcher is shutting down...");
@@ -253,9 +245,8 @@ public:
         return false;
     }
     
-    void timerCallback(int timerID) override
+    void timerCallback() override
     {
-
         juce::int64 currentTime = juce::Time::currentTimeMillis();
 
         if ((currentTime - timeWhenWatcherLastSeenAClient) > 20000) {
@@ -268,33 +259,6 @@ public:
             killProcessByName("m1-orientationmanager");
             startOrientationManager();
         }
-        /*
-        // TIMER 0 = m1-orientationmanager ping timer
-        // this is used to blindly check if the m1-orientationmanager has crashed and attempt to relaunch it
-        
-        if (timerID == 0) {
-            // pings and keeps m1-orientationmanager alive
-            DBG("TIMER[0]: " + std::to_string(currentTime - pingTime));
-            if (currentTime > pingTime && currentTime - pingTime > 1000) {
-                pingTime = juce::Time::currentTimeMillis() + 15000; // push time check for 10 seconds to wait for service restart
-
-                killProcessByName("m1-orientationmanager");
-                startOrientationManager();
-            }
-        }
-
-        // TIMER 1 = Shutdown timer
-        // this is used when there are no m1_orientation_client's found to start a countdown to shutdown all
-        // services including this one
-
-        if (timerID == 1) {
-            DBG("TIMER[1]: " + std::to_string(currentTime - shutdownCounterTime));
-            if (currentTime > shutdownCounterTime && currentTime - shutdownCounterTime > 60000) {
-                killProcessByName("m1-orientationmanager");
-                JUCEApplicationBase::quit(); // exit successfully to prompt service managers to not restart
-            }
-        }
-         */
     }
 };
 
