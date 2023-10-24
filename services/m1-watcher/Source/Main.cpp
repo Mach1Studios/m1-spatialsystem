@@ -78,7 +78,7 @@ void startOrientationManager()
         juce::File m1SupportDirectory = juce::File::getSpecialLocation(juce::File::commonApplicationDataDirectory);
         juce::File orientationManagerExe; // for linux and win
         
-        /*
+        
         if ((juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_7) ||
             (juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_8) ||
             (juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_9)) {
@@ -91,20 +91,8 @@ void startOrientationManager()
             std::string command = "launchctl start com.mach1.spatial.orientationmanager";
             DBG("Executing: " + command);
             system(command.c_str());
-        } else */
+        } else 
         if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::MacOSX) != 0) {
-            // MacOS 10.7-10.9, launchd v1.0
-            // load process m1-orientationmanager
-            std::string load_command = "launchctl load -w /Library/LaunchDaemons/com.mach1.spatial.orientationmanager.plist";
-            DBG("Executing: " + load_command);
-            system(load_command.c_str());
-            // start process m1-orientationmanager
-            std::string command = "launchctl start com.mach1.spatial.orientationmanager";
-            DBG("Executing: " + command);
-            system(command.c_str());
-
-            
-/*
             // All newer MacOS, launchd v2.0
             // load process m1-orientationmanager
             std::string load_command = "launchctl bootstrap gui/$UID /Library/LaunchDaemons/com.mach1.spatial.orientationmanager.plist";
@@ -114,7 +102,6 @@ void startOrientationManager()
             std::string command = "launchctl kickstart -p gui/$UID/com.mach1.spatial.orientationmanager";
             DBG("Executing: " + command);
             system(command.c_str());
- */
         } else if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::Windows) != 0) {
             // Any windows OS
             // TODO: migrate to Windows Service Manager
