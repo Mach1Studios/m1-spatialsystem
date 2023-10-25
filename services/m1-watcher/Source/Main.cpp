@@ -288,13 +288,18 @@ public:
         if ((currentTime - timeWhenWatcherLastSeenAClient) > 20000) {
             // Killing server because we haven't seen a client in 20 seconds
             killProcessByName("m1-orientationmanager");
+			timeWhenWatcherLastSeenAClient = currentTime;
         }
         
-        if ((clientRequestsServer) && ((currentTime - timeWhenWeLastStartedAManager) > 5000)) {
-            // Every 5 seconds we may restart or start a server if requested
-            killProcessByName("m1-orientationmanager");
+        if ((clientRequestsServer) && ((currentTime - timeWhenWeLastStartedAManager) > 10000)) {
+            // Every 10 seconds we may restart or start a server if requested
+			killProcessByName("m1-orientationmanager");
+			juce::Thread::sleep(2000); // wait for stop
             startOrientationManager();
-        }
+			juce::Thread::sleep(8000); // wait for start
+			clientRequestsServer = false;
+			timeWhenWeLastStartedAManager = currentTime;
+		}
     }
 };
 
