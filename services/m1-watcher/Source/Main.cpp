@@ -145,7 +145,6 @@ void startOrientationManager()
 			}
 			else if (res == 1053) {
 				DBG("start failed");
-				exit(1);
 			}
 			else if (res == 5) {
 				DBG("need run from administartor");
@@ -153,7 +152,6 @@ void startOrientationManager()
 			}
 			else {
 				DBG("some error");
-				exit(1);
 			}
 		} else {
             // TODO: factor out linux using systemd service
