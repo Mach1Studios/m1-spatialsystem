@@ -6,10 +6,8 @@
 	<true/>
 	<key>Label</key>
 	<string>com.mach1.spatial.watcher</string>
-	<key>ProgramArguments</key>
-	<array>
-		<string>/Library/Application Support/Mach1/m1-systemwatcher</string>
-	</array>
+	<key>Program</key>
+	<string>/Library/Application Support/Mach1/m1-systemwatcher</string>
 	<key>RunAtLoad</key>
 	<true/>
 	<key>StandardErrorPath</key>

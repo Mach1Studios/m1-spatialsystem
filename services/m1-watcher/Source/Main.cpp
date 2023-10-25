@@ -17,7 +17,6 @@
 #endif
 
 int serverPort, watcherPort;
-int activeClients = 1; // default with 1 so we do not auto shutdown on launch
 juce::int64 shutdownCounterTime = 0;
 juce::int64 pingTime = 0;
 
@@ -37,6 +36,11 @@ bool initFromSettings(std::string jsonSettingsFilePath) {
     return true;
 }
 
+uid_t uid = getuid();
+auto domain_target = (std::stringstream() << "gui/" << uid).str();
+auto service_target = (std::stringstream() << "gui/" << uid << "/com.mach1.spatial.orientationmanager").str();
+auto service_path = "/Library/LaunchAgents/com.mach1.spatial.orientationmanager.plist";
+
 void killProcessByName(const char *name)
 {
     std::string service_name;
@@ -45,54 +49,49 @@ void killProcessByName(const char *name)
         service_name = "com.mach1.spatial.orientationmanager";
     }
     
-	if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::MacOSX) != 0) {
-		DBG("Killing " + std::string(name) + "...");
-
-		std::string command;
-		if ((juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_7) ||
-			(juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_8) ||
-			(juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_9)) {
-			// MacOS 10.7-10.9, launchd v1.0
-			command = "launchctl stop /Library/LaunchDaemons/" + service_name + ".plist";
-		}
-		else if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::MacOSX) != 0) {
-			// All newer MacOS, launchd v2.0
-			command = "launchctl kill 9 gui/$UID/" + service_name;
-		}
-		else if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::Windows) != 0) {
-			command = "taskkill /IM " + std::string(name) + " /F";
-		}
-		else {
-			command = "pkill " + std::string(name);
-		}
-		DBG("Executing: " + command);
-		system(command.c_str());
+    DBG("Killing " + std::string(name) + "...");
+	std::string command;
+	if ((juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_7) ||
+		(juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_8) ||
+		(juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_9)) {
+		// MacOS 10.7-10.9, launchd v1.0
+		command = std::string("launchctl stop ") + service_name;
+        DBG("Executing: " + command);
+        system(command.c_str());
+	}
+	else if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::MacOSX) != 0) {
+		// All newer MacOS, launchd v2.0
+		command = std::string("launchctl kill 9 ") + service_target;
+        DBG("Executing: " + command);
+        system(command.c_str());
 	}
 	else if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::Windows) != 0) {
-		// Any windows OS
-		// Windows Service Manager
-		DBG("Stopping m1-orientationmanager service");
-		int res = system("sc stop M1Service");
-		if (res == 0) {
-			DBG("Stopped m1-orientationmanager server");
-		}
-		else if (res == 1060) {
-			DBG("not found service");
-		}
-		else if (res == 1062) {
-			DBG("service not running");
-		}
-		else if (res == 1053) {
-			DBG("start failed");
-		}
-		else if (res == 5) {
-			DBG("need run from administartor");
-		}
-		else {
-			DBG("some error");
-		}
+        // Windows Service Manager
+        DBG("Stopping m1-orientationmanager service");
+        int res = system("sc stop M1Service");
+        if (res == 0) {
+            DBG("Started m1-orientationmanager server");
+        }
+        else if (res == 1060) {
+            DBG("Service not found");
+            exit(1);
+        }
+        else if (res == 1053) {
+            DBG("Failed to start service");
+        }
+        else if (res == 5) {
+            DBG("Need to run as admin");
+            exit(1);
+        }
+        else {
+            DBG("Unknown Error");
+        }
 	}
-
+	else {
+		command = std::string("pkill ") + std::string(name);
+        DBG("Executing: " + command);
+        system(command.c_str());
+	}
 }
 
 void startOrientationManager()
@@ -112,23 +111,42 @@ void startOrientationManager()
             (juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_8) ||
             (juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_9)) {
             // MacOS 10.7-10.9, launchd v1.0
+
             // load process m1-orientationmanager
-//            std::string load_command = "launchctl load -w /Library/LaunchDaemons/com.mach1.spatial.orientationmanager.plist";
-//            DBG("Executing: " + load_command);
-//            system(load_command.c_str());
+            /*
+            std::string load_command = "launchctl load -w /Library/LaunchAgents/com.mach1.spatial.orientationmanager.plist";
+            DBG("Executing: " + load_command);
+            system(load_command.c_str());
+            */
+
             // start process m1-orientationmanager
+            // If service_path is already bootstrapped and disabled, launchctl bootstrap will fail until it is enabled again.
+            // So we should enable it first, and then bootstrap and enable it.
+            /*
+            auto enable_command = std::string("/bin/launchctl enable ") + service_target;
+            DBG("Executing: " + enable_command);
+            system(enable_command.c_str());
+            auto bootstrap_command = std::string("/bin/launchctl bootstrap ") + domain_target + " " + service_path;
+            DBG("Executing: " + bootstrap_command);
+            system(bootstrap_command.c_str());
+            DBG("Executing: " + enable_command);
+            system(enable_command.c_str());
+            */
             std::string command = "launchctl start com.mach1.spatial.orientationmanager";
             DBG("Executing: " + command);
             system(command.c_str());
-        } else 
-        if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::MacOSX) != 0) {
+        } else if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::MacOSX) != 0) {
             // All newer MacOS, launchd v2.0
+
             // load process m1-orientationmanager
-//            std::string load_command = "launchctl bootstrap gui/$UID /Library/LaunchDaemons/com.mach1.spatial.orientationmanager.plist";
-//            DBG("Executing: " + load_command);
-//            system(load_command.c_str());
+            /*
+            std::string load_command = "launchctl bootstrap gui/$UID /Library/LaunchAgents/com.mach1.spatial.orientationmanager.plist";
+            DBG("Executing: " + load_command);
+            system(load_command.c_str());
+            */
+            
             // start process m1-orientationmanager
-            std::string command = "launchctl kickstart -p gui/$UID/com.mach1.spatial.orientationmanager";
+            auto command = std::string("/bin/launchctl kickstart -p ") + service_target;
             DBG("Executing: " + command);
             system(command.c_str());
         } else if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::Windows) != 0) {
@@ -140,18 +158,18 @@ void startOrientationManager()
 				DBG("Started m1-orientationmanager server");
 			}
 			else if (res == 1060) {
-				DBG("not found service");
+				DBG("Service not found");
 				exit(1);
 			}
 			else if (res == 1053) {
-				DBG("start failed");
+				DBG("Failed to start service");
 			}
 			else if (res == 5) {
-				DBG("need run from administartor");
+				DBG("Need to run as admin");
 				exit(1);
 			}
 			else {
-				DBG("some error");
+				DBG("Unknown Error");
 			}
 		} else {
             // TODO: factor out linux using systemd service
