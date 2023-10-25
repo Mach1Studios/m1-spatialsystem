@@ -39,8 +39,8 @@ ifeq ($(detected_OS),Darwin)
 	sudo rm -rf "/Applications/Mach1 Spatial System/M1-VideoPlayer.app"
 	sudo rm -rf "/Applications/Mach1/M1-Transcoder.app"
 	sudo rm -rf "/Applications/Mach1/M1-Player.app"
-	sudo rm -rf "/Library/LaunchDaemons/com.mach1.spatial.orientationmanager.plist"
-	sudo rm -rf "/Library/LaunchDaemons/com.mach1.spatial.watcher.plist"
+	sudo rm -rf "/Library/LaunchAgents/com.mach1.spatial.orientationmanager.plist"
+	sudo rm -rf "/Library/LaunchAgents/com.mach1.spatial.watcher.plist"
 	sudo rm -rf "/Library/Application Support/Mach1/m1-orientationmanager"
 	sudo rm -rf "/Library/Application Support/Mach1/m1-systemwatcher"
 	# removing global
