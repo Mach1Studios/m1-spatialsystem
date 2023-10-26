@@ -12,7 +12,7 @@ then
 	#launchctl bootstrap gui/$(id -u) /Library/LaunchAgents/com.mach1.spatial.watcher.plist
 
     # Run postinstall actions for root.
-    echo "Executing postinstall"
+    echo "Executing postinstall..."
     # Add commands to execute in system context here.
 
     # Run postinstall actions for all logged in users.
@@ -20,7 +20,9 @@ then
         pid=$(echo $pid_uid | cut -d, -f1)
         uid=$(echo $pid_uid | cut -d, -f2)
         # Replace echo with e.g. launchctl load.
-        launchctl bsexec "$pid" chroot -u "$uid" / echo "Executing postinstall for $uid"
+        echo "Executing postinstall for $uid"
+        echo "launchctl bsexec "$pid" chroot -u "$uid""
+        launchctl bsexec "$pid" chroot -u "$uid"
     done
 
 fi
