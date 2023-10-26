@@ -8,6 +8,19 @@
 if [ -f "/Library/LaunchAgents/com.mach1.spatial.watcher.plist" ]
 then 
 	#launchctl load /Library/LaunchAgents/com.mach1.spatial.orientationmanager.plist
-	echo "Bootstrapping the watcher utility as user $(id -u)"
-	launchctl bootstrap gui/$(id -u) /Library/LaunchAgents/com.mach1.spatial.watcher.plist
+	#echo "Bootstrapping the watcher utility as user $(id -u)"
+	#launchctl bootstrap gui/$(id -u) /Library/LaunchAgents/com.mach1.spatial.watcher.plist
+
+    # Run postinstall actions for root.
+    echo "Executing postinstall"
+    # Add commands to execute in system context here.
+
+    # Run postinstall actions for all logged in users.
+    for pid_uid in $(ps -axo pid,uid,args | grep -i "com.mach1.spatial.watcher" | awk '{print $1 "," $2}'); do
+        pid=$(echo $pid_uid | cut -d, -f1)
+        uid=$(echo $pid_uid | cut -d, -f2)
+        # Replace echo with e.g. launchctl load.
+        launchctl bsexec "$pid" chroot -u "$uid" / echo "Executing postinstall for $uid"
+    done
+
 fi
