@@ -21,6 +21,7 @@ DAW focused plugins and apps relating to mixing Mach1 Spatial multichannel mixes
 - Add id system to clients to detect more than one M1-Monitor instance
 - Add better angle reset and offset adding management for clients
 - Refactor panner/monitor/player communication to a new class within Monitor instead of within OrientationManager
+- Fix PostInstall script for m1-orientationmanager on macos to support installing without requiring restarts
 
 ## Communication Map
 The following describes what is communicated between all apps and plugins via OSC and UDP, the ports are described and set by the [settings.json](m1-orientationmanager/Resources/settings.json) file.
