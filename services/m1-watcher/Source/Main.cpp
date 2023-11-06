@@ -16,7 +16,52 @@
 #include <unistd.h>
 #endif
 
-int serverPort, watcherPort;
+#include "m1_orientation_client/M1OrientationTypes.h"
+#include "m1_orientation_client/M1OrientationSettings.h"
+
+// TODO: refactor this class and the find_plugin struct
+class M1RegisteredPlugin {
+public:
+    // At a minimum we should expect port and if applicable name
+    // messages to ensure we do not delete this instance of a registered plugin
+    int port;
+    std::string name;
+    bool isPannerPlugin = false;
+    int input_mode;
+    float azimuth, elevation, diverge; // values expected unnormalized
+    float gain; // values expected unnormalized
+    
+    // pointer to store osc sender to communicate to registered plugin
+    juce::OSCSender* messageSender;
+};
+
+// search plugin by registered port number
+// TODO: potentially improve this with uuid concept
+struct find_plugin {
+    int port;
+    find_plugin(int port) : port(port) {}
+    bool operator () ( const M1RegisteredPlugin& p ) const
+    {
+        return p.port == port;
+    }
+};
+
+struct M1OrientationClientConnection {
+    int port;
+    std::string type = "";
+    juce::int64 time;
+};
+
+struct find_client_by_type {
+    std::string type;
+    find_client_by_type(std::string type) : type(type) {}
+    bool operator () ( const M1OrientationClientConnection& c ) const
+    {
+        return c.type == type;
+    }
+};
+
+int serverPort, helperPort;
 juce::int64 shutdownCounterTime = 0;
 juce::int64 pingTime = 0;
 
@@ -31,7 +76,7 @@ bool initFromSettings(std::string jsonSettingsFilePath) {
         // Found the settings.json
         juce::var mainVar = juce::JSON::parse(juce::File(jsonSettingsFilePath));
         serverPort = mainVar["serverPort"];
-        watcherPort = mainVar["watcherPort"];
+        helperPort = mainVar["helperPort"];
     }
     return true;
 }
@@ -126,13 +171,8 @@ void startOrientationManager()
             auto enable_command = std::string("/bin/launchctl enable ") + service_target;
             DBG("Executing: " + enable_command);
             system(enable_command.c_str());
-            auto bootstrap_command = std::string("/bin/launchctl bootstrap ") + domain_target + " " + service_path;
-            DBG("Executing: " + bootstrap_command);
-            system(bootstrap_command.c_str());
-            DBG("Executing: " + enable_command);
-            system(enable_command.c_str());
             */
-            std::string command = "launchctl start com.mach1.spatial.orientationmanager";
+            std::string command = "/bin/launchctl start com.mach1.spatial.orientationmanager";
             DBG("Executing: " + command);
             system(command.c_str());
         } else if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::MacOSX) != 0) {
@@ -190,6 +230,31 @@ void startOrientationManager()
 }
 
 //==============================================================================
+
+bool send(const std::vector<M1OrientationClientConnection>& m1_clients, juce::OSCMessage& msg) {
+    for (auto& m1_client : m1_clients) {
+        juce::OSCSender sender;
+        if (sender.connect("127.0.0.1", m1_client.port)) {
+            if (sender.send(msg)) {
+                return true;
+                // TODO: we need some feedback because we can send messages without error even when there is no client receiving
+            } else {
+                // TODO: ERROR: Issue with sending OSC message on server side
+                return false;
+            }
+        } else {
+            // TODO: ERROR: Issue with sending OSC message on server side
+            return false;
+        }
+    }
+}
+
+bool send(const std::vector<M1OrientationClientConnection>& m1_clients, std::string str) {
+    juce::OSCMessage msg(str.c_str());
+    return send(m1_clients, msg);
+}
+
+//==============================================================================
 class M1SystemWatcherApplication : public juce::JUCEApplication,
     private juce::Timer,
     public juce::OSCReceiver::Listener<juce::OSCReceiver::RealtimeCallback>
@@ -203,10 +268,58 @@ public:
     M1SystemWatcherApplication() {}
     ~M1SystemWatcherApplication() {}
     
+    const juce::String getApplicationName() override       { return ProjectInfo::projectName; }
+    const juce::String getApplicationVersion() override    { return ProjectInfo::versionString; }
+    bool moreThanOneInstanceAllowed() override             { return false; }
+    
+    std::vector<M1OrientationClientConnection> m1_clients;
+    std::vector<M1OrientationClientConnection> monitors; // track all the monitor instances
+    std::map<int, std::vector<float> > client_offset_ypr;
+    float master_yaw = 0; float master_pitch = 0; float master_roll = 0;
+    int master_mode = 0;
+    // Tracking for any plugin that does not need an m1_orientation_client but still needs feedback of orientation for UI purposes such as the M1-Panner plugin
+    std::vector<M1RegisteredPlugin> registeredPlugins;
+    bool bTimerActive = false;
+    
 	juce::int64 timeWhenWatcherLastSeenAClient = 0;
 	juce::int64 timeWhenWeLastStartedAManager = -10000;
     bool clientRequestsServer = false;
 
+    void send_getConnectedClients(const std::vector<M1OrientationClientConnection>& clients) {
+        juce::OSCMessage msg("/getConnectedClients");
+
+        for (int i = 0; i < clients.size(); i++) {
+            msg.addInt32(i); // client index
+            msg.addInt32(clients[i].port);
+            msg.addString(clients[i].type);
+        }
+        send(clients, msg);
+    }
+
+    void command_activateClients() {
+        // TODO: add function for checking for stalled clients that did not properly remove themselves from list
+
+        if (monitors.size() > 0) {
+            // send activate message to 1st index
+            juce::OSCSender sender;
+            if (sender.connect("127.0.0.1", monitors[0].port)) {
+                juce::OSCMessage msg("/m1-activate-client");
+                msg.addInt32(1); // send true / activate message
+                sender.send(msg);
+            }
+            // from 2nd index onward send a de-activate message
+            if (monitors.size() > 1) {
+                for (int i = 1; i < monitors.size(); i++) {
+                    if (sender.connect("127.0.0.1", monitors[i].port)) {
+                        juce::OSCMessage msg("/m1-activate-client");
+                        msg.addInt32(0); // send false / de-activate message
+                        sender.send(msg);
+                    }
+                }
+            }
+        }
+    }
+    
     void oscMessageReceived(const juce::OSCMessage& message) override
     {
         // restart the ping timer because we received a ping
@@ -215,10 +328,152 @@ public:
         if (message.getAddressPattern() == "/clientExists") {
             timeWhenWatcherLastSeenAClient = pingTime;
         }
-
-        if (message.getAddressPattern() == "/clientRequestsServer") {
+        else if (message.getAddressPattern() == "/clientRequestsServer") {
             clientRequestsServer = true;
         }
+        else if (message.getAddressPattern() == "/m1-addClient") {
+            // add client to clients list
+            int port = message[0].getInt32();
+            std::string type = message[1].getString().toStdString();
+            bool found = false;
+
+            for (auto& client : m1_clients) {
+                if (client.port == port) {
+                    client.time = juce::Time::currentTimeMillis();
+                    found = true;
+                }
+            }
+
+            if (!found) {
+                M1OrientationClientConnection m1_client;
+                m1_client.port = port;
+                m1_client.type = type;
+                m1_client.time = juce::Time::currentTimeMillis();
+                m1_clients.push_back(m1_client);
+                
+                juce::OSCSender sender;
+                if (sender.connect("127.0.0.1", port)) {
+                    juce::OSCMessage msg("/connectedToServer");
+                    if (m1_client.type == "monitor") {
+                        monitors.push_back(m1_client);
+                        command_activateClients();
+                        DBG("Number of monitors registered: "+std::to_string(monitors.size()));
+                    }
+                    msg.addInt32(m1_clients.size()-1); // send ID for multiple clients to send commands
+                    sender.send(msg);
+                    DBG("Number of mach1 clients registered: "+std::to_string(m1_clients.size()));
+                }
+            }
+            
+            if (!bTimerActive && m1_clients.size() > 0) {
+                startTimer(60);
+                bTimerActive = true;
+            }
+        }
+        else if (message.getAddressPattern() == "/m1-removeClient") {
+            int search_port = message[0].getInt32();
+            for (int index = 0; index < m1_clients.size(); index++) {
+                if (m1_clients[index].port == search_port) {
+                    if (m1_clients[index].type == "monitor") {
+                        // if the removed type is monitor
+                        for (int m_index = 0; m_index < m1_clients.size(); m_index++) {
+                            // search monitors and remove the same matching port
+                            if (monitors[m_index].port == search_port) {
+                                monitors.erase(monitors.begin() + m_index);
+                                command_activateClients();
+                                DBG("Number of monitors registered: "+std::to_string(monitors.size()));
+                            }
+                        }
+                    }
+                    // remove the client from the list
+                    m1_clients.erase(m1_clients.begin() + index);
+                    DBG("Number of mach1 clients registered: "+std::to_string(m1_clients.size()));
+                }
+            }
+            send_getConnectedClients(m1_clients);
+            
+            if (m1_clients.size() == 0 && registeredPlugins.size() == 0) {
+                stopTimer();
+                bTimerActive = false;
+            }
+        }
+        else if (message.getAddressPattern() == "/m1-status") {
+            // checking on active clients connection to remove any dead instances
+            int search_port = message[0].getInt32();
+            for (int index = 0; index < m1_clients.size(); index++) {
+                if (m1_clients[index].port == search_port) {
+                    // udpate ping time
+                    m1_clients[index].time = pingTime;
+                }
+            }
+        }
+        else if (message.getAddressPattern() == "/setMonitoringMode") {
+            // receiving updated monitoring mode or other misc settings for clients
+            master_mode = message[0].getInt32();
+            DBG("[Monitor] Mode: "+std::to_string(master_mode));
+        }
+        else if (message.getAddressPattern() == "/setMasterYPR") {
+            // Used for relaying a master calculated orientation to registered plugins that require this for GUI systems
+            // TODO: get port of active monitor and use this to tell player where to send its offset orientation
+            master_yaw = message[0].getFloat32();
+            master_pitch = message[1].getFloat32();
+            master_roll = message[2].getFloat32();
+        }
+        else if (message.getAddressPattern() == "/m1-register-plugin") {
+            // registering new panner instance
+            auto port = message[0].getInt32();
+            // protect port creation to only messages from registered plugin (example: an m1-panner)
+            if (std::find_if(registeredPlugins.begin(), registeredPlugins.end(), find_plugin(port)) == registeredPlugins.end()) {
+                M1RegisteredPlugin foundPlugin;
+                foundPlugin.port = port;
+                foundPlugin.messageSender = new juce::OSCSender();
+                foundPlugin.messageSender->connect("127.0.0.1", port); // connect to that newly discovered panner locally
+                registeredPlugins.push_back(foundPlugin);
+                DBG("Plugin registered: " + std::to_string(port));
+            } else {
+                DBG("Plugin port already registered: " + std::to_string(port));
+            }
+            if (!bTimerActive && registeredPlugins.size() > 0) {
+                startTimer(60);
+                bTimerActive = true;
+            } else {
+                if (registeredPlugins.size() == 0 && m1_clients.size() == 0) {
+                    // TODO: setup logic for deleting from `registeredPlugins`
+                    stopTimer();
+                    bTimerActive = false;
+                }
+            }
+        }
+        else if (message.getAddressPattern() == "/panner-settings") {
+            if (message.size() > 0) { // check message size
+                auto plugin_port = message[0].getInt32();
+                if (message.size() == 6) {
+                    auto input_mode = message[1].getInt32();
+                    auto azi = message[2].getFloat32();
+                    auto ele = message[3].getFloat32();
+                    auto div = message[4].getFloat32();
+                    auto gain = message[5].getFloat32();
+                    DBG("[OSC] Panner: port="+std::to_string(plugin_port)+", in="+std::to_string(input_mode)+", az="+std::to_string(azi)+", el="+std::to_string(ele)+", di="+std::to_string(div)+", gain="+std::to_string(gain));
+                    // Check if port matches expected registered-plugin port
+                    if (registeredPlugins.size() > 0) {
+                        auto it = std::find_if(registeredPlugins.begin(), registeredPlugins.end(), find_plugin(plugin_port));
+                        auto index = it - registeredPlugins.begin(); // find the index from the found plugin
+                        registeredPlugins[index].isPannerPlugin = true;
+                        registeredPlugins[index].input_mode = input_mode;
+                        registeredPlugins[index].azimuth = azi;
+                        registeredPlugins[index].elevation = ele;
+                        registeredPlugins[index].diverge = div;
+                        registeredPlugins[index].gain = gain;
+                    }
+                }
+            } else {
+                // port not found, error here
+            }
+        }
+        else {
+            DBG("OSC Message not implemented: " + message.getAddressPattern().toString());
+        }
+
     }
 
     void initialise(const juce::String&) override
@@ -244,29 +499,17 @@ public:
         
         juce::DatagramSocket socket(false); 
         socket.setEnablePortReuse(true);
-        if (!socket.bindToPort(watcherPort)) {
+        if (!socket.bindToPort(helperPort)) {
             socket.shutdown();
 
-            juce::String message = "Failed to bind to port " + std::to_string(watcherPort);
-            juce::MessageManager::getInstance()->callFunctionOnMessageThread([](void* m) -> void* {
-                juce::AlertWindow::showMessageBoxAsync(
-                    juce::AlertWindow::InfoIcon,
-                    "Alert Box",
-                    static_cast<juce::String*>(m)->toRawUTF8(),
-                    "OK",
-                    nullptr,  // No associated component
-                    juce::ModalCallbackFunction::create([m](int result) {
-                        quit();
-                    })
-                );
-                return nullptr;
-                }, &message);
+            juce::String message = "Failed to bind to port " + std::to_string(helperPort);
             DBG(message);
+            quit();
         }
         else {
             socket.shutdown();
 
-            receiver.connect(watcherPort);
+            receiver.connect(helperPort);
             receiver.addListener(this);
 
             shutdownCounterTime = juce::Time::currentTimeMillis();
@@ -276,6 +519,7 @@ public:
         }
     }
 
+    //==============================================================================
     void shutdown() override
     {
         stopTimer();
@@ -284,19 +528,19 @@ public:
         DBG("m1-systemwatcher is shutting down...");
     }
 
-    const juce::String getApplicationName() override
+    void systemRequestedQuit() override
     {
-        return ProjectInfo::projectName;
+        // This is called when the app is being asked to quit: you can ignore this
+        // request and let the app carry on running, or call quit() to allow the app to close.
+        quit();
     }
 
-    const juce::String getApplicationVersion() override
+    void anotherInstanceStarted (const juce::String& commandLine) override
     {
-        return ProjectInfo::versionString;
-    }
-    
-    bool moreThanOneInstanceAllowed() override
-    {
-        return false;
+        // When another instance of the app is launched while this one is running,
+        // this method is invoked, and the commandLine parameter tells you what
+        // the other instance's command-line arguments were.
+        quit();
     }
     
     void timerCallback() override
@@ -318,6 +562,52 @@ public:
 			clientRequestsServer = false;
 			timeWhenWeLastStartedAManager = currentTime;
 		}
+        
+        if (registeredPlugins.size() > 0) {
+            for (auto &i: registeredPlugins) {
+                juce::OSCMessage m = juce::OSCMessage(juce::OSCAddressPattern("/monitor-settings"));
+                m.addInt32(master_mode);
+                m.addFloat32(master_yaw); // expected normalised
+                m.addFloat32(master_pitch); // expected normalised
+                m.addFloat32(master_roll); // expected normalised
+                //m.addInt32(monitor_output_mode); // TODO: add the output configuration to sync plugins when requested
+                i.messageSender->send(m);
+            }
+        }
+        
+        // TODO: check if any registered plugins closed
+        //for (auto &i: registeredPlugins) {
+        //}
+        
+        if (m1_clients.size() > 0) {
+
+            for (int index = 0; index < m1_clients.size(); index++) {
+                if ((currentTime - m1_clients[index].time) > 10000) {
+                    // remove dead client
+                    if (m1_clients[index].type == "monitor") {
+                        // if the removed type is monitor
+                        for (int m_index = 0; m_index < m1_clients.size(); m_index++) {
+                            // search monitors and remove the same matching port
+                            if (monitors[m_index].port == m1_clients[index].port) {
+                                monitors.erase(monitors.begin() + m_index);
+                                command_activateClients();
+                                DBG("Number of monitors registered: "+std::to_string(monitors.size()));
+                            }
+                        }
+                        
+                        // remove the client from the list
+                        m1_clients.erase(m1_clients.begin() + index);
+                        DBG("Number of mach1 clients registered: "+std::to_string(m1_clients.size()));
+                    }
+                }
+                
+                if (m1_clients[index].type == "player") {
+                    // TODO: send panners to player clients here
+                    juce::OSCMessage m = juce::OSCMessage(juce::OSCAddressPattern("/panner-settings"));
+                }
+            }
+        }
+
     }
 };
 

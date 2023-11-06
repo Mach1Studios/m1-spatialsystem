@@ -31,6 +31,7 @@ set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
 # add JUCE and other custom modules
 add_subdirectory(../../m1-orientationmanager/JUCE "${CMAKE_CURRENT_BINARY_DIR}/JUCE_build")
+add_subdirectory(../../m1-orientationmanager/Modules "${CMAKE_CURRENT_BINARY_DIR}/Modules_build")
 
 # PLUGIN/APP NAME & ID  (for dynamic naming schemes)
 set(CUSTOM_BUNDLE_ID "com.mach1.spatial.watcher")
@@ -83,6 +84,7 @@ target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE
         juce::juce_graphics
         juce::juce_gui_basics
         juce::juce_osc
+        m1_orientation_client
         )
 
 ### setup info.plist and entitlements for macos
