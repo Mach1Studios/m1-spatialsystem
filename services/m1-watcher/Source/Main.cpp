@@ -48,6 +48,7 @@ struct find_plugin {
 struct M1OrientationClientConnection {
     int port;
     std::string type = "";
+    bool active = false; // TODO: implement this to avoid using copies of specific type clients
     juce::int64 time;
 };
 
