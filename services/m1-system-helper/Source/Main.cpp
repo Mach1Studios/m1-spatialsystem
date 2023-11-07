@@ -255,7 +255,7 @@ bool send(const std::vector<M1OrientationClientConnection>& m1_clients, std::str
 }
 
 //==============================================================================
-class M1SystemWatcherApplication : public juce::JUCEApplication,
+class M1SystemHelperApplication : public juce::JUCEApplication,
     private juce::Timer,
     public juce::OSCReceiver::Listener<juce::OSCReceiver::RealtimeCallback>
 {
@@ -265,8 +265,8 @@ class M1SystemWatcherApplication : public juce::JUCEApplication,
     // this is used to blindly check if the m1-orientationmanager has crashed and attempt to relaunch it
     
 public:
-    M1SystemWatcherApplication() {}
-    ~M1SystemWatcherApplication() {}
+    M1SystemHelperApplication() {}
+    ~M1SystemHelperApplication() {}
     
     const juce::String getApplicationName() override       { return ProjectInfo::projectName; }
     const juce::String getApplicationVersion() override    { return ProjectInfo::versionString; }
@@ -282,7 +282,7 @@ public:
     std::vector<M1RegisteredPlugin> registeredPlugins;
     bool bTimerActive = false;
     
-	juce::int64 timeWhenWatcherLastSeenAClient = 0;
+	juce::int64 timeWhenHelperLastSeenAClient = 0;
 	juce::int64 timeWhenWeLastStartedAManager = -10000;
     bool clientRequestsServer = false;
 
@@ -346,7 +346,7 @@ public:
         pingTime = juce::Time::currentTimeMillis();
 
         if (message.getAddressPattern() == "/clientExists") {
-            timeWhenWatcherLastSeenAClient = pingTime;
+            timeWhenHelperLastSeenAClient = pingTime;
         }
         else if (message.getAddressPattern() == "/clientRequestsServer") {
             clientRequestsServer = true;
@@ -587,7 +587,7 @@ public:
         stopTimer();
         receiver.removeListener(this);
         receiver.disconnect();
-        DBG("m1-systemwatcher is shutting down...");
+        DBG("m1-system-helper is shutting down...");
     }
 
     void systemRequestedQuit() override
@@ -609,10 +609,10 @@ public:
     {
         juce::int64 currentTime = juce::Time::currentTimeMillis();
 
-        if ((currentTime - timeWhenWatcherLastSeenAClient) > 20000) {
+        if ((currentTime - timeWhenHelperLastSeenAClient) > 20000) {
             // Killing server because we haven't seen a client in 20 seconds
             killProcessByName("m1-orientationmanager");
-			timeWhenWatcherLastSeenAClient = currentTime;
+			timeWhenHelperLastSeenAClient = currentTime;
         }
         
         if ((clientRequestsServer) && ((currentTime - timeWhenWeLastStartedAManager) > 10000)) {
@@ -687,4 +687,4 @@ public:
 
 //==============================================================================
 // This macro generates the main() routine that launches the app.
-START_JUCE_APPLICATION(M1SystemWatcherApplication)
+START_JUCE_APPLICATION(M1SystemHelperApplication)

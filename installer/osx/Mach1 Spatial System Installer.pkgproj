@@ -783,7 +783,7 @@
 													<key>GID</key>
 													<integer>80</integer>
 													<key>PATH</key>
-													<string>../../services/m1-watcher/build/m1-systemwatcher_artefacts/m1-systemwatcher</string>
+													<string>../../services/m1-system-helper/build/m1-system-helper_artefacts/m1-system-helper</string>
 													<key>PATH_TYPE</key>
 													<integer>1</integer>
 													<key>PERMISSIONS</key>
@@ -990,7 +990,7 @@
 											<key>GID</key>
 											<integer>0</integer>
 											<key>PATH</key>
-											<string>../../services/m1-watcher/com.mach1.spatial.watcher.plist</string>
+											<string>../../services/m1-system-helper/com.mach1.spatial.helper.plist</string>
 											<key>PATH_TYPE</key>
 											<integer>1</integer>
 											<key>PERMISSIONS</key>

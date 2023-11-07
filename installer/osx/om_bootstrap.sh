@@ -5,11 +5,11 @@
 
 # TODO: write a test for macos 10.7->10.9 to use load command instead of bootstrap
 
-if [ -f "/Library/LaunchAgents/com.mach1.spatial.watcher.plist" ]
+if [ -f "/Library/LaunchAgents/com.mach1.spatial.helper.plist" ]
 then 
 	#launchctl load /Library/LaunchAgents/com.mach1.spatial.orientationmanager.plist
-	#echo "Bootstrapping the watcher utility as user $(id -u)"
-	#launchctl bootstrap gui/$(id -u) /Library/LaunchAgents/com.mach1.spatial.watcher.plist
+	#echo "Bootstrapping the helper utility as user $(id -u)"
+	#launchctl bootstrap gui/$(id -u) /Library/LaunchAgents/com.mach1.spatial.helper.plist
 
     if [ "$3" == "/" ]; then
         # Run postinstall actions for root.
@@ -22,8 +22,8 @@ then
             uid=$(echo $pid_uid | cut -d, -f2)
             # Replace echo with e.g. launchctl load.
             echo "Executing postinstall for $uid"
-            echo "launchctl bootstrap -p gui/"$uid" /Library/LaunchAgents/com.mach1.spatial.watcher.plist"
-            launchctl bootstrap -p gui/"$uid" /Library/LaunchAgents/com.mach1.spatial.watcher.plist
+            echo "launchctl bootstrap -p gui/"$uid" /Library/LaunchAgents/com.mach1.spatial.helper.plist"
+            launchctl bootstrap -p gui/"$uid" /Library/LaunchAgents/com.mach1.spatial.helper.plist
         done
     fi
 fi

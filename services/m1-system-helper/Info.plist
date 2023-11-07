@@ -7,7 +7,7 @@
 	<key>CFBundleIconFile</key>
 	<string>Icon.icns</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.mach1.spatial.watcher</string>
+	<string>com.mach1.spatial.helper</string>
 	<key>CFBundleName</key>
 	<string>${EXECUTABLE_NAME}</string>
 	<key>CFBundleDisplayName</key>

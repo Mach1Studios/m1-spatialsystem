@@ -1,4 +1,4 @@
-# m1-systemwatcher
+# m1-system-helper
 A background executable that checks if the server is still active and operating and otherwise attempts to relaunch it properly. This should be launched by any and all `m1_orientation_client` or client to the server.
 
 ## Setup
@@ -9,7 +9,7 @@ A background executable that checks if the server is still active and operating 
 - `cmake --build .`
 
 ### Build via .jucer
-- Open the `m1-systemwatcher.jucer` and compile as needed
+- Open the `m1-system-helper.jucer` and compile as needed
 
 ## Install
 Currently this helper service executable is expected in a common data directory of each local machine, and where applicable to be managed by a service agent or LaunchAgent.

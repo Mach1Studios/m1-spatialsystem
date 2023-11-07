@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 file(STRINGS VERSION CURRENT_VERSION)
-project(m1-systemwatcher VERSION ${CURRENT_VERSION})
+project(m1-system-helper VERSION ${CURRENT_VERSION})
 
 # Avoid warning about DOWNLOAD_EXTRACT_TIMESTAMP in CMake 3.24:
 if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.24.0")
@@ -34,7 +34,7 @@ add_subdirectory(../../m1-orientationmanager/JUCE "${CMAKE_CURRENT_BINARY_DIR}/J
 add_subdirectory(../../m1-orientationmanager/Modules "${CMAKE_CURRENT_BINARY_DIR}/Modules_build")
 
 # PLUGIN/APP NAME & ID  (for dynamic naming schemes)
-set(CUSTOM_BUNDLE_ID "com.mach1.spatial.watcher")
+set(CUSTOM_BUNDLE_ID "com.mach1.spatial.helper")
 set(CUSTOM_APP_CODE "M1SW")
 
 # add the plugin targets

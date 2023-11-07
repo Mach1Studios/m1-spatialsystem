@@ -22,7 +22,7 @@ clear:
 	rm -rf m1-player/build
 	rm -rf m1-transcoder/dist
 	rm -rf m1-orientationmanager/build
-	rm -rf services/m1-watcher/build
+	rm -rf services/m1-system-helper/build
 
 clear-dev:
 	rm -rf installer/osx/build
@@ -31,7 +31,7 @@ clear-dev:
 	rm -rf m1-player/build-dev
 	rm -rf m1-transcoder/dist
 	rm -rf m1-orientationmanager/build-dev
-	rm -rf services/m1-watcher/build-dev
+	rm -rf services/m1-system-helper/build-dev
 
 clear-installs:
 ifeq ($(detected_OS),Darwin)
@@ -40,9 +40,9 @@ ifeq ($(detected_OS),Darwin)
 	sudo rm -rf "/Applications/Mach1/M1-Transcoder.app"
 	sudo rm -rf "/Applications/Mach1/M1-Player.app"
 	sudo rm -rf "/Library/LaunchAgents/com.mach1.spatial.orientationmanager.plist"
-	sudo rm -rf "/Library/LaunchAgents/com.mach1.spatial.watcher.plist"
+	sudo rm -rf "/Library/LaunchAgents/com.mach1.spatial.helper.plist"
 	sudo rm -rf "/Library/Application Support/Mach1/m1-orientationmanager"
-	sudo rm -rf "/Library/Application Support/Mach1/m1-systemwatcher"
+	sudo rm -rf "/Library/Application Support/Mach1/m1-system-helper"
 	# removing global
 	sudo rm -rf "/Library/Application Support/Avid/Audio/Plug-Ins/M1-Monitor.aaxplugin"
 	sudo rm -rf "/Library/Application Support/Avid/Audio/Plug-Ins/M1-Panner.aaxplugin"
@@ -82,7 +82,7 @@ else
 	cmake m1-player -Bm1-player/build
 endif
 	cmake m1-orientationmanager -Bm1-orientationmanager/build
-	cmake services/m1-watcher -Bservices/m1-watcher/build
+	cmake services/m1-system-helper -Bservices/m1-system-helper/build
 	cd m1-transcoder && npm install
 
 build: 
@@ -90,7 +90,7 @@ build:
 	cmake --build m1-panner/build --config "Release"
 	cmake --build m1-player/build --config "Release"
 	cmake --build m1-orientationmanager/build --config "Release"
-	cmake --build services/m1-watcher/build --config "Release"
+	cmake --build services/m1-system-helper/build --config "Release"
 ifeq ($(detected_OS),Darwin)
 	cd m1-transcoder && npm run package-mac
 else ifeq ($(detected_OS),Windows)
@@ -104,21 +104,21 @@ ifeq ($(detected_OS),Darwin)
 	cmake m1-panner -Bm1-panner/build-dev -G "Xcode" -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_AAX=ON -DAAX_PATH=$(AAX_PATH) -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DBUILD_STANDALONE=ON
 	cmake m1-player -Bm1-player/build-dev -G "Xcode"
 	cmake m1-orientationmanager -Bm1-orientationmanager/build-dev -G "Xcode" -DCMAKE_INSTALL_PREFIX="/Library/Application Support/Mach1"
-	cmake services/m1-watcher -Bservices/m1-watcher/build-dev -G "Xcode" -DCMAKE_INSTALL_PREFIX="/Library/Application Support/Mach1"
+	cmake services/m1-system-helper -Bservices/m1-system-helper/build-dev -G "Xcode" -DCMAKE_INSTALL_PREFIX="/Library/Application Support/Mach1"
 	cd m1-transcoder && npm install
 else ifeq ($(detected_OS),Windows)
 	cmake m1-monitor -Bm1-monitor/build-dev -G "Visual Studio 16 2019" -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF -DBUILD_VST3=ON -DBUILD_STANDALONE=ON
 	cmake m1-panner -Bm1-panner/build-dev -G "Visual Studio 16 2019" -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF -DBUILD_VST3=ON -DBUILD_STANDALONE=ON
 	cmake m1-player -Bm1-player/build-dev -G "Visual Studio 16 2019"
 	cmake m1-orientationmanager -Bm1-orientationmanager/build-dev -G "Visual Studio 16 2019" -DCMAKE_INSTALL_PREFIX="\Documents and Settings\All Users\Application Data\Mach1"
-	cmake services/m1-watcher -Bservices/m1-watcher/build-dev -G "Visual Studio 16 2019" -DCMAKE_INSTALL_PREFIX="\Documents and Settings\All Users\Application Data\Mach1"
+	cmake services/m1-system-helper -Bservices/m1-system-helper/build-dev -G "Visual Studio 16 2019" -DCMAKE_INSTALL_PREFIX="\Documents and Settings\All Users\Application Data\Mach1"
 	cd m1-transcoder && npm install
 else
 	cmake m1-monitor -Bm1-monitor/build-dev -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_STANDALONE=ON
 	cmake m1-panner -Bm1-panner/build-dev -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_STANDALONE=ON
 	cmake m1-player -Bm1-player/build-dev
 	cmake m1-orientationmanager -Bm1-orientationmanager/build-dev -DCMAKE_INSTALL_PREFIX="/opt/Mach1"
-	cmake services/m1-watcher -Bservices/m1-watcher/build-dev -DCMAKE_INSTALL_PREFIX="/opt/Mach1"
+	cmake services/m1-system-helper -Bservices/m1-system-helper/build-dev -DCMAKE_INSTALL_PREFIX="/opt/Mach1"
 	cd m1-transcoder && npm install
 endif
 
@@ -136,7 +136,7 @@ ifeq ($(detected_OS),Darwin)
 	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-panner/build/M1-Panner_artefacts/VST3/M1-Panner.vst3
 	codesign -v --force -o runtime --entitlements m1-player/Resources/M1-Player.entitlements --sign $(APPLE_CODESIGN_CODE) --timestamp m1-player/build/M1-Player_artefacts/Release/M1-Player.app
 	codesign -v --force -o runtime --entitlements m1-orientationmanager/Resources/entitlements.mac.plist --sign $(APPLE_CODESIGN_CODE) --timestamp m1-orientationmanager/build/m1-orientationmanager_artefacts/m1-orientationmanager
-	codesign -v --force -o runtime --entitlements services/m1-watcher/entitlements.mac.plist --sign $(APPLE_CODESIGN_CODE) --timestamp services/m1-watcher/build/m1-systemwatcher_artefacts/m1-systemwatcher
+	codesign -v --force -o runtime --entitlements services/m1-system-helper/entitlements.mac.plist --sign $(APPLE_CODESIGN_CODE) --timestamp services/m1-system-helper/build/m1-system-helper_artefacts/m1-system-helper
 endif
 
 # codesigning and notarizing m1-transcoder is done via electron-builder
@@ -150,10 +150,10 @@ ifeq ($(detected_OS),Darwin)
 	#ditto -c -k --keepParent "$(PWD)/m1-orientationmanager/build/m1-orientationmanager_artefacts/m1-orientationmanager" "$(PWD)/m1-orientationmanager/build/m1-orientationmanager_artefacts/m1-orientationmanager.zip"
 	#cd "m1-orientationmanager/build/m1-orientationmanager_artefacts" && zip -qr m1-orientationmanager.zip m1-orientationmanager -x "*.DS_Store"
 	#./installer/osx/macos_utilities.sh -f m1-orientationmanager -z .zip -p m1-orientationmanager/build/m1-orientationmanager_artefacts -k 'notarize-app' --apple-id $(APPLE_USERNAME) --apple-app-pass $(ALTOOL_APPPASS) -t $(APPLE_TEAM_CODE)
-	# m1-watcher
-	#ditto -c -k --keepParent "$(PWD)/services/m1-watcher/build/m1-systemwatcher_artefacts/m1-systemwatcher" "$(PWD)/services/m1-watcher/build/m1-systemwatcher_artefacts/m1-systemwatcher.zip"
-	#cd "services/m1-watcher/build/m1-systemwatcher" && zip -qr m1-systemwatcher.zip m1-systemwatcher -x "*.DS_Store"
-	#./installer/osx/macos_utilities.sh -f m1-systemwatcher -z .zip -p services/m1-watcher/build/m1-systemwatcher_artefacts -k 'notarize-app' --apple-id $(APPLE_USERNAME) --apple-app-pass $(ALTOOL_APPPASS) -t $(APPLE_TEAM_CODE)
+	# m1-system-helper
+	#ditto -c -k --keepParent "$(PWD)/services/m1-system-helper/build/m1-system-helper/m1-system-helper" "$(PWD)/services/m1-system-helper/build/m1-system-helper_artefacts/m1-system-helper.zip"
+	#cd "services/m1-system-helper/build/m1-system-helper" && zip -qr m1-system-helper.zip m1-system-helper -x "*.DS_Store"
+	#./installer/osx/macos_utilities.sh -f m1-system-helper -z .zip -p services/m1-system-helper/build/m1-system-helper_artefacts -k 'notarize-app' --apple-id $(APPLE_USERNAME) --apple-app-pass $(ALTOOL_APPPASS) -t $(APPLE_TEAM_CODE)
 endif
 
 package:
