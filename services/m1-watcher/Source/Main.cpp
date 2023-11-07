@@ -19,7 +19,6 @@
 #include "m1_orientation_client/M1OrientationTypes.h"
 #include "m1_orientation_client/M1OrientationSettings.h"
 
-// TODO: refactor this class and the find_plugin struct
 class M1RegisteredPlugin {
 public:
     // At a minimum we should expect port and if applicable name
@@ -273,8 +272,9 @@ public:
     bool moreThanOneInstanceAllowed() override             { return false; }
     
     std::vector<M1OrientationClientConnection> m1_clients;
+    // TODO: refactor these so they arent copies of the `m1_clients`
+    std::vector<M1OrientationClientConnection> players; // track all the player instances
     std::vector<M1OrientationClientConnection> monitors; // track all the monitor instances
-    std::map<int, std::vector<float> > client_offset_ypr;
     float master_yaw = 0; float master_pitch = 0; float master_roll = 0;
     int master_mode = 0;
     // Tracking for any plugin that does not need an m1_orientation_client but still needs feedback of orientation for UI purposes such as the M1-Panner plugin
@@ -297,8 +297,7 @@ public:
     }
 
     void command_activateClients() {
-        // TODO: add function for checking for stalled clients that did not properly remove themselves from list
-
+        /// MONITORS
         if (monitors.size() > 0) {
             // send activate message to 1st index
             juce::OSCSender sender;
@@ -311,6 +310,26 @@ public:
             if (monitors.size() > 1) {
                 for (int i = 1; i < monitors.size(); i++) {
                     if (sender.connect("127.0.0.1", monitors[i].port)) {
+                        juce::OSCMessage msg("/m1-activate-client");
+                        msg.addInt32(0); // send false / de-activate message
+                        sender.send(msg);
+                    }
+                }
+            }
+        }
+        /// PLAYERS
+        if (players.size() > 0) {
+            // send activate message to 1st index
+            juce::OSCSender sender;
+            if (sender.connect("127.0.0.1", players[0].port)) {
+                juce::OSCMessage msg("/m1-activate-client");
+                msg.addInt32(1); // send true / activate message
+                sender.send(msg);
+            }
+            // from 2nd index onward send a de-activate message
+            if (players.size() > 1) {
+                for (int i = 1; i < players.size(); i++) {
+                    if (sender.connect("127.0.0.1", players[i].port)) {
                         juce::OSCMessage msg("/m1-activate-client");
                         msg.addInt32(0); // send false / de-activate message
                         sender.send(msg);
@@ -357,11 +376,14 @@ public:
                     if (m1_client.type == "monitor") {
                         monitors.push_back(m1_client);
                         command_activateClients();
-                        DBG("Number of monitors registered: "+std::to_string(monitors.size()));
+                    }
+                    if (m1_client.type == "player") {
+                        players.push_back(m1_client);
+                        command_activateClients();
                     }
                     msg.addInt32(m1_clients.size()-1); // send ID for multiple clients to send commands
                     sender.send(msg);
-                    DBG("Number of mach1 clients registered: "+std::to_string(m1_clients.size()));
+                    DBG("Number of mach1 clients registered: "+std::to_string(m1_clients.size()) + " | monitors:" + std::to_string(monitors.size()) + " | players:" + std::to_string(players.size()));
                 }
             }
             
@@ -376,18 +398,27 @@ public:
                 if (m1_clients[index].port == search_port) {
                     if (m1_clients[index].type == "monitor") {
                         // if the removed type is monitor
-                        for (int m_index = 0; m_index < m1_clients.size(); m_index++) {
+                        for (int m_index = 0; m_index < monitors.size(); m_index++) {
                             // search monitors and remove the same matching port
                             if (monitors[m_index].port == search_port) {
                                 monitors.erase(monitors.begin() + m_index);
                                 command_activateClients();
-                                DBG("Number of monitors registered: "+std::to_string(monitors.size()));
+                            }
+                        }
+                    }
+                    if (m1_clients[index].type == "player") {
+                        // if the removed type is player
+                        for (int p_index = 0; p_index < players.size(); p_index++) {
+                            // search players and remove the same matching port
+                            if (players[p_index].port == search_port) {
+                                players.erase(players.begin() + p_index);
+                                command_activateClients();
                             }
                         }
                     }
                     // remove the client from the list
                     m1_clients.erase(m1_clients.begin() + index);
-                    DBG("Number of mach1 clients registered: "+std::to_string(m1_clients.size()));
+                    DBG("Number of mach1 clients registered: "+std::to_string(m1_clients.size()) + " | monitors:" + std::to_string(monitors.size()) + " | players:" + std::to_string(players.size()));
                 }
             }
             send_getConnectedClients(m1_clients);
@@ -400,10 +431,22 @@ public:
         else if (message.getAddressPattern() == "/m1-status") {
             // checking on active clients connection to remove any dead instances
             int search_port = message[0].getInt32();
+            bool bFound = false;
             for (int index = 0; index < m1_clients.size(); index++) {
                 if (m1_clients[index].port == search_port) {
                     // udpate ping time
                     m1_clients[index].time = pingTime;
+                    bFound = true;
+                }
+            }
+            if (!bFound) {
+                // received status update from a client no longer in our list
+                // prompting client to re-add itself
+                juce::OSCSender sender;
+                if (sender.connect("127.0.0.1", search_port)) {
+                    juce::OSCMessage msg("/m1-reconnect-req");
+                    sender.send(msg);
+                    DBG("Attempting to re-register client");
                 }
             }
         }
@@ -412,9 +455,27 @@ public:
             master_mode = message[0].getInt32();
             DBG("[Monitor] Mode: "+std::to_string(master_mode));
         }
+        else if (message.getAddressPattern() == "/setPlayerYPR") {
+            // Used for relaying the active player offset to calculate the orientation in the active monitor instance
+            if (monitors.size() > 0) {
+                for (int index = 0; index < m1_clients.size(); index++) {
+                    
+                    // TODO: refactor using callback to send a message when an update is received
+                    if (m1_clients[index].type == "monitor") {
+                        juce::OSCSender sender;
+                        if (sender.connect("127.0.0.1", m1_clients[index].port)) {
+                            juce::OSCMessage msg("/YPR-Offset");
+                            msg.addFloat32(message[0].getFloat32());
+                            msg.addFloat32(message[1].getFloat32());
+                            msg.addFloat32(message[2].getFloat32());
+                            sender.send(msg);
+                        }
+                    }
+                }
+            }
+        }
         else if (message.getAddressPattern() == "/setMasterYPR") {
             // Used for relaying a master calculated orientation to registered plugins that require this for GUI systems
-            // TODO: get port of active monitor and use this to tell player where to send its offset orientation
             master_yaw = message[0].getFloat32();
             master_pitch = message[1].getFloat32();
             master_roll = message[2].getFloat32();
@@ -567,9 +628,9 @@ public:
             for (auto &i: registeredPlugins) {
                 juce::OSCMessage m = juce::OSCMessage(juce::OSCAddressPattern("/monitor-settings"));
                 m.addInt32(master_mode);
-                m.addFloat32(master_yaw); // expected normalised
+                m.addFloat32(master_yaw);   // expected normalised
                 m.addFloat32(master_pitch); // expected normalised
-                m.addFloat32(master_roll); // expected normalised
+                m.addFloat32(master_roll);  // expected normalised
                 //m.addInt32(monitor_output_mode); // TODO: add the output configuration to sync plugins when requested
                 i.messageSender->send(m);
             }
@@ -579,35 +640,47 @@ public:
         //for (auto &i: registeredPlugins) {
         //}
         
+        // client specific messages and cleanup
         if (m1_clients.size() > 0) {
-
             for (int index = 0; index < m1_clients.size(); index++) {
-                if ((currentTime - m1_clients[index].time) > 10000) {
-                    // remove dead client
-                    if (m1_clients[index].type == "monitor") {
-                        // if the removed type is monitor
-                        for (int m_index = 0; m_index < m1_clients.size(); m_index++) {
-                            // search monitors and remove the same matching port
-                            if (monitors[m_index].port == m1_clients[index].port) {
-                                monitors.erase(monitors.begin() + m_index);
-                                command_activateClients();
-                                DBG("Number of monitors registered: "+std::to_string(monitors.size()));
-                            }
-                        }
-                        
-                        // remove the client from the list
-                        m1_clients.erase(m1_clients.begin() + index);
-                        DBG("Number of mach1 clients registered: "+std::to_string(m1_clients.size()));
-                    }
-                }
-                
+                // TODO: refactor using callback to send a message when an update is received
                 if (m1_clients[index].type == "player") {
                     // TODO: send panners to player clients here
                     juce::OSCMessage m = juce::OSCMessage(juce::OSCAddressPattern("/panner-settings"));
                 }
+                
+                // cleanup any zombie clients
+                if ((currentTime - m1_clients[index].time) > 10000) {
+                    
+                    // if the removed type is monitor
+                    if (m1_clients[index].type == "monitor") {
+                        // if the removed type is monitor
+                        for (int m_index = 0; m_index < monitors.size(); m_index++) {
+                            // search monitors and remove the same matching port
+                            if (monitors[m_index].port == m1_clients[index].port) {
+                                monitors.erase(monitors.begin() + m_index);
+                                command_activateClients();
+                            }
+                        }
+                    }
+                    
+                    // if the removed type is player
+                    if (m1_clients[index].type == "player") {
+                        for (int p_index = 0; p_index < players.size(); p_index++) {
+                            // search players and remove the same matching port
+                            if (players[p_index].port == m1_clients[index].port) {
+                                players.erase(players.begin() + p_index);
+                                command_activateClients();
+                            }
+                        }
+                    }
+                        
+                    // remove the client from the list
+                    m1_clients.erase(m1_clients.begin() + index);
+                    DBG("Number of mach1 clients registered: "+std::to_string(m1_clients.size()) + " | monitors:" + std::to_string(monitors.size()) + " | players:" + std::to_string(players.size()));
+                }
             }
         }
-
     }
 };
 
