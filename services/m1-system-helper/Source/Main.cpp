@@ -394,6 +394,7 @@ public:
             }
         }
         else if (message.getAddressPattern() == "/m1-removeClient") {
+            // remove client from clients list
             int search_port = message[0].getInt32();
             for (int index = 0; index < m1_clients.size(); index++) {
                 if (m1_clients[index].port == search_port) {
