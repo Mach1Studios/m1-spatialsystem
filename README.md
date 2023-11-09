@@ -27,10 +27,9 @@ DAW focused plugins and apps relating to mixing Mach1 Spatial multichannel mixes
 The following describes what is communicated between all apps and plugins via OSC and UDP, the ports are described and set by the [settings.json](m1-orientationmanager/Resources/settings.json) file.
 
 - OrientationManager -> Monitor [sends 3rd party orientation]
-- Monitor -> OrientationManager [sends calculated orientation for Panner[s]/Player]
 - OrientationManager -> Player [sends 3rd party orientation]
-- OrientationManager -> Player [sends panners settings]
-- Panner[s] -> OrientationManager [sends panner settings]
-- Player -> Monitor [sends orientation]
+- Monitor -> Panners [sends calculated orientation for GUI]
+- Panners -> Player [sends panner settings for drawing in Player]
+- Player -> Monitor [sends mouse offset orientation to monitor]
 - Monitor -> OrientationManager [transport]
 - OrientationManager -> Player [transport]
