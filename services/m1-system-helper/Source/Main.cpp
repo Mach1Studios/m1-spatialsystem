@@ -216,7 +216,6 @@ void startOrientationManager()
             orientationManagerExe = m1SupportDirectory.getChildFile("Mach1").getChildFile("m1-orientationmanager");
             juce::StringArray arguments;
             arguments.add(orientationManagerExe.getFullPathName().quoted());
-            arguments.add("--no-gui");
             DBG("Starting m1-orientationmanager: " + orientationManagerExe.getFullPathName());
             if (orientationManagerProcess.start(arguments)) {
                 DBG("Started m1-orientationmanager server");
@@ -376,12 +375,11 @@ public:
                     juce::OSCMessage msg("/connectedToServer");
                     if (m1_client.type == "monitor") {
                         monitors.push_back(m1_client);
-                        command_activateClients();
                     }
                     if (m1_client.type == "player") {
                         players.push_back(m1_client);
-                        command_activateClients();
                     }
+                    command_activateClients();
                     msg.addInt32(m1_clients.size()-1); // send ID for multiple clients to send commands
                     sender.send(msg);
                     DBG("Number of mach1 clients registered: "+std::to_string(m1_clients.size()) + " | monitors:" + std::to_string(monitors.size()) + " | players:" + std::to_string(players.size()));
@@ -439,6 +437,11 @@ public:
                     // udpate ping time
                     m1_clients[index].time = pingTime;
                     bFound = true;
+                    juce::OSCSender sender;
+                    if (sender.connect("127.0.0.1", m1_clients[index].port)) {
+                        juce::OSCMessage msg("/m1-response");
+                        sender.send(msg);
+                    }
                 }
             }
             if (!bFound) {
