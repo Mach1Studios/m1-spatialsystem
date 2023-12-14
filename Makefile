@@ -16,22 +16,44 @@ pull:
 	git pull --recurse-submodules
 
 clear:
+ifeq ($(detected_OS),Darwin)
 	rm -rf installer/osx/build
+endif
+ifeq ($(detected_OS),Windows)
+	-del /F /S /Q m1-monitor\build
+	-del /F /S /Q m1-panner\build
+	-del /F /S /Q m1-player\build
+	-del /F /S /Q m1-transcoder\dist
+	-del /F /S /Q m1-orientationmanager\build
+	-del /F /S /Q services\m1-system-helper\build
+else
 	rm -rf m1-monitor/build
 	rm -rf m1-panner/build
 	rm -rf m1-player/build
 	rm -rf m1-transcoder/dist
 	rm -rf m1-orientationmanager/build
 	rm -rf services/m1-system-helper/build
+endif
 
 clear-dev:
+ifeq ($(detected_OS),Darwin)
 	rm -rf installer/osx/build
+endif
+ifeq ($(detected_OS),Windows)
+	-del /F /S /Q m1-monitor\build
+	-del /F /S /Q m1-panner\build
+	-del /F /S /Q m1-player\build
+	-del /F /S /Q m1-transcoder\dist
+	-del /F /S /Q m1-orientationmanager\build
+	-del /F /S /Q services\m1-system-helper\build
+else
 	rm -rf m1-monitor/build-dev
 	rm -rf m1-panner/build-dev
 	rm -rf m1-player/build-dev
 	rm -rf m1-transcoder/dist
 	rm -rf m1-orientationmanager/build-dev
 	rm -rf services/m1-system-helper/build-dev
+endif
 
 clear-installs:
 ifeq ($(detected_OS),Darwin)
