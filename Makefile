@@ -40,12 +40,12 @@ ifeq ($(detected_OS),Darwin)
 	rm -rf installer/osx/build
 endif
 ifeq ($(detected_OS),Windows)
-	-del /F /S /Q m1-monitor\build
-	-del /F /S /Q m1-panner\build
-	-del /F /S /Q m1-player\build
+	-del /F /S /Q m1-monitor\build-dev
+	-del /F /S /Q m1-panner\build-dev
+	-del /F /S /Q m1-player\build-dev
 	-del /F /S /Q m1-transcoder\dist
-	-del /F /S /Q m1-orientationmanager\build
-	-del /F /S /Q services\m1-system-helper\build
+	-del /F /S /Q m1-orientationmanager\build-dev
+	-del /F /S /Q services\m1-system-helper\build-dev
 else
 	rm -rf m1-monitor/build-dev
 	rm -rf m1-panner/build-dev
