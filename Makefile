@@ -162,6 +162,9 @@ ifeq ($(detected_OS),Darwin)
 	codesign -v --force -o runtime --entitlements m1-player/Resources/M1-Player.entitlements --sign $(APPLE_CODESIGN_CODE) --timestamp m1-player/build/M1-Player_artefacts/Release/M1-Player.app
 	codesign -v --force -o runtime --entitlements m1-orientationmanager/Resources/entitlements.mac.plist --sign $(APPLE_CODESIGN_CODE) --timestamp m1-orientationmanager/build/m1-orientationmanager_artefacts/m1-orientationmanager
 	codesign -v --force -o runtime --entitlements services/m1-system-helper/entitlements.mac.plist --sign $(APPLE_CODESIGN_CODE) --timestamp services/m1-system-helper/build/m1-system-helper_artefacts/m1-system-helper
+else ifeq ($(detected_OS),Windows)
+	$(WRAPTOOL) sign --verbose --account $(PACE_ID) --wcguid "$(M1_GLOBAL_GUID)" --signid $(WIN_SIGNTOOL_ID) --in m1-monitor/build/M1-Monitor_artefacts/AAX/M1-Monitor.aaxplugin --out m1-monitor/build/M1-Monitor_artefacts/AAX/M1-Monitor.aaxplugin
+	$(WRAPTOOL) sign --verbose --account $(PACE_ID) --wcguid "$(M1_GLOBAL_GUID)" --signid $(WIN_SIGNTOOL_ID) --in m1-panner/build/M1-Panner_artefacts/AAX/M1-Panner.aaxplugin --out m1-panner/build/M1-Panner_artefacts/AAX/M1-Panner.aaxplugin
 endif
 
 # codesigning and notarizing m1-transcoder is done via electron-builder
@@ -189,4 +192,6 @@ ifeq ($(detected_OS),Darwin)
 	productsign --sign $(APPLE_CODESIGN_INSTALLER_ID) "installer/osx/build/Mach1 Spatial System Installer.pkg" "installer/osx/build/signed/Mach1 Spatial System Installer.pkg"
 	xcrun notarytool submit --wait --keychain-profile 'notarize-app' --apple-id $(APPLE_USERNAME) --password $(ALTOOL_APPPASS) --team-id $(APPLE_TEAM_CODE) "installer/osx/build/signed/Mach1 Spatial System Installer.pkg"
 	xcrun stapler staple installer/osx/build/signed/Mach1\ Spatial\ System\ Installer.pkg
+else ifeq ($(detected_OS),Windows)
+	$(WIN_INNO_PATH) "/ssigntool=$(WIN_SIGNTOOL_PATH) sign /f $(WIN_CODESIGN_CERT_PATH) /t http://timestamp.digicert.com $f" /Qp installer.iss
 endif

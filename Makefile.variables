@@ -1,17 +1,33 @@
+# This file is used to setup local variables and paths for 
+# configuring, building and packaging the m1-spatialsystem 
+# project cross-platform
+#
+# Please rename and fill in the variables below to be used
+# with the Makefile in this directory or 
+# copy these variables as environment variables as needed
+#
+
 # For custom override of SDK
+# Note: leave blank to use local cmake installations
 M1SDK_PATH=
 
-AAX_PATH="/Users/[USERNAME]/SDKs/aax-sdk-2-5-1"
-VST2_PATH="/Users/[USERNAME]/SDKs/VST_SDK_vst2/VST2_SDK"
+AAX_PATH=
+VST2_PATH=
 
 WRAPTOOL=
-PACE_ID=
+PACE_ACCOUNT=
 
 APPLE_TEAM_CODE=
 APPLE_CODESIGN_ID="Developer ID Application: [NAME] ($(APPLE_TEAM_CODE))"
 APPLE_CODESIGN_CODE=
 APPLE_CODESIGN_INSTALLER_ID="Developer ID Installer: [NAME] ($(APPLE_TEAM_CODE))"
-	
+
+WIN_INNO_PATH=
+WIN_SIGNTOOL_PATH=
+WIN_SIGNTOOL_ID=
+WIN_SIGNTOOL_PASS=
+WIN_CODESIGN_CERT_PATH=
+
 PANNER_FULL_GUID=
 MONITOR_FULL_GUID=
 TRANSCODER_GUID=
