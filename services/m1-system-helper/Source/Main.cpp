@@ -81,10 +81,16 @@ bool initFromSettings(std::string jsonSettingsFilePath) {
     return true;
 }
 
-uid_t uid = getuid();
-auto domain_target = (std::stringstream() << "gui/" << uid).str();
-auto service_target = (std::stringstream() << "gui/" << uid << "/com.mach1.spatial.orientationmanager").str();
-auto service_path = "/Library/LaunchAgents/com.mach1.spatial.orientationmanager.plist";
+#if defined(__APPLE__)
+    uid_t uid = getuid();
+    auto domain_target = (std::stringstream() << "gui/" << uid).str();
+    auto service_target = (std::stringstream() << "gui/" << uid << "/com.mach1.spatial.orientationmanager").str();
+    auto service_path = "/Library/LaunchAgents/com.mach1.spatial.orientationmanager.plist";
+#elif defined(_WIN32) || defined(_WIN64)
+    auto domain_target = (std::stringstream() << "gui/").str();
+    auto service_target = (std::stringstream() << "gui/" << "/com.mach1.spatial.orientationmanager").str();
+    std::string service_path = "";
+#endif
 
 void killProcessByName(const char *name)
 {
