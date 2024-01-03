@@ -24,7 +24,7 @@ Name: custom; Description: Custom installation; Flags: iscustom
 [Components]
 Name: aax; Description: AAX; Types: full
 Name: vst2; Description: VST2; Types: full
-Name: vst3; Description: VST3; Types: full
+//Name: vst3; Description: VST3
 Name: m1player; Description: M1VideoPlayer; Types: full
 Name: m1transcoder; Description: M1Transcoder; Types: full custom; Flags: fixed
 
@@ -32,26 +32,24 @@ Name: m1transcoder; Description: M1Transcoder; Types: full custom; Flags: fixed
 Name: {app}; Type: filesandordirs
 
 [Files]
-Source: "..\..\m1-monitor\Builds\VisualStudio2017\x64\Release\AAX\M1-Monitor.aaxplugin"; DestDir: "{pf64}\Common Files\Avid\Audio\Plug-Ins"; Components: aax; Flags: ignoreversion recursesubdirs
-Source: "..\..\m1-panner\panner\Builds\VisualStudio2017\x64\Release\AAX\M1-Panner.aaxplugin"; DestDir: "{pf64}\Common Files\Avid\Audio\Plug-Ins"; Components: aax; Flags: ignoreversion recursesubdirs
+Source: "..\..\m1-monitor\build\M1-Monitor_artefacts\Release\AAX\M1-Monitor.aaxplugin"; DestDir: "{pf64}\Common Files\Avid\Audio\Plug-Ins"; Components: aax; Flags: ignoreversion recursesubdirs
+Source: "..\..\m1-panner\build\M1-Panner_artefacts\Release\AAX\M1-Panner.aaxplugin"; DestDir: "{pf64}\Common Files\Avid\Audio\Plug-Ins"; Components: aax; Flags: ignoreversion recursesubdirs
 Source: "..\resources\templates\PTHD\*"; DestDir: "{app}\templates\PTHD"; Components: aax; Flags: ignoreversion recursesubdirs createallsubdirs
 
-Source: "..\..\m1-monitor\Builds\VisualStudio2017\x64\Release\VST\M1-Monitor.dll"; DestDir: "{code:GetDir|0}"; Components: vst2; Flags: ignoreversion
-Source: "..\..\m1-panner\panner\Builds\VisualStudio2017\x64\Release\VST\signed\M1-Panner(1-8).dll"; DestDir: "{code:GetDir|0}"; Components: vst2; Flags: ignoreversion
+Source: "..\..\m1-monitor\build\M1-Monitor_artefacts\Release\VST\M1-Monitor.dll"; DestDir: "{code:GetDir|0}"; Components: vst2; Flags: ignoreversion
+Source: "..\..\m1-panner\build\M1-Panner_artefacts\Release\VST\M1-Panner.dll"; DestDir: "{code:GetDir|0}"; Components: vst2; Flags: ignoreversion
 Source: "..\resources\templates\Reaper\*"; DestDir: "{app}\templates\Reaper"; Components: vst2; Flags: ignoreversion recursesubdirs createallsubdirs
 
-Source: "..\..\m1-monitor\Builds\VisualStudio2017\x64\Release\VST3\M1-Monitor.vst3"; DestDir: "{code:GetDir|1}"; Components: vst3; Flags: ignoreversion
-Source: "..\..\m1-panner\panner\Builds\VisualStudio2017\x64\Release\VST3\signed\M1-Panner.vst3"; DestDir: "{code:GetDir|1}"; Components: vst3; Flags: ignoreversion
-//Source: "resources\templates\Reaper\*"; DestDir: "{app}\templates\Reaper"; Components: vst3; Flags: ignoreversion recursesubdirs createallsubdirs
+//Source: "..\..\m1-monitor\build\M1-Monitor_artefacts\Release\VST3\M1-Monitor.vst3"; DestDir: "{code:GetDir|1}"; Components: vst3; Flags: ignoreversion
+//Source: "..\..\m1-panner\build\M1-Panner_artefacts\Release\VST3\M1-Panner.vst3"; DestDir: "{code:GetDir|1}"; Components: vst3; Flags: ignoreversion
 
 Source: "..\..\m1-transcoder\dist\M1-Transcoder.exe"; Excludes: "ffmpeg.exe,ffmpeg.dll"; DestDir: "{app}\M1-Transcoder"; Components: m1transcoder; Flags: ignoreversion
-Source: "..\CHANGELOG.md"; Excludes: "ffmpeg*.zip,av*.dll,postproc*.dll,sw*.dll"; DestDir: "{app}"; Components: m1transcoder; Flags: ignoreversion
 Source: "..\resources\docs\Mach1-Monitor.pdf"; DestDir: "{app}\docs"; Components: m1transcoder; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\resources\docs\Mach1-Panner.pdf"; DestDir: "{app}\docs"; Components: m1transcoder; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\resources\docs\Mach1-Transcoder.pdf"; DestDir: "{app}\docs"; Components: m1transcoder; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\resources\docs\Mach1-UserGuide.pdf"; DestDir: "{app}\docs"; Components: m1transcoder; Flags: ignoreversion recursesubdirs createallsubdirs
 
-Source: "..\..\m1-player\bin\*"; Excludes: "ffmpeg*.zip,av*.dll,postproc*.dll,sw*.dll"; DestDir: "{app}\M1-Player"; Components: m1player; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\..\m1-player\build\M1-Player_artefacts\Release\*"; Excludes: "ffmpeg*.zip,av*.dll,postproc*.dll,sw*.dll"; DestDir: "{app}\M1-Player"; Components: m1player; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Run]
 //Filename: "{app}\M1-Player\install_ffmpeg.bat"; Parameters: "install"; Flags: runhidden
@@ -79,8 +77,8 @@ begin
     False, 'New Folder');
     Page1.Add('VST 64-bit plug-ins location');
     Page1.Values[0] := ExpandConstant('{pf64}\Steinberg\VstPlugins');
-    Page1.Add('VST3 64-bit plug-ins location');
-    Page1.Values[1] := ExpandConstant('{pf64}\Common Files\VST3');
+    //Page1.Add('VST3 64-bit plug-ins location');
+    //Page1.Values[1] := ExpandConstant('{pf64}\Common Files\VST3');
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
