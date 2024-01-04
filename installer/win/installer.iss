@@ -1,9 +1,8 @@
 [Setup]
-SignTool=signtool
 AppName=Mach1 Spatial System
 AppVersion=2.0.0
 AppPublisher=Mach1
-DefaultDirName={pf}\Mach1 Spatial System
+DefaultDirName={pf64}\Mach1 Spatial System
 DisableProgramGroupPage=yes
 VersionInfoVersion=2.0.0
 VersionInfoDescription=
@@ -15,6 +14,7 @@ InfoBeforeFile=..\intro.rtf
 InfoAfterFile=..\summary.rtf
 DisableWelcomePage=no
 DefaultGroupName=Mach1
+Uninstallable=yes
 UninstallDisplayName=Mach1 Spatial System Uninstaller
 
 [Types]
@@ -27,6 +27,7 @@ Name: vst2; Description: VST2; Types: full
 //Name: vst3; Description: VST3
 Name: m1player; Description: M1VideoPlayer; Types: full
 Name: m1transcoder; Description: M1Transcoder; Types: full custom; Flags: fixed
+Name: m1services; Description: M1Services; Types: full custom; Flags: fixed
 
 [UninstallDelete]
 Name: {app}; Type: filesandordirs
@@ -49,10 +50,14 @@ Source: "..\resources\docs\Mach1-Panner.pdf"; DestDir: "{app}\docs"; Components:
 Source: "..\resources\docs\Mach1-Transcoder.pdf"; DestDir: "{app}\docs"; Components: m1transcoder; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\resources\docs\Mach1-UserGuide.pdf"; DestDir: "{app}\docs"; Components: m1transcoder; Flags: ignoreversion recursesubdirs createallsubdirs
 
-Source: "..\..\m1-player\build\M1-Player_artefacts\Release\*"; Excludes: "ffmpeg*.zip,av*.dll,postproc*.dll,sw*.dll"; DestDir: "{app}\M1-Player"; Components: m1player; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\..\m1-player\build\M1-Player_artefacts\Release\*"; Excludes: "ffmpeg*.zip,*.exp,*M1-Player.lib,*av*.dll,postproc*.dll,sw*.dll"; DestDir: "{app}\M1-Player"; Components: m1player; Flags: ignoreversion recursesubdirs createallsubdirs
+
+Source: "..\..\m1-orientationmanager\build\M1-orientationmanager_artefacts\Release\m1-orientationmanager.exe"; Excludes: "ffmpeg*.zip,*.exp,*m1-orientationmanager.lib,*av*.dll,postproc*.dll,sw*.dll"; DestDir: "{app}\services\m1-orientationmanager.exe"; Components: m1services; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\..\services\m1-system-helper\build\M1-system-helper_artefacts\Release\m1-system-helper.exe"; DestDir: "{app}\services\m1-system-helper.exe"; Components: m1services; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Run]
-//Filename: "{app}\M1-Player\install_ffmpeg.bat"; Parameters: "install"; Flags: runhidden
+Filename: "{src}\version_cleanup.bat"; Parameters: "install"; Flags: runhidden
+Filename: "{src}\om_bootstrap.bat"; Parameters: "install"; Flags: runhidden
 
 [Messages]
 SetupWindowTitle=Install Mach1 Spatial System

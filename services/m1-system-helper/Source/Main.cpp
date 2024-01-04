@@ -199,7 +199,7 @@ void startOrientationManager()
             // Any windows OS
             // Windows Service Manager
 			DBG("Starting m1-orientationmanager service");
-			int res = system("sc start M1Service");
+			int res = system("sc start M1-OrientationManager");
 			if (res == 0) {
 				DBG("Started m1-orientationmanager server");
 			}
