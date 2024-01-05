@@ -2,7 +2,7 @@
 AppName=Mach1 Spatial System
 AppVersion=2.0.0
 AppPublisher=Mach1
-DefaultDirName={pf64}\Mach1 Spatial System
+DefaultDirName={pf64}\Mach1
 DisableProgramGroupPage=yes
 VersionInfoVersion=2.0.0
 VersionInfoDescription=
@@ -44,16 +44,16 @@ Source: "..\resources\templates\Reaper\*"; DestDir: "{app}\templates\Reaper"; Co
 //Source: "..\..\m1-monitor\build\M1-Monitor_artefacts\Release\VST3\M1-Monitor.vst3"; DestDir: "{code:GetDir|1}"; Components: vst3; Flags: ignoreversion
 //Source: "..\..\m1-panner\build\M1-Panner_artefacts\Release\VST3\M1-Panner.vst3"; DestDir: "{code:GetDir|1}"; Components: vst3; Flags: ignoreversion
 
-Source: "..\..\m1-transcoder\dist\M1-Transcoder.exe"; Excludes: "ffmpeg.exe,ffmpeg.dll"; DestDir: "{app}\M1-Transcoder"; Components: m1transcoder; Flags: ignoreversion
+Source: "..\..\m1-transcoder\dist\M1-Transcoder.exe"; Excludes: "ffmpeg.exe,ffmpeg.dll"; DestDir: "{app}"; Components: m1transcoder; Flags: ignoreversion
 Source: "..\resources\docs\Mach1-Monitor.pdf"; DestDir: "{app}\docs"; Components: m1transcoder; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\resources\docs\Mach1-Panner.pdf"; DestDir: "{app}\docs"; Components: m1transcoder; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\resources\docs\Mach1-Transcoder.pdf"; DestDir: "{app}\docs"; Components: m1transcoder; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\resources\docs\Mach1-UserGuide.pdf"; DestDir: "{app}\docs"; Components: m1transcoder; Flags: ignoreversion recursesubdirs createallsubdirs
 
-Source: "..\..\m1-player\build\M1-Player_artefacts\Release\*"; Excludes: "ffmpeg*.zip,*.exp,*M1-Player.lib,*av*.dll,postproc*.dll,sw*.dll"; DestDir: "{app}\M1-Player"; Components: m1player; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\..\m1-player\build\M1-Player_artefacts\Release\*"; Excludes: "ffmpeg*.zip,*.exp,*M1-Player.lib,*av*.dll,postproc*.dll,sw*.dll"; DestDir: "{app}"; Components: m1player; Flags: ignoreversion recursesubdirs createallsubdirs
 
-Source: "..\..\m1-orientationmanager\build\M1-orientationmanager_artefacts\Release\m1-orientationmanager.exe"; Excludes: "ffmpeg*.zip,*.exp,*m1-orientationmanager.lib,*av*.dll,postproc*.dll,sw*.dll"; DestDir: "{app}\services\m1-orientationmanager.exe"; Components: m1services; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "..\..\services\m1-system-helper\build\M1-system-helper_artefacts\Release\m1-system-helper.exe"; DestDir: "{app}\services\m1-system-helper.exe"; Components: m1services; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\..\m1-orientationmanager\build\M1-orientationmanager_artefacts\Release\m1-orientationmanager.exe"; Excludes: "ffmpeg*.zip,*.exp,*m1-orientationmanager.lib,*av*.dll,postproc*.dll,sw*.dll"; DestDir: "{app}\services"; Components: m1services; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\..\services\m1-system-helper\build\M1-system-helper_artefacts\Release\m1-system-helper.exe"; DestDir: "{app}\services"; Components: m1services; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Run]
 Filename: "{src}\version_cleanup.bat"; Parameters: "install"; Flags: runhidden
