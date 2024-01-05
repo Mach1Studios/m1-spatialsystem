@@ -50,14 +50,13 @@ Source: "..\resources\docs\Mach1-Panner.pdf"; DestDir: "{app}\docs"; Components:
 Source: "..\resources\docs\Mach1-Transcoder.pdf"; DestDir: "{app}\docs"; Components: m1transcoder; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\resources\docs\Mach1-UserGuide.pdf"; DestDir: "{app}\docs"; Components: m1transcoder; Flags: ignoreversion recursesubdirs createallsubdirs
 
-Source: "..\..\m1-player\build\M1-Player_artefacts\Release\*"; Excludes: "ffmpeg*.zip,*.exp,*M1-Player.lib,*av*.dll,postproc*.dll,sw*.dll"; DestDir: "{app}"; Components: m1player; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\..\m1-player\build\M1-Player_artefacts\Release\*"; Excludes: "ffmpeg*.zip,*.exp,*M1-Player.lib"; DestDir: "{app}"; Components: m1player; Flags: ignoreversion recursesubdirs createallsubdirs; BeforeInstall: RunVersionCleanup
 
 Source: "..\..\m1-orientationmanager\build\M1-orientationmanager_artefacts\Release\m1-orientationmanager.exe"; Excludes: "ffmpeg*.zip,*.exp,*m1-orientationmanager.lib,*av*.dll,postproc*.dll,sw*.dll"; DestDir: "{app}\services"; Components: m1services; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\..\services\m1-system-helper\build\M1-system-helper_artefacts\Release\m1-system-helper.exe"; DestDir: "{app}\services"; Components: m1services; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Run]
-Filename: "{src}\version_cleanup.bat"; Parameters: "install"; Flags: runhidden
-Filename: "{src}\om_bootstrap.bat"; Parameters: "install"; Flags: runhidden
+Filename: "{src}\om_bootstrap.bat"; Parameters: "install"; Flags: postinstall runhidden
 
 [Messages]
 SetupWindowTitle=Install Mach1 Spatial System
@@ -105,5 +104,20 @@ begin
     Page1.ID : Result := not IsComponentSelected('vst2');
   else
     Result := False;
+  end;
+end;
+
+procedure RunVersionCleanup();
+var
+  ResultCode: integer;
+begin
+  // Launch bat script
+  ExtractTemporaryFile('version_cleanup.bat');
+  if Exec(ExpandConstant('{tmp}\version_cleanup.bat'), '', '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
+  begin
+    // handle success
+  end
+  else begin
+    // handle failure
   end;
 end;
