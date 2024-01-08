@@ -50,13 +50,16 @@ Source: "..\resources\docs\Mach1-Panner.pdf"; DestDir: "{app}\docs"; Components:
 Source: "..\resources\docs\Mach1-Transcoder.pdf"; DestDir: "{app}\docs"; Components: m1transcoder; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\resources\docs\Mach1-UserGuide.pdf"; DestDir: "{app}\docs"; Components: m1transcoder; Flags: ignoreversion recursesubdirs createallsubdirs
 
+Source: "version_cleanup.bat"; Flags: dontcopy noencryption
 Source: "..\..\m1-player\build\M1-Player_artefacts\Release\*"; Excludes: "ffmpeg*.zip,*.exp,*M1-Player.lib"; DestDir: "{app}"; Components: m1player; Flags: ignoreversion recursesubdirs createallsubdirs; BeforeInstall: RunVersionCleanup
 
-Source: "..\..\m1-orientationmanager\build\M1-orientationmanager_artefacts\Release\m1-orientationmanager.exe"; Excludes: "ffmpeg*.zip,*.exp,*m1-orientationmanager.lib,*av*.dll,postproc*.dll,sw*.dll"; DestDir: "{app}\services"; Components: m1services; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "..\..\services\m1-system-helper\build\M1-system-helper_artefacts\Release\m1-system-helper.exe"; DestDir: "{app}\services"; Components: m1services; Flags: ignoreversion recursesubdirs createallsubdirs
-
+Source: "service_setup.bat"; Flags: dontcopy noencryption
+Source: "service_stopper.bat"; Flags: dontcopy noencryption
+Source: "..\..\m1-orientationmanager\build\M1-orientationmanager_artefacts\Release\m1-orientationmanager.exe"; Excludes: "ffmpeg*.zip,*.exp,*m1-orientationmanager.lib,*av*.dll,postproc*.dll,sw*.dll"; DestDir: "{commonappdata}\Mach1"; Components: m1services; Flags: ignoreversion recursesubdirs createallsubdirs; BeforeInstall: StopServices
+Source: "..\..\services\m1-system-helper\build\M1-system-helper_artefacts\Release\m1-system-helper.exe"; DestDir: "{commonappdata}\Mach1"; Components: m1services; Flags: ignoreversion recursesubdirs createallsubdirs; BeforeInstall: StopServices; AfterInstall: SetupServices
+Source: "..\..\m1-orientationmanager\Resources\settings.json"; DestDir: "{commonappdata}\Mach1"; Components: m1services; Flags: ignoreversion recursesubdirs createallsubdirs
 [Run]
-Filename: "{src}\om_bootstrap.bat"; Parameters: "install"; Flags: postinstall runhidden
+//Filename: "{src}\om_bootstrap.bat"; Parameters: "install"; Flags: postinstall runhidden
 
 [Messages]
 SetupWindowTitle=Install Mach1 Spatial System
@@ -114,6 +117,36 @@ begin
   // Launch bat script
   ExtractTemporaryFile('version_cleanup.bat');
   if Exec(ExpandConstant('{tmp}\version_cleanup.bat'), '', '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
+  begin
+    // handle success
+  end
+  else begin
+    // handle failure
+  end;
+end;
+
+procedure SetupServices();
+var
+  ResultCode: integer;
+begin
+  // Launch bat script
+  ExtractTemporaryFile('service_setup.bat');
+  if Exec(ExpandConstant('{tmp}\service_setup.bat'), '', '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
+  begin
+    // handle success
+  end
+  else begin
+    // handle failure
+  end;
+end;
+
+procedure StopServices();
+var
+  ResultCode: integer;
+begin
+  // Launch bat script
+  ExtractTemporaryFile('service_stopper.bat');
+  if Exec(ExpandConstant('{tmp}\service_stopper.bat'), '', '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
   begin
     // handle success
   end
