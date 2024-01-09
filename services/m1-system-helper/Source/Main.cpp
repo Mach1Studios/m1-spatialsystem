@@ -119,7 +119,7 @@ void killProcessByName(const char *name)
 	else if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::Windows) != 0) {
         // Windows Service Manager
         DBG("Stopping m1-orientationmanager service");
-        int res = system("sc stop M1Service");
+        int res = system("sc stop M1-OrientationManager");
         if (res == 0) {
             DBG("Started m1-orientationmanager server");
         }
