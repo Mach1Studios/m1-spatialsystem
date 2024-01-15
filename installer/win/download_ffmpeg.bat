@@ -25,7 +25,7 @@ echo copying ffmpeg dlls 1>&2
 copy /Y "%ProgramW6432%\Mach1\ffmpeg\bin\avformat*.dll" "%ProgramW6432%\Mach1"
 copy /Y "%ProgramW6432%\Mach1\ffmpeg\bin\avutil*.dll" "%ProgramW6432%\Mach1"
 copy /Y "%ProgramW6432%\Mach1\ffmpeg\bin\avcodec*.dll" "%ProgramW6432%\Mach1"
-copy /Y "%ProgramW6432%\Mach1\ffmpeg\bin\swscale*.dll" "%ProgramW6432%\Mach1"
+copy /Y "%ProgramW6432%\Mach1\ffmpeg\bin\sw*.dll" "%ProgramW6432%\Mach1"
 
 echo removing downloaded ffmpeg dir 1>&2
 rmdir /s /q "%ProgramW6432%\Mach1\ffmpeg"
