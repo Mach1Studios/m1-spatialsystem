@@ -50,8 +50,8 @@ Source: "..\resources\docs\Mach1-Panner.pdf"; DestDir: "{app}\docs"; Components:
 Source: "..\resources\docs\Mach1-Transcoder.pdf"; DestDir: "{app}\docs"; Components: m1transcoder; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\resources\docs\Mach1-UserGuide.pdf"; DestDir: "{app}\docs"; Components: m1transcoder; Flags: ignoreversion recursesubdirs createallsubdirs
 
-Source: "version_cleanup.bat"; Flags: dontcopy noencryption
-Source: "..\..\m1-player\build\M1-Player_artefacts\Release\*"; Excludes: "ffmpeg*.zip,*.exp,*M1-Player.lib"; DestDir: "{app}"; Components: m1player; Flags: ignoreversion recursesubdirs createallsubdirs; BeforeInstall: RunVersionCleanup
+Source: "player_setup.bat"; Flags: dontcopy noencryption
+Source: "..\..\m1-player\build\M1-Player_artefacts\Release\M1-Player.exe"; Excludes: "ffmpeg*.zip,*.exp,*M1-Player.lib"; DestDir: "{app}"; Components: m1player; Flags: ignoreversion recursesubdirs createallsubdirs; BeforeInstall: RunPlayerCleanup
 
 Source: "service_setup.bat"; Flags: dontcopy noencryption
 Source: "service_stopper.bat"; Flags: dontcopy noencryption
@@ -110,13 +110,13 @@ begin
   end;
 end;
 
-procedure RunVersionCleanup();
+procedure RunPlayerCleanup();
 var
   ResultCode: integer;
 begin
   // Launch bat script
-  ExtractTemporaryFile('version_cleanup.bat');
-  if Exec(ExpandConstant('{tmp}\version_cleanup.bat'), '', '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
+  ExtractTemporaryFile('player_setup.bat');
+  if Exec(ExpandConstant('{tmp}\player_setup.bat'), '', '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
   begin
     // handle success
   end
