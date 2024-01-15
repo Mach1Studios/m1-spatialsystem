@@ -16,6 +16,7 @@ DisableWelcomePage=no
 DefaultGroupName=Mach1
 Uninstallable=yes
 UninstallDisplayName=Mach1 Spatial System Uninstaller
+PrivilegesRequired=admin
 
 [Types]
 Name: full; Description: Full installation
@@ -25,9 +26,9 @@ Name: custom; Description: Custom installation; Flags: iscustom
 Name: aax; Description: AAX; Types: full
 Name: vst2; Description: VST2; Types: full
 //Name: vst3; Description: VST3
-Name: m1player; Description: M1VideoPlayer; Types: full
-Name: m1transcoder; Description: M1Transcoder; Types: full custom; Flags: fixed
-Name: m1services; Description: M1Services; Types: full custom; Flags: fixed
+Name: m1player; Description: M1-Player; Types: full
+Name: m1transcoder; Description: M1-Transcoder; Types: full custom; Flags: fixed
+Name: m1services; Description: M1 Background Services; Types: full custom; Flags: fixed
 
 [UninstallDelete]
 Name: {app}; Type: filesandordirs
@@ -51,6 +52,7 @@ Source: "..\resources\docs\Mach1-Transcoder.pdf"; DestDir: "{app}\docs"; Compone
 Source: "..\resources\docs\Mach1-UserGuide.pdf"; DestDir: "{app}\docs"; Components: m1transcoder; Flags: ignoreversion recursesubdirs createallsubdirs
 
 Source: "player_setup.bat"; Flags: dontcopy noencryption
+Source: "download_ffmpeg.bat"; DestDir: "{app}"; Components: m1player; Flags: noencryption ignoreversion
 Source: "..\..\m1-player\build\M1-Player_artefacts\Release\M1-Player.exe"; Excludes: "ffmpeg*.zip,*.exp,*M1-Player.lib"; DestDir: "{app}"; Components: m1player; Flags: ignoreversion recursesubdirs createallsubdirs; BeforeInstall: RunPlayerCleanup
 
 Source: "service_setup.bat"; Flags: dontcopy noencryption
@@ -58,8 +60,9 @@ Source: "service_stopper.bat"; Flags: dontcopy noencryption
 Source: "..\..\m1-orientationmanager\build\M1-orientationmanager_artefacts\Release\m1-orientationmanager.exe"; Excludes: "ffmpeg*.zip,*.exp,*m1-orientationmanager.lib,*av*.dll,postproc*.dll,sw*.dll"; DestDir: "{commonappdata}\Mach1"; Components: m1services; Flags: ignoreversion recursesubdirs createallsubdirs; BeforeInstall: StopServices
 Source: "..\..\services\m1-system-helper\build\M1-system-helper_artefacts\Release\m1-system-helper.exe"; DestDir: "{commonappdata}\Mach1"; Components: m1services; Flags: ignoreversion recursesubdirs createallsubdirs; BeforeInstall: StopServices; AfterInstall: SetupServices
 Source: "..\..\m1-orientationmanager\Resources\settings.json"; DestDir: "{commonappdata}\Mach1"; Components: m1services; Flags: ignoreversion recursesubdirs createallsubdirs
+
 [Run]
-//Filename: "{src}\om_bootstrap.bat"; Parameters: "install"; Flags: postinstall runhidden
+Filename: "{app}\download_ffmpeg.bat"; Parameters: "install"; Flags: postinstall runascurrentuser; StatusMsg: "Downloading required ffmpeg libs..."
 
 [Messages]
 SetupWindowTitle=Install Mach1 Spatial System
