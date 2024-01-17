@@ -125,14 +125,14 @@ void killProcessByName(const char *name)
         }
         else if (res == 1060) {
             DBG("Service not found");
-            exit(1);
+            juce::JUCEApplicationBase::quit();
         }
         else if (res == 1053) {
             DBG("Failed to start service");
         }
         else if (res == 5) {
             DBG("Need to run as admin");
-            exit(1);
+            juce::JUCEApplicationBase::quit();
         }
         else {
             DBG("Unknown Error");
@@ -205,14 +205,14 @@ void startOrientationManager()
 			}
 			else if (res == 1060) {
 				DBG("Service not found");
-				exit(1);
+                juce::JUCEApplicationBase::quit();
 			}
 			else if (res == 1053) {
 				DBG("Failed to start service");
 			}
 			else if (res == 5) {
 				DBG("Need to run as admin");
-				exit(1);
+                juce::JUCEApplicationBase::quit();
 			}
 			else {
 				DBG("Unknown Error");
@@ -228,7 +228,7 @@ void startOrientationManager()
             } else {
                 // Failed to start the process
                 DBG("Failed to start the m1-orientationmanager");
-                exit(1);
+                juce::JUCEApplicationBase::quit();
             }
         }
 	}
