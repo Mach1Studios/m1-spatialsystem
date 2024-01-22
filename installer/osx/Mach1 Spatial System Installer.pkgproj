@@ -1276,7 +1276,7 @@
 				<key>PREINSTALL_PATH</key>
 				<dict>
 					<key>PATH</key>
-					<string>version_cleanup.sh</string>
+					<string>preinstall_services.sh</string>
 					<key>PATH_TYPE</key>
 					<integer>1</integer>
 				</dict>
@@ -1288,7 +1288,7 @@
 				<key>AUTHENTICATION</key>
 				<integer>1</integer>
 				<key>CONCLUSION_ACTION</key>
-				<integer>2</integer>
+				<integer>0</integer>
 				<key>FOLLOW_SYMBOLIC_LINKS</key>
 				<false/>
 				<key>IDENTIFIER</key>
