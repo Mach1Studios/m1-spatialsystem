@@ -88,7 +88,7 @@ endif
 setup-codeisgning:
 ifeq ($(detected_OS),Darwin)
 	security find-identity -p basic -v
-	xcrun notarytool store-credentials 'notarize-app' --apple-id $(APPLE_ID) --team-id $(APPLE_TEAM_CODE)
+	xcrun notarytool store-credentials 'notarize-app' --apple-id $(APPLE_USERNAME) --team-id $(APPLE_TEAM_CODE) --password $(ALTOOL_APPPASS)
 endif 
 
 # run configure first
