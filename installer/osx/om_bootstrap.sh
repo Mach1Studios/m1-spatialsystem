@@ -13,7 +13,8 @@ then
     do
         echo "Executing postinstall for $uid"
         launchctl bootstrap gui/"$uid" /Library/LaunchAgents/com.mach1.spatial.helper.plist
-        #launchctl kickstart -kp gui/"$uid" com.mach1.spatial.helper
+        #launchctl kickstart -kp gui/"$uid"/com.mach1.spatial.helper
+        launchctl bootstrap gui/"$uid" /Library/LaunchAgents/com.mach1.spatial.orientationmanager.plist
     done
 fi
 
