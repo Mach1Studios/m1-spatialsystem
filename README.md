@@ -2,15 +2,16 @@
 DAW focused plugins and apps relating to mixing Mach1 Spatial multichannel mixes
 
 ## Setup
+- Update the `./Makefile.variables` with the needed variables, specifically the VST SDK and AAX SDK paths
+- `make dev` will setup xcode local dev environment for all products
 
 ### MacOS
-- update the `./Makefile.variables` with the needed variables, specifically the VST SDK and AAX SDK paths
-- `make dev` will setup xcode local dev environment for all products
 
 ### Windows
 
 #### Codesigning
-- use `certmgr.exe` and open the Personal certificates to grab the `Thumbprint` from the relevant Digicert Codesigning Certificate to be used in the codesign step via `WIN_SIGNTOOL_ID`
+- Use SafeNet Authentication Client app to check and update current windows certificates for codesigning (via the hardware usb key)
+- Use `certmgr.exe` and open the Personal certificates to grab the `Thumbprint` from the relevant Digicert Codesigning Certificate to be used in the codesign step via `WIN_SIGNTOOL_ID`
 
 ## Known Issues
 - [MacOS] m1-orientationmanager and external BLE device handling issues in macOS versions 12.0, 12.1 and 12.2
