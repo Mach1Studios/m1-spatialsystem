@@ -163,8 +163,8 @@ ifeq ($(detected_OS),Darwin)
 	codesign -v --force -o runtime --entitlements m1-orientationmanager/Resources/entitlements.mac.plist --sign $(APPLE_CODESIGN_CODE) --timestamp m1-orientationmanager/build/m1-orientationmanager_artefacts/m1-orientationmanager
 	codesign -v --force -o runtime --entitlements services/m1-system-helper/entitlements.mac.plist --sign $(APPLE_CODESIGN_CODE) --timestamp services/m1-system-helper/build/m1-system-helper_artefacts/m1-system-helper
 else ifeq ($(detected_OS),Windows)
-	$(WRAPTOOL) sign --verbose --account $(PACE_ID) --wcguid "$(M1_GLOBAL_GUID)" --signid $(WIN_SIGNTOOL_ID) --in m1-monitor/build/M1-Monitor_artefacts/AAX/M1-Monitor.aaxplugin --out m1-monitor/build/M1-Monitor_artefacts/AAX/M1-Monitor.aaxplugin
-	$(WRAPTOOL) sign --verbose --account $(PACE_ID) --wcguid "$(M1_GLOBAL_GUID)" --signid $(WIN_SIGNTOOL_ID) --in m1-panner/build/M1-Panner_artefacts/AAX/M1-Panner.aaxplugin --out m1-panner/build/M1-Panner_artefacts/AAX/M1-Panner.aaxplugin
+	$(WRAPTOOL) sign --verbose --account $(PACE_ACCOUNT) --wcguid "$(M1_GLOBAL_GUID)" --signid $(WIN_SIGNTOOL_ID) --in m1-monitor/build/M1-Monitor_artefacts/Release/AAX/M1-Monitor.aaxplugin --out m1-monitor/build/M1-Monitor_artefacts/Release/AAX/M1-Monitor.aaxplugin
+	$(WRAPTOOL) sign --verbose --account $(PACE_ACCOUNT) --wcguid "$(M1_GLOBAL_GUID)" --signid $(WIN_SIGNTOOL_ID) --in m1-panner/build/M1-Panner_artefacts/Release/AAX/M1-Panner.aaxplugin --out m1-panner/build/M1-Panner_artefacts/Release/AAX/M1-Panner.aaxplugin
 endif
 
 # codesigning and notarizing m1-transcoder is done via electron-builder
