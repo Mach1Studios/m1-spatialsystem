@@ -3,15 +3,15 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleExecutable</key>
-	<string>${EXECUTABLE_NAME}</string>
+	<string>m1-system-helper</string>
 	<key>CFBundleIconFile</key>
 	<string>Icon.icns</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.mach1.spatial.helper</string>
 	<key>CFBundleName</key>
-	<string>${EXECUTABLE_NAME}</string>
+	<string>m1-system-helper</string>
 	<key>CFBundleDisplayName</key>
-	<string>${PRODUCT_NAME}</string>
+	<string>m1-system-helper</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleSignature</key>
@@ -21,7 +21,7 @@
 	<key>CFBundleVersion</key>
 	<string>1.0.0</string>
     <key>LSMinimumSystemVersion</key>
-    <string>${MACOSX_DEPLOYMENT_TARGET}</string>
+    <string>10.14</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>Mach 1, Corp.</string>
     <key>NSAppTransportSecurity</key>    

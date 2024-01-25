@@ -97,7 +97,10 @@ if(APPLE)
         XCODE_ATTRIBUTE_CODE_SIGN_ENTITLEMENTS "${CMAKE_CURRENT_SOURCE_DIR}/entitlements.mac.plist"
         XCODE_ATTRIBUTE_INFOPLIST_KEY_LSApplicationCategoryType "public.app-category.utilities"
     )
-    target_link_options(${CMAKE_PROJECT_NAME} PRIVATE LINKER:-sectcreate,__TEXT,__info_plist,${CMAKE_CURRENT_SOURCE_DIR}/Info.plist)
+    message(STATUS "Attaching Info.plist found at ${CMAKE_CURRENT_SOURCE_DIR}/Info.plist")
+    set_target_properties(${CMAKE_PROJECT_NAME} PROPERTIES LINK_FLAGS 
+        "-sectcreate __TEXT __info_plist ${CMAKE_CURRENT_SOURCE_DIR}/Info.plist"
+    )
 endif()
 
 ### IDE Generator post-config ###
