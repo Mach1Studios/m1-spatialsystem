@@ -45,15 +45,16 @@ Source: "..\resources\templates\Reaper\*"; DestDir: "{app}\templates\Reaper"; Co
 //Source: "..\..\m1-monitor\build\M1-Monitor_artefacts\Release\VST3\M1-Monitor.vst3"; DestDir: "{code:GetDir|1}"; Components: vst3; Flags: ignoreversion
 //Source: "..\..\m1-panner\build\M1-Panner_artefacts\Release\VST3\M1-Panner.vst3"; DestDir: "{code:GetDir|1}"; Components: vst3; Flags: ignoreversion
 
-Source: "..\..\m1-transcoder\dist\M1-Transcoder.exe"; Excludes: "ffmpeg.exe,ffmpeg.dll"; DestDir: "{app}"; Components: m1transcoder; Flags: ignoreversion
+Source: "..\..\m1-transcoder\dist\M1-Transcoder.exe"; Excludes: "ffmpeg.exe,ffmpeg.dll"; DestDir: "{app}"; Components: m1transcoder; Flags: ignoreversion; AfterInstall: RunPostinstallTranscoder
 Source: "..\resources\docs\Mach1-Monitor.pdf"; DestDir: "{app}\docs"; Components: m1transcoder; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\resources\docs\Mach1-Panner.pdf"; DestDir: "{app}\docs"; Components: m1transcoder; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\resources\docs\Mach1-Transcoder.pdf"; DestDir: "{app}\docs"; Components: m1transcoder; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\resources\docs\Mach1-UserGuide.pdf"; DestDir: "{app}\docs"; Components: m1transcoder; Flags: ignoreversion recursesubdirs createallsubdirs
 
-Source: "player_setup.bat"; Flags: dontcopy noencryption
+Source: "preinstall_player.bat"; Flags: dontcopy noencryption
+Source: "postinstall_transcoder.bat"; Flags: dontcopy noencryption
 Source: "download_ffmpeg.bat"; DestDir: "{app}"; Components: m1player; Flags: noencryption ignoreversion
-Source: "..\..\m1-player\build\M1-Player_artefacts\Release\M1-Player.exe"; Excludes: "ffmpeg*.zip,*.exp,*M1-Player.lib"; DestDir: "{app}"; Components: m1player; Flags: ignoreversion recursesubdirs createallsubdirs; BeforeInstall: RunPlayerCleanup
+Source: "..\..\m1-player\build\M1-Player_artefacts\Release\M1-Player.exe"; Excludes: "ffmpeg*.zip,*.exp,*M1-Player.lib"; DestDir: "{app}"; Components: m1player; Flags: ignoreversion recursesubdirs createallsubdirs; BeforeInstall: RunPreinstallPlayer
 
 Source: "service_setup.bat"; Flags: dontcopy noencryption
 Source: "service_stopper.bat"; Flags: dontcopy noencryption
@@ -113,13 +114,13 @@ begin
   end;
 end;
 
-procedure RunPlayerCleanup();
+procedure RunPreinstallPlayer();
 var
   ResultCode: integer;
 begin
   // Launch bat script
-  ExtractTemporaryFile('player_setup.bat');
-  if Exec(ExpandConstant('{tmp}\player_setup.bat'), '', '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
+  ExtractTemporaryFile('preinstall_player.bat');
+  if Exec(ExpandConstant('{tmp}\preinstall_player.bat'), '', '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
   begin
     // handle success
   end
@@ -150,6 +151,21 @@ begin
   // Launch bat script
   ExtractTemporaryFile('service_stopper.bat');
   if Exec(ExpandConstant('{tmp}\service_stopper.bat'), '', '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
+  begin
+    // handle success
+  end
+  else begin
+    // handle failure
+  end;
+end;
+
+procedure RunPostinstallTranscoder();
+var
+  ResultCode: integer;
+begin
+  // Launch bat script
+  ExtractTemporaryFile('postinstall_transcoder.bat');
+  if Exec(ExpandConstant('{tmp}\postinstall_transcoder.bat'), '', '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
   begin
     // handle success
   end
