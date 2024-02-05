@@ -75,15 +75,14 @@ ifeq ($(detected_OS),Darwin)
 	sudo rm -rf "/Library/Audio/Plug-Ins/Components/M1-Monitor.component"
 	sudo rm -rf "/Library/Audio/Plug-Ins/Components/M1-Panner.component"
 	# removing local user
-	sudo rm -rf ~/Library/Application\ Support/Avid/Audio/Plug-Ins/M1-Monitor.aaxplugin
-	sudo rm -rf ~/Library/Application\ Support/Avid/Audio/Plug-Ins/M1-Panner.aaxplugin
-	sudo rm -rf ~/Library/Audio/Plug-Ins/VST/M1-Monitor.vst
-	sudo rm -rf ~/Library/Audio/Plug-Ins/VST/M1-Panner.vst
-	sudo rm -rf ~/Library/Audio/Plug-Ins/VST3/M1-Monitor.vst3
-	sudo rm -rf ~/Library/Audio/Plug-Ins/VST3/M1-Panner.vst3
-	sudo rm -rf ~/Library/Audio/Plug-Ins/Components/M1-Monitor.component
-	sudo rm -rf ~/Library/Audio/Plug-Ins/Components/M1-Panner.component
-endif
+	rm -rf ~/Library/Application\ Support/Avid/Audio/Plug-Ins/M1-Monitor.aaxplugin
+	rm -rf ~/Library/Application\ Support/Avid/Audio/Plug-Ins/M1-Panner.aaxplugin
+	rm -rf ~/Library/Audio/Plug-Ins/VST/M1-Monitor.vst
+	rm -rf ~/Library/Audio/Plug-Ins/VST/M1-Panner.vst
+	rm -rf ~/Library/Audio/Plug-Ins/VST3/M1-Monitor.vst3
+	rm -rf ~/Library/Audio/Plug-Ins/VST3/M1-Panner.vst3
+	rm -rf ~/Library/Audio/Plug-Ins/Components/M1-Monitor.component
+	rm -rf ~/Library/Audio/Plug-Ins/Components/M1-Panner.componentendif
 
 setup-codeisgning:
 ifeq ($(detected_OS),Darwin)
