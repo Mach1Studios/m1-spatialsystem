@@ -57,14 +57,14 @@ endif
 
 clear-installs:
 ifeq ($(detected_OS),Darwin)
-	sudo rm -rf "/Applications/Mach1 Spatial System/M1-Transcoder.app"
-	sudo rm -rf "/Applications/Mach1 Spatial System/M1-VideoPlayer.app"
-	sudo rm -rf "/Applications/Mach1/M1-Transcoder.app"
-	sudo rm -rf "/Applications/Mach1/M1-Player.app"
-	sudo rm -rf "/Library/LaunchAgents/com.mach1.spatial.orientationmanager.plist"
-	sudo rm -rf "/Library/LaunchAgents/com.mach1.spatial.helper.plist"
-	sudo rm -rf "/Library/Application Support/Mach1/m1-orientationmanager"
-	sudo rm -rf "/Library/Application Support/Mach1/m1-system-helper"
+	sudo rm -rf /Applications/Mach1\ Spatial\ System/M1-Transcoder.app
+	sudo rm -rf /Applications/Mach1\ Spatial\ System/M1-VideoPlayer.app
+	sudo rm -rf /Applications/Mach1/M1-Transcoder.app
+	sudo rm -rf /Applications/Mach1/M1-Player.app
+	sudo rm -rf /Library/LaunchAgents/com.mach1.spatial.orientationmanager.plist
+	sudo rm -rf /Library/LaunchAgents/com.mach1.spatial.helper.plist
+	sudo rm -rf /Library/Application Support/Mach1/m1-orientationmanager
+	sudo rm -rf /Library/Application Support/Mach1/m1-system-helper
 	# removing global
 	sudo rm -rf "/Library/Application Support/Avid/Audio/Plug-Ins/M1-Monitor.aaxplugin"
 	sudo rm -rf "/Library/Application Support/Avid/Audio/Plug-Ins/M1-Panner.aaxplugin"
@@ -75,14 +75,14 @@ ifeq ($(detected_OS),Darwin)
 	sudo rm -rf "/Library/Audio/Plug-Ins/Components/M1-Monitor.component"
 	sudo rm -rf "/Library/Audio/Plug-Ins/Components/M1-Panner.component"
 	# removing local user
-	sudo rm -rf "~/Library/Application Support/Avid/Audio/Plug-Ins/M1-Monitor.aaxplugin"
-	sudo rm -rf "~/Library/Application Support/Avid/Audio/Plug-Ins/M1-Panner.aaxplugin"
-	sudo rm -rf "~/Library/Audio/Plug-Ins/VST/M1-Monitor.vst"
-	sudo rm -rf "~/Library/Audio/Plug-Ins/VST/M1-Panner.vst"
-	sudo rm -rf "~/Library/Audio/Plug-Ins/VST3/M1-Monitor.vst3"
-	sudo rm -rf "~/Library/Audio/Plug-Ins/VST3/M1-Panner.vst3"
-	sudo rm -rf "~/Library/Audio/Plug-Ins/Components/M1-Monitor.component"
-	sudo rm -rf "~/Library/Audio/Plug-Ins/Components/M1-Panner.component"
+	sudo rm -rf ~/Library/Application\ Support/Avid/Audio/Plug-Ins/M1-Monitor.aaxplugin
+	sudo rm -rf ~/Library/Application\ Support/Avid/Audio/Plug-Ins/M1-Panner.aaxplugin
+	sudo rm -rf ~/Library/Audio/Plug-Ins/VST/M1-Monitor.vst
+	sudo rm -rf ~/Library/Audio/Plug-Ins/VST/M1-Panner.vst
+	sudo rm -rf ~/Library/Audio/Plug-Ins/VST3/M1-Monitor.vst3
+	sudo rm -rf ~/Library/Audio/Plug-Ins/VST3/M1-Panner.vst3
+	sudo rm -rf ~/Library/Audio/Plug-Ins/Components/M1-Monitor.component
+	sudo rm -rf ~/Library/Audio/Plug-Ins/Components/M1-Panner.component
 endif
 
 setup-codeisgning:
