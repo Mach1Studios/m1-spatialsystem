@@ -82,7 +82,8 @@ ifeq ($(detected_OS),Darwin)
 	rm -rf ~/Library/Audio/Plug-Ins/VST3/M1-Monitor.vst3
 	rm -rf ~/Library/Audio/Plug-Ins/VST3/M1-Panner.vst3
 	rm -rf ~/Library/Audio/Plug-Ins/Components/M1-Monitor.component
-	rm -rf ~/Library/Audio/Plug-Ins/Components/M1-Panner.componentendif
+	rm -rf ~/Library/Audio/Plug-Ins/Components/M1-Panner.component
+endif
 
 setup-codeisgning:
 ifeq ($(detected_OS),Darwin)
