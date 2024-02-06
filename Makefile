@@ -105,7 +105,7 @@ else
 endif
 	cmake m1-orientationmanager -Bm1-orientationmanager/build
 	cmake services/m1-system-helper -Bservices/m1-system-helper/build
-	cd m1-transcoder && npm install
+	cd m1-transcoder && ./scripts/setup.sh && npm install
 
 build: 
 	cmake --build m1-monitor/build --config "Release"
@@ -128,7 +128,7 @@ ifeq ($(detected_OS),Darwin)
 	cmake m1-orientationmanager -Bm1-orientationmanager/build-dev -G "Xcode" -DCMAKE_INSTALL_PREFIX="/Library/Application Support/Mach1"
 	cmake services/m1-system-helper -Bservices/m1-system-helper/build-dev -G "Xcode" -DCMAKE_INSTALL_PREFIX="/Library/Application Support/Mach1"
 	cmake m1-orientationmanager/osc_client -Bm1-orientationmanager/osc_client/build-dev -G "Xcode"
-	cd m1-transcoder && npm install
+	cd m1-transcoder && ./scripts/setup.sh && npm install
 else ifeq ($(detected_OS),Windows)
 	cmake m1-monitor -Bm1-monitor/build-dev -G "Visual Studio 16 2019" -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF -DBUILD_VST3=ON -DBUILD_STANDALONE=ON
 	cmake m1-panner -Bm1-panner/build-dev -G "Visual Studio 16 2019" -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF -DBUILD_VST3=ON -DBUILD_STANDALONE=ON
@@ -136,7 +136,7 @@ else ifeq ($(detected_OS),Windows)
 	cmake m1-orientationmanager -Bm1-orientationmanager/build-dev -G "Visual Studio 16 2019" -DCMAKE_INSTALL_PREFIX="\Documents and Settings\All Users\Application Data\Mach1"
 	cmake services/m1-system-helper -Bservices/m1-system-helper/build-dev -G "Visual Studio 16 2019" -DCMAKE_INSTALL_PREFIX="\Documents and Settings\All Users\Application Data\Mach1"
 	cmake m1-orientationmanager/osc_client -Bm1-orientationmanager/osc_client/build-dev -G "Visual Studio 16 2019"
-	cd m1-transcoder && npm install
+	cd m1-transcoder && ./scripts/setup.sh && npm install
 else
 	cmake m1-monitor -Bm1-monitor/build-dev -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_STANDALONE=ON
 	cmake m1-panner -Bm1-panner/build-dev -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_STANDALONE=ON
@@ -144,7 +144,7 @@ else
 	cmake m1-orientationmanager -Bm1-orientationmanager/build-dev -DCMAKE_INSTALL_PREFIX="/opt/Mach1"
 	cmake services/m1-system-helper -Bservices/m1-system-helper/build-dev -DCMAKE_INSTALL_PREFIX="/opt/Mach1"
 	cmake m1-orientationmanager/osc_client -Bm1-orientationmanager/osc_client/build-dev
-	cd m1-transcoder && npm install
+	cd m1-transcoder && ./scripts/setup.sh && npm install
 endif
 
 codesign:
