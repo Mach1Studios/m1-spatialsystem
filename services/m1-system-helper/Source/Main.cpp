@@ -283,6 +283,8 @@ public:
     std::vector<M1OrientationClientConnection> monitors; // track all the monitor instances
     float master_yaw = 0; float master_pitch = 0; float master_roll = 0;
     int master_mode = 0;
+    float prev_master_yaw = 0; float prev_master_pitch = 0; float prev_master_roll = 0;
+    int prev_master_mode = 0;
     // Tracking for any plugin that does not need an m1_orientation_client but still needs feedback of orientation for UI purposes such as the M1-Panner plugin
     std::vector<M1RegisteredPlugin> registeredPlugins;
     bool bTimerActive = false;
@@ -393,7 +395,7 @@ public:
             }
             
             if (!bTimerActive && m1_clients.size() > 0) {
-                startTimer(60);
+                startTimer(20);
                 bTimerActive = true;
             }
         }
@@ -478,7 +480,7 @@ public:
                             juce::OSCMessage msg("/YPR-Offset");
                             msg.addFloat32(message[0].getFloat32());
                             msg.addFloat32(message[1].getFloat32());
-                            msg.addFloat32(message[2].getFloat32());
+                            //msg.addFloat32(message[2].getFloat32());
                             sender.send(msg);
                         }
                     }
@@ -506,7 +508,7 @@ public:
                 DBG("Plugin port already registered: " + std::to_string(port));
             }
             if (!bTimerActive && registeredPlugins.size() > 0) {
-                startTimer(60);
+                startTimer(20);
                 bTimerActive = true;
             } else {
                 if (registeredPlugins.size() == 0 && m1_clients.size() == 0) {
@@ -587,7 +589,7 @@ public:
             shutdownCounterTime = juce::Time::currentTimeMillis();
 
             // starts the m1-orientationmanager ping timer
-            startTimer(1000);
+            startTimer(20);
         }
     }
 
@@ -636,14 +638,22 @@ public:
 		}
         
         if (registeredPlugins.size() > 0) {
-            for (auto &i: registeredPlugins) {
-                juce::OSCMessage m = juce::OSCMessage(juce::OSCAddressPattern("/monitor-settings"));
-                m.addInt32(master_mode);
-                m.addFloat32(master_yaw);   // expected normalised
-                m.addFloat32(master_pitch); // expected normalised
-                m.addFloat32(master_roll);  // expected normalised
-                //m.addInt32(monitor_output_mode); // TODO: add the output configuration to sync plugins when requested
-                i.messageSender->send(m);
+            // check if any values have changed since last loop
+            if (master_mode != prev_master_mode || master_yaw != prev_master_yaw || master_pitch != prev_master_pitch || master_roll != prev_master_roll) {
+                for (auto &i: registeredPlugins) {
+                    juce::OSCMessage m = juce::OSCMessage(juce::OSCAddressPattern("/monitor-settings"));
+                    m.addInt32(master_mode);
+                    m.addFloat32(master_yaw);   // expected normalised
+                    m.addFloat32(master_pitch); // expected normalised
+                    m.addFloat32(master_roll);  // expected normalised
+                    //m.addInt32(monitor_output_mode); // TODO: add the output configuration to sync plugins when requested
+                    i.messageSender->send(m);
+                }
+                // update stored monitor values for checking changes in next loop
+                prev_master_mode = master_mode;
+                prev_master_yaw = master_yaw;
+                prev_master_pitch = master_pitch;
+                prev_master_roll = master_roll;
             }
         }
         
