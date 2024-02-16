@@ -470,9 +470,9 @@ public:
         }
         else if (message.getAddressPattern() == "/setPlayerYPR") {
             // Used for relaying the active player offset to calculate the orientation in the active monitor instance
+            DBG("[Player] Yaw Offset: "+std::to_string(message[0].getFloat32()));
             if (monitors.size() > 0) {
                 for (int index = 0; index < m1_clients.size(); index++) {
-                    
                     // TODO: refactor using callback to send a message when an update is received
                     if (m1_clients[index].type == "monitor") {
                         juce::OSCSender sender;
@@ -482,6 +482,7 @@ public:
                             msg.addFloat32(message[1].getFloat32());
                             //msg.addFloat32(message[2].getFloat32());
                             sender.send(msg);
+
                         }
                     }
                 }
@@ -489,6 +490,7 @@ public:
         }
         else if (message.getAddressPattern() == "/setMasterYPR") {
             // Used for relaying a master calculated orientation to registered plugins that require this for GUI systems
+            DBG("[Monitor] Yaw: "+std::to_string(message[0].getFloat32()));
             master_yaw = message[0].getFloat32();
             master_pitch = message[1].getFloat32();
             master_roll = message[2].getFloat32();
@@ -627,6 +629,7 @@ public:
 			timeWhenHelperLastSeenAClient = currentTime;
         }
         
+        // this is used for when a client has lost connection to the orientationmanager and signals here for the orientationmanager to be restarted (should ideally be avoided)
         if ((clientRequestsServer) && ((currentTime - timeWhenWeLastStartedAManager) > 10000)) {
             // Every 10 seconds we may restart or start a server if requested
 			killProcessByName("m1-orientationmanager");
@@ -675,7 +678,6 @@ public:
                     
                     // if the removed type is monitor
                     if (m1_clients[index].type == "monitor") {
-                        // if the removed type is monitor
                         for (int m_index = 0; m_index < monitors.size(); m_index++) {
                             // search monitors and remove the same matching port
                             if (monitors[m_index].port == m1_clients[index].port) {
