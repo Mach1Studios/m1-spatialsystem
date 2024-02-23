@@ -8,4 +8,7 @@ if [ -d "/Applications/Mach1 Spatial System/M1-VideoPlayer.app" ]
 then
 	mkdir -p "/Applications/Mach1/legacy"
 	sudo mv "/Applications/Mach1 Spatial System/M1-VideoPlayer.app" "/Applications/Mach1/legacy/M1-VideoPlayer.app"
+	echo "Mach1 Spatial System: Found version 1 installed and migrated legacy M1-VideoPlayer app to new install location."
 fi
+
+exit 0

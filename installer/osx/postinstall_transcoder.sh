@@ -8,3 +8,5 @@ if [ -d "~/Application Support/Mach1 Spatial System" ]
 then 
 	rm -rf "~/Application Support/Mach1 Spatial System"
 fi
+
+exit 0

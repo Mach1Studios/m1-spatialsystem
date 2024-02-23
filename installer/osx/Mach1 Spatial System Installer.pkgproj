@@ -529,7 +529,7 @@
 			<key>MUST-CLOSE-APPLICATION-ITEMS</key>
 			<array/>
 			<key>MUST-CLOSE-APPLICATIONS</key>
-			<true/>
+			<false/>
 			<key>PACKAGE_FILES</key>
 			<dict>
 				<key>DEFAULT_INSTALL_LOCATION</key>
@@ -4768,22 +4768,31 @@
 				</dict>
 				<dict>
 					<key>BEHAVIOR</key>
-					<integer>3</integer>
+					<integer>2</integer>
 					<key>DICTIONARY</key>
 					<dict>
 						<key>IC_REQUIREMENT_OS_DISK_TYPE</key>
-						<integer>0</integer>
+						<integer>1</integer>
 						<key>IC_REQUIREMENT_OS_DISTRIBUTION_TYPE</key>
 						<integer>0</integer>
 						<key>IC_REQUIREMENT_OS_MINIMUM_VERSION</key>
 						<integer>101300</integer>
 					</dict>
 					<key>IC_REQUIREMENT_CHECK_TYPE</key>
-					<integer>1</integer>
+					<integer>0</integer>
 					<key>IDENTIFIER</key>
 					<string>fr.whitebox.Packages.requirement.os</string>
 					<key>MESSAGE</key>
-					<array/>
+					<array>
+						<dict>
+							<key>LANGUAGE</key>
+							<string>English</string>
+							<key>SECONDARY_VALUE</key>
+							<string></string>
+							<key>VALUE</key>
+							<string>Some apps and features will not launch or operate as expected on this version of macOS.</string>
+						</dict>
+					</array>
 					<key>NAME</key>
 					<string>Operating System</string>
 					<key>STATE</key>

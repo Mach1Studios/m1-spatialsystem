@@ -20,6 +20,7 @@ then
 	rm -f "/Library/Application Support/Mach1/m1-system-helper"
 	rm "/Library/Application Support/LaunchAgents/com.mach1.spatial.orientationmanager.plist"
 	rm "/Library/Application Support/LaunchAgents/com.mach1.spatial.helper.plist"
+	echo "Mach1 Spatial System: Removed previously installed Mach1 Spatial System services."
 fi
 
 # TODO: Figure out ideal way to handle deprecating old system (not safe to remove in case the user wants to switch back)
