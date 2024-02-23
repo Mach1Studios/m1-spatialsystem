@@ -658,11 +658,19 @@ public:
                 prev_master_pitch = master_pitch;
                 prev_master_roll = master_roll;
             }
+            
+            // send a ping to all registered plugins every 2 seconds
+            if ((currentTime - timeWhenWeLastStartedAManager) > 2000) {
+                for (auto &i: registeredPlugins) {
+                    juce::OSCMessage m = juce::OSCMessage(juce::OSCAddressPattern("/m1-ping"));
+                    i.messageSender->send(m);
+                }
+            }
+            
+            // TODO: check if any registered plugins closed
+            //for (auto &i: registeredPlugins) {
+            //}
         }
-        
-        // TODO: check if any registered plugins closed
-        //for (auto &i: registeredPlugins) {
-        //}
         
         // client specific messages and cleanup
         if (m1_clients.size() > 0) {
