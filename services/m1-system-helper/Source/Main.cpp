@@ -523,7 +523,7 @@ public:
         else if (message.getAddressPattern() == "/panner-settings") {
             if (message.size() > 0) { // check message size
                 auto plugin_port = message[0].getInt32();
-                if (message.size() == 6) {
+                if (message.size() >= 6) {
                     auto input_mode = message[1].getInt32();
                     auto azi = message[2].getFloat32();
                     auto ele = message[3].getFloat32();
