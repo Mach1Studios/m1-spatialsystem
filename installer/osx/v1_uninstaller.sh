@@ -4,6 +4,8 @@
 # Uninstall 1.x.x Mach1 Spatial System
 
 # Remove installed files from .pkg
+echo "Uninstalling Mach1 Spatial System v1..."
+
 sudo rm -rf /Applications/Mach1\ Spatial\ System
 rm -rf ~/Library/Application\ Support/Mach1\ Spatial\ System
 
@@ -31,3 +33,5 @@ rm -rf ~/Library/Audio/Plug-Ins/VST3/M1-Panner\(6-\>8\).vst3
 # Remove files made by the operating system during runtime
 rm -rf ~/Library/Application\ Support/M1-Transcoder
 rm -rf ~/Library/Application\ Support/M1-Notifier
+
+echo "Uninstalled Mach1 Spatial System v1"
