@@ -5,12 +5,12 @@
 
 if [ -f "/Library/LaunchAgents/com.mach1.spatial.helper.plist" ]
 then 
-    echo "Executing preinstall for services..."
+    echo "Executing preinstall for services..." > /Library/Application\ Support/Mach1/m1-spatialsystem.log
     for uid in $(ps -axo uid,args | grep -i "[l]oginwindow.app" | awk '{ print $1 }')
     do
     	echo "Testing user $uid"
     	if launchctl asuser "$uid" launchctl list 'com.mach1.spatial.helper' &> /dev/null; then
-    	    echo "Executing preinstall for $uid"
+    	    echo "Executing preinstall for $uid" > /Library/Application\ Support/Mach1/m1-spatialsystem.log
     		launchctl bootout gui/"$uid" '/Library/LaunchAgents/com.mach1.spatial.helper.plist'
            	launchctl stop com.mach1.spatial.orientationmanager
     	fi
@@ -20,7 +20,7 @@ then
 	rm -f "/Library/Application Support/Mach1/m1-system-helper"
 	rm "/Library/Application Support/LaunchAgents/com.mach1.spatial.orientationmanager.plist"
 	rm "/Library/Application Support/LaunchAgents/com.mach1.spatial.helper.plist"
-	echo "Mach1 Spatial System: Removed previously installed Mach1 Spatial System services."
+	echo "Mach1 Spatial System: Removed previously installed Mach1 Spatial System services." > /Library/Application\ Support/Mach1/m1-spatialsystem.log
 fi
 
 # TODO: Figure out ideal way to handle deprecating old system (not safe to remove in case the user wants to switch back)
