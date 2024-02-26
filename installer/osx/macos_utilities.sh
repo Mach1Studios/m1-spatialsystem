@@ -1,4 +1,4 @@
-#!/bin/bash
+#! /bin/bash
 
 # MACH1 SPATIAL SYSTEM 
 # Common build and distribution utilities
