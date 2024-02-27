@@ -101,22 +101,22 @@ void killProcessByName(const char *name)
     }
     
     DBG("Killing " + std::string(name) + "...");
-	std::string command;
-	if ((juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_7) ||
-		(juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_8) ||
-		(juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_9)) {
-		// MacOS 10.7-10.9, launchd v1.0
-		command = std::string("launchctl stop ") + service_name;
+    std::string command;
+    if ((juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_7) ||
+        (juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_8) ||
+        (juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_9)) {
+        // MacOS 10.7-10.9, launchd v1.0
+        command = std::string("launchctl stop ") + service_name;
         DBG("Executing: " + command);
         system(command.c_str());
-	}
-	else if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::MacOSX) != 0) {
-		// All newer MacOS, launchd v2.0
-		command = std::string("launchctl kill 9 ") + service_target;
+    }
+    else if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::MacOSX) != 0) {
+        // All newer MacOS, launchd v2.0
+        command = std::string("launchctl kill 9 ") + service_target;
         DBG("Executing: " + command);
         system(command.c_str());
-	}
-	else if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::Windows) != 0) {
+    }
+    else if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::Windows) != 0) {
         // Windows Service Manager
         DBG("Stopping m1-orientationmanager service");
         int res = system("sc stop M1-OrientationManager");
@@ -137,12 +137,12 @@ void killProcessByName(const char *name)
         else {
             DBG("Unknown Error");
         }
-	}
-	else {
-		command = std::string("pkill ") + std::string(name);
+    }
+    else {
+        command = std::string("pkill ") + std::string(name);
         DBG("Executing: " + command);
         system(command.c_str());
-	}
+    }
 }
 
 void startOrientationManager()
@@ -198,26 +198,26 @@ void startOrientationManager()
         } else if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::Windows) != 0) {
             // Any windows OS
             // Windows Service Manager
-			DBG("Starting m1-orientationmanager service");
-			int res = system("sc start M1-OrientationManager");
-			if (res == 0) {
-				DBG("Started m1-orientationmanager server");
-			}
-			else if (res == 1060) {
-				DBG("Service not found");
+            DBG("Starting m1-orientationmanager service");
+            int res = system("sc start M1-OrientationManager");
+            if (res == 0) {
+                DBG("Started m1-orientationmanager server");
+            }
+            else if (res == 1060) {
+                DBG("Service not found");
                 juce::JUCEApplicationBase::quit();
-			}
-			else if (res == 1053) {
-				DBG("Failed to start service");
-			}
-			else if (res == 5) {
-				DBG("Need to run as admin");
+            }
+            else if (res == 1053) {
+                DBG("Failed to start service");
+            }
+            else if (res == 5) {
+                DBG("Need to run as admin");
                 juce::JUCEApplicationBase::quit();
-			}
-			else {
-				DBG("Unknown Error");
-			}
-		} else {
+            }
+            else {
+                DBG("Unknown Error");
+            }
+        } else {
             // TODO: factor out linux using systemd service
             orientationManagerExe = m1SupportDirectory.getChildFile("Mach1").getChildFile("m1-orientationmanager");
             juce::StringArray arguments;
@@ -231,7 +231,7 @@ void startOrientationManager()
                 juce::JUCEApplicationBase::quit();
             }
         }
-	}
+    }
 }
 
 //==============================================================================
@@ -260,23 +260,12 @@ bool send(const std::vector<M1OrientationClientConnection>& m1_clients, std::str
 }
 
 //==============================================================================
-class M1SystemHelperApplication : public juce::JUCEApplication,
-    private juce::Timer,
-    public juce::OSCReceiver::Listener<juce::OSCReceiver::RealtimeCallback>
-{
+class M1SystemHelperService :
+    public juce::Timer, 
+    public juce::OSCReceiver::Listener<juce::OSCReceiver::RealtimeCallback> {
+
     juce::OSCReceiver receiver;
 
-    // TIMER = m1-orientationmanager ping timer
-    // this is used to blindly check if the m1-orientationmanager has crashed and attempt to relaunch it
-    
-public:
-    M1SystemHelperApplication() {}
-    ~M1SystemHelperApplication() {}
-    
-    const juce::String getApplicationName() override       { return ProjectInfo::projectName; }
-    const juce::String getApplicationVersion() override    { return ProjectInfo::versionString; }
-    bool moreThanOneInstanceAllowed() override             { return false; }
-    
     std::vector<M1OrientationClientConnection> m1_clients;
     // TODO: refactor these so they arent copies of the `m1_clients`
     std::vector<M1OrientationClientConnection> players; // track all the player instances
@@ -288,9 +277,9 @@ public:
     // Tracking for any plugin that does not need an m1_orientation_client but still needs feedback of orientation for UI purposes such as the M1-Panner plugin
     std::vector<M1RegisteredPlugin> registeredPlugins;
     bool bTimerActive = false;
-    
-	juce::int64 timeWhenHelperLastSeenAClient = 0;
-	juce::int64 timeWhenWeLastStartedAManager = -10000;
+
+    juce::int64 timeWhenHelperLastSeenAClient = 0;
+    juce::int64 timeWhenWeLastStartedAManager = -10000;
     bool clientRequestsServer = false;
 
     void send_getConnectedClients(const std::vector<M1OrientationClientConnection>& clients) {
@@ -346,7 +335,7 @@ public:
             }
         }
     }
-    
+
     void oscMessageReceived(const juce::OSCMessage& message) override
     {
         // restart the ping timer because we received a ping
@@ -377,7 +366,7 @@ public:
                 m1_client.type = type;
                 m1_client.time = juce::Time::currentTimeMillis();
                 m1_clients.push_back(m1_client);
-                
+
                 juce::OSCSender sender;
                 if (sender.connect("127.0.0.1", port)) {
                     juce::OSCMessage msg("/connectedToServer");
@@ -388,12 +377,12 @@ public:
                         players.push_back(m1_client);
                     }
                     command_activateClients();
-                    msg.addInt32(m1_clients.size()-1); // send ID for multiple clients to send commands
+                    msg.addInt32(m1_clients.size() - 1); // send ID for multiple clients to send commands
                     sender.send(msg);
-                    DBG("Number of mach1 clients registered: "+std::to_string(m1_clients.size()) + " | monitors:" + std::to_string(monitors.size()) + " | players:" + std::to_string(players.size()));
+                    DBG("Number of mach1 clients registered: " + std::to_string(m1_clients.size()) + " | monitors:" + std::to_string(monitors.size()) + " | players:" + std::to_string(players.size()));
                 }
             }
-            
+
             if (!bTimerActive && m1_clients.size() > 0) {
                 startTimer(20);
                 bTimerActive = true;
@@ -426,11 +415,11 @@ public:
                     }
                     // remove the client from the list
                     m1_clients.erase(m1_clients.begin() + index);
-                    DBG("Number of mach1 clients registered: "+std::to_string(m1_clients.size()) + " | monitors:" + std::to_string(monitors.size()) + " | players:" + std::to_string(players.size()));
+                    DBG("Number of mach1 clients registered: " + std::to_string(m1_clients.size()) + " | monitors:" + std::to_string(monitors.size()) + " | players:" + std::to_string(players.size()));
                 }
             }
             send_getConnectedClients(m1_clients);
-            
+
             if (m1_clients.size() == 0 && registeredPlugins.size() == 0) {
                 stopTimer();
                 bTimerActive = false;
@@ -466,7 +455,7 @@ public:
         else if (message.getAddressPattern() == "/setMonitoringMode") {
             // receiving updated monitoring mode or other misc settings for clients
             master_mode = message[0].getInt32();
-            DBG("[Monitor] Mode: "+std::to_string(master_mode));
+            DBG("[Monitor] Mode: " + std::to_string(master_mode));
         }
         else if (message.getAddressPattern() == "/setPlayerYPR") {
             // Used for relaying the active player offset to calculate the orientation in the active monitor instance
@@ -506,13 +495,15 @@ public:
                 foundPlugin.messageSender->connect("127.0.0.1", port); // connect to that newly discovered panner locally
                 registeredPlugins.push_back(foundPlugin);
                 DBG("Plugin registered: " + std::to_string(port));
-            } else {
+            }
+            else {
                 DBG("Plugin port already registered: " + std::to_string(port));
             }
             if (!bTimerActive && registeredPlugins.size() > 0) {
                 startTimer(20);
                 bTimerActive = true;
-            } else {
+            }
+            else {
                 if (registeredPlugins.size() == 0 && m1_clients.size() == 0) {
                     // TODO: setup logic for deleting from `registeredPlugins`
                     stopTimer();
@@ -529,7 +520,7 @@ public:
                     auto ele = message[3].getFloat32();
                     auto div = message[4].getFloat32();
                     auto gain = message[5].getFloat32();
-                    DBG("[OSC] Panner: port="+std::to_string(plugin_port)+", in="+std::to_string(input_mode)+", az="+std::to_string(azi)+", el="+std::to_string(ele)+", di="+std::to_string(div)+", gain="+std::to_string(gain));
+                    DBG("[OSC] Panner: port=" + std::to_string(plugin_port) + ", in=" + std::to_string(input_mode) + ", az=" + std::to_string(azi) + ", el=" + std::to_string(ele) + ", di=" + std::to_string(div) + ", gain=" + std::to_string(gain));
                     // Check if port matches expected registered-plugin port
                     if (registeredPlugins.size() > 0) {
                         auto it = std::find_if(registeredPlugins.begin(), registeredPlugins.end(), find_plugin(plugin_port));
@@ -542,17 +533,17 @@ public:
                         registeredPlugins[index].gain = gain;
                     }
                 }
-            } else {
+            }
+            else {
                 // port not found, error here
             }
         }
         else {
             DBG("OSC Message not implemented: " + message.getAddressPattern().toString());
         }
-
     }
 
-    void initialise(const juce::String&) override
+    void initialise()
     {
         // We will assume the folders are properly created during the installation step
         juce::File settingsFile;
@@ -562,25 +553,27 @@ public:
         if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::MacOSX) != 0) {
             // test for any mac OS
             settingsFile = m1SupportDirectory.getChildFile("Application Support").getChildFile("Mach1");
-        } else if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::Windows) != 0) {
+        }
+        else if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::Windows) != 0) {
             // test for any windows OS
             settingsFile = m1SupportDirectory.getChildFile("Mach1");
-        } else {
+        }
+        else {
             settingsFile = m1SupportDirectory.getChildFile("Mach1");
         }
         settingsFile = settingsFile.getChildFile("settings.json");
         DBG("Opening settings file: " + settingsFile.getFullPathName().quoted());
-        
+
         initFromSettings(settingsFile.getFullPathName().toStdString());
-        
-        juce::DatagramSocket socket(false); 
+
+        juce::DatagramSocket socket(false);
         socket.setEnablePortReuse(true);
         if (!socket.bindToPort(helperPort)) {
             socket.shutdown();
 
             juce::String message = "Failed to bind to port " + std::to_string(helperPort);
             DBG(message);
-            quit();
+            exit(0);
         }
         else {
             socket.shutdown();
@@ -596,7 +589,7 @@ public:
     }
 
     //==============================================================================
-    void shutdown() override
+    void shutdown()
     {
         stopTimer();
         receiver.removeListener(this);
@@ -604,21 +597,7 @@ public:
         DBG("m1-system-helper is shutting down...");
     }
 
-    void systemRequestedQuit() override
-    {
-        // This is called when the app is being asked to quit: you can ignore this
-        // request and let the app carry on running, or call quit() to allow the app to close.
-        quit();
-    }
-
-    void anotherInstanceStarted (const juce::String& commandLine) override
-    {
-        // When another instance of the app is launched while this one is running,
-        // this method is invoked, and the commandLine parameter tells you what
-        // the other instance's command-line arguments were.
-        quit();
-    }
-    
+    //==============================================================================
     void timerCallback() override
     {
         juce::int64 currentTime = juce::Time::currentTimeMillis();
@@ -626,20 +605,20 @@ public:
         if ((currentTime - timeWhenHelperLastSeenAClient) > 20000) {
             // Killing server because we haven't seen a client in 20 seconds
             killProcessByName("m1-orientationmanager");
-			timeWhenHelperLastSeenAClient = currentTime;
+            timeWhenHelperLastSeenAClient = currentTime;
         }
         
         // this is used for when a client has lost connection to the orientationmanager and signals here for the orientationmanager to be restarted (should ideally be avoided)
         if ((clientRequestsServer) && ((currentTime - timeWhenWeLastStartedAManager) > 10000)) {
             // Every 10 seconds we may restart or start a server if requested
-			killProcessByName("m1-orientationmanager");
-			juce::Thread::sleep(2000); // wait for stop
+            killProcessByName("m1-orientationmanager");
+            juce::Thread::sleep(2000); // wait for stop
             startOrientationManager();
-			juce::Thread::sleep(8000); // wait for start
-			clientRequestsServer = false;
-			timeWhenWeLastStartedAManager = currentTime;
-		}
-        
+            juce::Thread::sleep(8000); // wait for start
+            clientRequestsServer = false;
+            timeWhenWeLastStartedAManager = currentTime;
+        }
+
         if (registeredPlugins.size() > 0) {
             // check if any values have changed since last loop
             if (master_mode != prev_master_mode || master_yaw != prev_master_yaw || master_pitch != prev_master_pitch || master_roll != prev_master_roll) {
@@ -671,7 +650,7 @@ public:
             //for (auto &i: registeredPlugins) {
             //}
         }
-        
+
         // client specific messages and cleanup
         if (m1_clients.size() > 0) {
             for (int index = 0; index < m1_clients.size(); index++) {
@@ -680,10 +659,10 @@ public:
                     // TODO: send panners to player clients here
                     juce::OSCMessage m = juce::OSCMessage(juce::OSCAddressPattern("/panner-settings"));
                 }
-                
+
                 // cleanup any zombie clients
                 if ((currentTime - m1_clients[index].time) > 10000) {
-                    
+
                     // if the removed type is monitor
                     if (m1_clients[index].type == "monitor") {
                         for (int m_index = 0; m_index < monitors.size(); m_index++) {
@@ -694,7 +673,7 @@ public:
                             }
                         }
                     }
-                    
+
                     // if the removed type is player
                     if (m1_clients[index].type == "player") {
                         for (int p_index = 0; p_index < players.size(); p_index++) {
@@ -705,16 +684,224 @@ public:
                             }
                         }
                     }
-                        
+
                     // remove the client from the list
                     m1_clients.erase(m1_clients.begin() + index);
-                    DBG("Number of mach1 clients registered: "+std::to_string(m1_clients.size()) + " | monitors:" + std::to_string(monitors.size()) + " | players:" + std::to_string(players.size()));
+                    DBG("Number of mach1 clients registered: " + std::to_string(m1_clients.size()) + " | monitors:" + std::to_string(monitors.size()) + " | players:" + std::to_string(players.size()));
                 }
             }
         }
     }
+
+public:
+    static M1SystemHelperService& getInstance() {
+        static M1SystemHelperService instance; // Singleton instance
+        return instance;
+    }
+
+    void start() {
+        initialise();
+
+        while (!juce::MessageManager::getInstance()->hasStopMessageBeenSent()) {
+
+            juce::Thread::sleep(100);
+        }
+
+        shutdown();
+    }
+
+};
+
+#if !defined(GUI_APP) && defined(JUCE_WINDOWS)
+#include <Windows.h>
+#include <iostream>
+#include <thread>
+
+SERVICE_STATUS          g_ServiceStatus = { 0 };
+SERVICE_STATUS_HANDLE   g_StatusHandle = NULL;
+HANDLE                  g_ServiceStopEvent = INVALID_HANDLE_VALUE;
+
+// Service control handler function
+VOID WINAPI ServiceControlHandler(DWORD dwControl) {
+    switch (dwControl) {
+    case SERVICE_CONTROL_STOP:
+    case SERVICE_CONTROL_SHUTDOWN:
+        // Report the service status as STOP_PENDING.
+        g_ServiceStatus.dwCurrentState = SERVICE_STOP_PENDING;
+        SetServiceStatus(g_StatusHandle, &g_ServiceStatus);
+
+        juce::MessageManager::getInstance()->stopDispatchLoop();
+
+        // Signal the service to stop.
+        SetEvent(g_ServiceStopEvent);
+        return;
+
+    default:
+        break;
+    }
+}
+
+// Service entry point
+VOID WINAPI ServiceMain(DWORD argc, LPTSTR* argv) {
+    g_StatusHandle = RegisterServiceCtrlHandler("M1-System-Helper", ServiceControlHandler);
+    if (!g_StatusHandle) {
+        std::cerr << "RegisterServiceCtrlHandler failed: " << GetLastError() << std::endl;
+        return;
+    }
+
+    // Report the service status as RUNNING.
+    g_ServiceStatus.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
+    g_ServiceStatus.dwCurrentState = SERVICE_RUNNING;
+    g_ServiceStatus.dwControlsAccepted = SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN;
+    g_ServiceStatus.dwWin32ExitCode = NO_ERROR;
+    g_ServiceStatus.dwServiceSpecificExitCode = 0;
+    g_ServiceStatus.dwCheckPoint = 0;
+    g_ServiceStatus.dwWaitHint = 0;
+    SetServiceStatus(g_StatusHandle, &g_ServiceStatus);
+
+    // Create an event to signal the service to stop.
+    g_ServiceStopEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+    if (g_ServiceStopEvent == NULL) {
+        // Handle error.
+        return;
+    }
+
+    // Start a worker thread to perform the service's workand wait for the worker thread to complete.
+    std::thread([&] { juce::MessageManager::getInstance()->runDispatchLoop(); }).detach();
+    std::thread([]() { M1SystemHelperService::getInstance().start(); }).join();
+
+    // Cleanup and report the service status as STOPPED.
+    CloseHandle(g_ServiceStopEvent);
+    g_ServiceStatus.dwCurrentState = SERVICE_STOPPED;
+    g_ServiceStatus.dwControlsAccepted = 0;
+    SetServiceStatus(g_StatusHandle, &g_ServiceStatus);
+}
+
+int main(int argc, char* argv[]) {
+    SERVICE_TABLE_ENTRY ServiceTable[] =
+    {
+        { "M1-System-Helper", (LPSERVICE_MAIN_FUNCTION)ServiceMain},
+        { NULL, NULL }
+    };
+
+    // This is where the service starts.
+    if (StartServiceCtrlDispatcher(ServiceTable) == FALSE) {
+        std::cerr << "StartServiceCtrlDispatcher failed: " << GetLastError() << std::endl;
+    }
+
+    return 0;
+}
+
+#else
+
+class M1SystemHelperApplication : public juce::JUCEApplication
+{
+public:
+    //==============================================================================
+    M1SystemHelperApplication() {
+    }
+
+    const juce::String getApplicationName() override { return ProjectInfo::projectName; }
+    const juce::String getApplicationVersion() override { return ProjectInfo::versionString; }
+    bool moreThanOneInstanceAllowed() override { return false; }
+
+    //==============================================================================
+    void initialise(const juce::String& commandLine) override
+    {
+        // This method is where you should put your application's initialisation code..
+        std::thread([]() { M1SystemHelperService::getInstance().start(); }).detach();
+
+#if defined(GUI_APP)
+        mainWindow.reset(new MainWindow(getApplicationName()));
+#else
+        juce::MessageManager::getInstance()->runDispatchLoop();
+#endif
+    }
+
+    void shutdown() override
+    {
+        // Add your application's shutdown code here..
+
+#if defined(GUI_APP)
+        mainWindow = nullptr; // (deletes our window)
+#endif
+    }
+
+    //==============================================================================
+    void systemRequestedQuit() override
+    {
+        // This is called when the app is being asked to quit: you can ignore this
+        // request and let the app carry on running, or call quit() to allow the app to close.
+        quit();
+    }
+
+    void anotherInstanceStarted(const juce::String& commandLine) override
+    {
+        // When another instance of the app is launched while this one is running,
+        // this method is invoked, and the commandLine parameter tells you what
+        // the other instance's command-line arguments were.
+        quit();
+    }
+
+#if defined(GUI_APP)
+    //==============================================================================
+    /*
+        This class implements the desktop window that contains an instance of
+        our MainComponent class.
+    */
+    class MainWindow : public juce::DocumentWindow
+    {
+    public:
+        MainWindow(juce::String name)
+            : DocumentWindow(name,
+                juce::Desktop::getInstance().getDefaultLookAndFeel()
+                .findColour(juce::ResizableWindow::backgroundColourId),
+                DocumentWindow::allButtons)
+        {
+            setUsingNativeTitleBar(true);
+            setContentOwned(new MainComponent(), true);
+
+#if JUCE_IOS || JUCE_ANDROID
+            setFullScreen(true);
+#else
+            setResizable(true, true);
+            centreWithSize(getWidth(), getHeight());
+#endif
+
+            setVisible(true);
+        }
+
+        void closeButtonPressed() override
+        {
+            // This is called when the user tries to close this window. Here, we'll just
+            // ask the app to quit when this happens, but you can change this to do
+            // whatever you need.
+            JUCEApplication::getInstance()->systemRequestedQuit();
+        }
+
+        /* Note: Be careful if you override any DocumentWindow methods - the base
+           class uses a lot of them, so by overriding you might break its functionality.
+           It's best to do all your work in your content component instead, but if
+           you really have to override any DocumentWindow methods, make sure your
+           subclass also calls the superclass's method.
+        */
+
+    private:
+        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainWindow)
+    };
+#endif
+
+private:
+#if defined(GUI_APP)
+    std::unique_ptr<MainWindow> mainWindow;
+#endif
+
 };
 
 //==============================================================================
 // This macro generates the main() routine that launches the app.
+//==============================================================================
+
 START_JUCE_APPLICATION(M1SystemHelperApplication)
+
+#endif
