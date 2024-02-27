@@ -101,22 +101,22 @@ void killProcessByName(const char *name)
     }
     
     DBG("Killing " + std::string(name) + "...");
-	std::string command;
-	if ((juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_7) ||
-		(juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_8) ||
-		(juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_9)) {
-		// MacOS 10.7-10.9, launchd v1.0
-		command = std::string("launchctl stop ") + service_name;
+    std::string command;
+    if ((juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_7) ||
+        (juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_8) ||
+        (juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_9)) {
+        // MacOS 10.7-10.9, launchd v1.0
+        command = std::string("launchctl stop ") + service_name;
         DBG("Executing: " + command);
         system(command.c_str());
-	}
-	else if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::MacOSX) != 0) {
-		// All newer MacOS, launchd v2.0
-		command = std::string("launchctl kill 9 ") + service_target;
+    }
+    else if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::MacOSX) != 0) {
+        // All newer MacOS, launchd v2.0
+        command = std::string("launchctl kill 9 ") + service_target;
         DBG("Executing: " + command);
         system(command.c_str());
-	}
-	else if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::Windows) != 0) {
+    }
+    else if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::Windows) != 0) {
         // Windows Service Manager
         DBG("Stopping m1-orientationmanager service");
         int res = system("sc stop M1-OrientationManager");
@@ -137,12 +137,12 @@ void killProcessByName(const char *name)
         else {
             DBG("Unknown Error");
         }
-	}
-	else {
-		command = std::string("pkill ") + std::string(name);
+    }
+    else {
+        command = std::string("pkill ") + std::string(name);
         DBG("Executing: " + command);
         system(command.c_str());
-	}
+    }
 }
 
 void startOrientationManager()
@@ -198,26 +198,26 @@ void startOrientationManager()
         } else if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::Windows) != 0) {
             // Any windows OS
             // Windows Service Manager
-			DBG("Starting m1-orientationmanager service");
-			int res = system("sc start M1-OrientationManager");
-			if (res == 0) {
-				DBG("Started m1-orientationmanager server");
-			}
-			else if (res == 1060) {
-				DBG("Service not found");
+            DBG("Starting m1-orientationmanager service");
+            int res = system("sc start M1-OrientationManager");
+            if (res == 0) {
+                DBG("Started m1-orientationmanager server");
+            }
+            else if (res == 1060) {
+                DBG("Service not found");
                 juce::JUCEApplicationBase::quit();
-			}
-			else if (res == 1053) {
-				DBG("Failed to start service");
-			}
-			else if (res == 5) {
-				DBG("Need to run as admin");
+            }
+            else if (res == 1053) {
+                DBG("Failed to start service");
+            }
+            else if (res == 5) {
+                DBG("Need to run as admin");
                 juce::JUCEApplicationBase::quit();
-			}
-			else {
-				DBG("Unknown Error");
-			}
-		} else {
+            }
+            else {
+                DBG("Unknown Error");
+            }
+        } else {
             // TODO: factor out linux using systemd service
             orientationManagerExe = m1SupportDirectory.getChildFile("Mach1").getChildFile("m1-orientationmanager");
             juce::StringArray arguments;
@@ -231,7 +231,7 @@ void startOrientationManager()
                 juce::JUCEApplicationBase::quit();
             }
         }
-	}
+    }
 }
 
 //==============================================================================
@@ -537,7 +537,6 @@ class M1SystemHelperService :
         else {
             DBG("OSC Message not implemented: " + message.getAddressPattern().toString());
         }
-
     }
 
     void initialise()
@@ -772,10 +771,8 @@ int main(int argc, char* argv[]) {
 
     return 0;
 }
+
 #else
-
-
-
 
 class M1SystemHelperApplication : public juce::JUCEApplication
 {
