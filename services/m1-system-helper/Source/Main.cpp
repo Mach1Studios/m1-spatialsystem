@@ -513,14 +513,23 @@ class M1SystemHelperService :
         }
         else if (message.getAddressPattern() == "/panner-settings") {
             if (message.size() > 0) { // check message size
-                auto plugin_port = message[0].getInt32();
+                int plugin_port = message[0].getInt32();
                 if (message.size() >= 6) {
-                    auto input_mode = message[1].getInt32();
-                    auto azi = message[2].getFloat32();
-                    auto ele = message[3].getFloat32();
-                    auto div = message[4].getFloat32();
-                    auto gain = message[5].getFloat32();
+                    int input_mode = message[1].getInt32();
+                    float azi = message[2].getFloat32();
+                    float ele = message[3].getFloat32();
+                    float div = message[4].getFloat32();
+                    float gain = message[5].getFloat32();
                     DBG("[OSC] Panner: port=" + std::to_string(plugin_port) + ", in=" + std::to_string(input_mode) + ", az=" + std::to_string(azi) + ", el=" + std::to_string(ele) + ", di=" + std::to_string(div) + ", gain=" + std::to_string(gain));
+                    // get optional messages
+                    std::string displayName;
+                    if (message.size() >= 7 && message[6].isString()) {
+                        displayName = message[6].getString().toStdString();
+                    }
+                    juce::OSCColour colour;
+                    if (message.size() >= 8 && message[7].isColour()) {
+                        colour = message[7].getColour();
+                    }
                     // Check if port matches expected registered-plugin port
                     if (registeredPlugins.size() > 0) {
                         auto it = std::find_if(registeredPlugins.begin(), registeredPlugins.end(), find_plugin(plugin_port));
@@ -531,6 +540,7 @@ class M1SystemHelperService :
                         registeredPlugins[index].elevation = ele;
                         registeredPlugins[index].diverge = div;
                         registeredPlugins[index].gain = gain;
+                        registeredPlugins[index].name = displayName;
                     
                         if (m1_clients.size() > 0) {
                             for (int client = 0; client < m1_clients.size(); client++) {
@@ -545,6 +555,12 @@ class M1SystemHelperService :
                                         m.addFloat32(registeredPlugins[index].elevation);
                                         m.addFloat32(registeredPlugins[index].diverge);
                                         m.addFloat32(registeredPlugins[index].gain);
+                                        // send optional messages
+                                        m.addString(registeredPlugins[index].name);
+                                        if (message.size() >= 8 && message[7].isColour()) {
+                                            m.addColour(colour);
+                                        }
+                                        
                                         sender.send(m);
                                         DBG("[OSC] Panner: port=" + std::to_string(registeredPlugins[index].port) + " | Relayed to Player: " + std::to_string(m1_clients[client].port));
                                     }
