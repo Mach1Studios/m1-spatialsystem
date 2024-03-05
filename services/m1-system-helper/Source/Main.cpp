@@ -573,7 +573,7 @@ class M1SystemHelperService :
 
             juce::String message = "Failed to bind to port " + std::to_string(helperPort);
             DBG(message);
-            exit(0);
+            juce::JUCEApplicationBase::quit();
         }
         else {
             socket.shutdown();
