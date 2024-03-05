@@ -531,6 +531,26 @@ class M1SystemHelperService :
                         registeredPlugins[index].elevation = ele;
                         registeredPlugins[index].diverge = div;
                         registeredPlugins[index].gain = gain;
+                    
+                        if (m1_clients.size() > 0) {
+                            for (int client = 0; client < m1_clients.size(); client++) {
+                                if (m1_clients[client].type == "player") {
+                                    // relay the panner-settings message to the players
+                                    juce::OSCSender sender;
+                                    if (sender.connect("127.0.0.1", m1_clients[client].port)) {
+                                        juce::OSCMessage m = juce::OSCMessage(juce::OSCAddressPattern("/panner-settings"));
+                                        m.addInt32(registeredPlugins[index].port);
+                                        m.addInt32(registeredPlugins[index].input_mode);
+                                        m.addFloat32(registeredPlugins[index].azimuth);
+                                        m.addFloat32(registeredPlugins[index].elevation);
+                                        m.addFloat32(registeredPlugins[index].diverge);
+                                        m.addFloat32(registeredPlugins[index].gain);
+                                        sender.send(m);
+                                        DBG("[OSC] Panner: port=" + std::to_string(registeredPlugins[index].port) + " | Relayed to Player: " + std::to_string(m1_clients[client].port));
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -654,12 +674,6 @@ class M1SystemHelperService :
         // client specific messages and cleanup
         if (m1_clients.size() > 0) {
             for (int index = 0; index < m1_clients.size(); index++) {
-                // TODO: refactor using callback to send a message when an update is received
-                if (m1_clients[index].type == "player") {
-                    // TODO: send panners to player clients here
-                    juce::OSCMessage m = juce::OSCMessage(juce::OSCAddressPattern("/panner-settings"));
-                }
-
                 // cleanup any zombie clients
                 if ((currentTime - m1_clients[index].time) > 10000) {
 
