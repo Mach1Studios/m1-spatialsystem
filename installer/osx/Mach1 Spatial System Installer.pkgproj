@@ -4810,6 +4810,15 @@
 			<dict>
 				<key>installer-script.domains:enable_currentUserHome</key>
 				<integer>0</integer>
+				<key>installer-script.domains:enable_localSystem</key>
+				<integer>0</integer>
+				<key>installer-script.options:allow-external-scripts</key>
+				<integer>1</integer>
+				<key>installer-script.options:hostArchitectures</key>
+				<array>
+					<string>i386</string>
+					<string>arm64</string>
+				</array>
 			</dict>
 			<key>BUILD_FORMAT</key>
 			<integer>0</integer>

@@ -120,7 +120,7 @@ else
 endif
 
 # run configure first
-package: build codesign notarize installer
+package: build codesign notarize installer-pkg
 
 # clear and configure for release
 configure: clear
@@ -184,7 +184,7 @@ ifeq ($(detected_OS),Darwin)
 	#./installer/osx/macos_utilities.sh -f m1-system-helper -z .zip -p services/m1-system-helper/build/m1-system-helper_artefacts -k 'notarize-app' --apple-id $(APPLE_USERNAME) --apple-app-pass $(ALTOOL_APPPASS) -t $(APPLE_TEAM_CODE)
 endif
 
-installer:
+installer-pkg:
 ifeq ($(detected_OS),Darwin)
 	packagesbuild -v installer/osx/Mach1\ Spatial\ System\ Installer.pkgproj
 	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp installer/osx/build/Mach1\ Spatial\ System\ Installer.pkg
