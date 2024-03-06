@@ -15,6 +15,12 @@ endif
 pull:
 	git pull --recurse-submodules
 
+setup-codeisgning:
+ifeq ($(detected_OS),Darwin)
+	security find-identity -p basic -v
+	xcrun notarytool store-credentials 'notarize-app' --apple-id $(APPLE_USERNAME) --team-id $(APPLE_TEAM_CODE) --password $(ALTOOL_APPPASS)
+endif 
+
 clear:
 ifeq ($(detected_OS),Darwin)
 	rm -rf installer/osx/build
@@ -85,41 +91,7 @@ ifeq ($(detected_OS),Darwin)
 	rm -rf ~/Library/Audio/Plug-Ins/Components/M1-Panner.component
 endif
 
-setup-codeisgning:
-ifeq ($(detected_OS),Darwin)
-	security find-identity -p basic -v
-	xcrun notarytool store-credentials 'notarize-app' --apple-id $(APPLE_USERNAME) --team-id $(APPLE_TEAM_CODE) --password $(ALTOOL_APPPASS)
-endif 
-
-# run configure first
-build-all: build codesign notarize package
-
-# clear and configure 
-configure: clear
-	cmake m1-monitor -Bm1-monitor/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DAAX_PATH=$(AAX_PATH) -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF
-	cmake m1-panner -Bm1-panner/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DAAX_PATH=$(AAX_PATH) -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF
-ifeq ($(detected_OS),Darwin)
-	cmake m1-player -Bm1-player/build -G "Xcode"
-else
-	cmake m1-player -Bm1-player/build
-endif
-	cmake m1-orientationmanager -Bm1-orientationmanager/build
-	cmake services/m1-system-helper -Bservices/m1-system-helper/build
-	cd m1-transcoder && ./scripts/setup.sh && npm install
-
-build: 
-	cmake --build m1-monitor/build --config "Release"
-	cmake --build m1-panner/build --config "Release"
-	cmake --build m1-player/build --config "Release"
-	cmake --build m1-orientationmanager/build --config "Release"
-	cmake --build services/m1-system-helper/build --config "Release"
-ifeq ($(detected_OS),Darwin)
-	cd m1-transcoder && npm run package-mac
-else ifeq ($(detected_OS),Windows)
-	cd m1-transcoder && npm run package-win
-endif
-
-# setup dev envs with common IDEs
+# configure for debug and setup dev envs with common IDEs
 dev:
 ifeq ($(detected_OS),Darwin)
 	cmake m1-monitor -Bm1-monitor/build-dev -G "Xcode" -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_AAX=ON -DAAX_PATH=$(AAX_PATH) -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DBUILD_STANDALONE=ON
@@ -145,6 +117,34 @@ else
 	cmake services/m1-system-helper -Bservices/m1-system-helper/build-dev -DCMAKE_INSTALL_PREFIX="/opt/Mach1"
 	cmake m1-orientationmanager/osc_client -Bm1-orientationmanager/osc_client/build-dev
 	cd m1-transcoder && ./scripts/setup.sh && npm install
+endif
+
+# run configure first
+package: build codesign notarize installer
+
+# clear and configure for release
+configure: clear
+	cmake m1-monitor -Bm1-monitor/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DAAX_PATH=$(AAX_PATH) -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF
+	cmake m1-panner -Bm1-panner/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DAAX_PATH=$(AAX_PATH) -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF
+ifeq ($(detected_OS),Darwin)
+	cmake m1-player -Bm1-player/build -G "Xcode"
+else
+	cmake m1-player -Bm1-player/build
+endif
+	cmake m1-orientationmanager -Bm1-orientationmanager/build
+	cmake services/m1-system-helper -Bservices/m1-system-helper/build
+	cd m1-transcoder && ./scripts/setup.sh && npm install
+
+build: 
+	cmake --build m1-monitor/build --config "Release"
+	cmake --build m1-panner/build --config "Release"
+	cmake --build m1-player/build --config "Release"
+	cmake --build m1-orientationmanager/build --config "Release"
+	cmake --build services/m1-system-helper/build --config "Release"
+ifeq ($(detected_OS),Darwin)
+	cd m1-transcoder && npm run package-mac
+else ifeq ($(detected_OS),Windows)
+	cd m1-transcoder && npm run package-win
 endif
 
 codesign:
@@ -184,7 +184,7 @@ ifeq ($(detected_OS),Darwin)
 	#./installer/osx/macos_utilities.sh -f m1-system-helper -z .zip -p services/m1-system-helper/build/m1-system-helper_artefacts -k 'notarize-app' --apple-id $(APPLE_USERNAME) --apple-app-pass $(ALTOOL_APPPASS) -t $(APPLE_TEAM_CODE)
 endif
 
-package:
+installer:
 ifeq ($(detected_OS),Darwin)
 	packagesbuild -v installer/osx/Mach1\ Spatial\ System\ Installer.pkgproj
 	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp installer/osx/build/Mach1\ Spatial\ System\ Installer.pkg
