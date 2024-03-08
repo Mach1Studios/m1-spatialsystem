@@ -24,12 +24,16 @@ public:
     // At a minimum we should expect port and if applicable name
     // messages to ensure we do not delete this instance of a registered plugin
     int port;
+    int state;
     std::string name;
-    bool isPannerPlugin = false;
+    juce::OSCColour color;
     int input_mode;
     float azimuth, elevation, diverge; // values expected unnormalized
     float gain; // values expected unnormalized
+    float st_orbit_azimuth, st_spread; // values expected unnormalized
     
+    bool isPannerPlugin = false;
+
     // pointer to store osc sender to communicate to registered plugin
     juce::OSCSender* messageSender;
 };
@@ -516,9 +520,9 @@ class M1SystemHelperService :
                 int plugin_port = message[0].getInt32();
                 
                 if (message.size() > 1) {
-                    int input_mode = message[1].getInt32();
-                    if (input_mode < 0) { // disconnect message received
-                        
+                    int state = message[1].getInt32();
+                    
+                    if (state == -1) { // disconnect message received
                         if (registeredPlugins.size() > 0) {
                             auto it = std::find_if(registeredPlugins.begin(), registeredPlugins.end(), find_plugin(plugin_port));
                             auto index = it - registeredPlugins.begin(); // find the index from the found plugin
@@ -539,61 +543,92 @@ class M1SystemHelperService :
                                     }
                                 }
                             }
-                            
                             if (index >= 0) {
                                 registeredPlugins.erase(it);
                             }
                         }
-                    }
-                    
-                    if (message.size() >= 6) {
-                        float azi = message[2].getFloat32();
-                        float ele = message[3].getFloat32();
-                        float div = message[4].getFloat32();
-                        float gain = message[5].getFloat32();
-                        DBG("[OSC] Panner: port=" + std::to_string(plugin_port) + ", in=" + std::to_string(input_mode) + ", az=" + std::to_string(azi) + ", el=" + std::to_string(ele) + ", di=" + std::to_string(div) + ", gain=" + std::to_string(gain));
-                        // get optional messages
-                        std::string displayName;
-                        if (message.size() >= 7 && message[6].isString()) {
-                            displayName = message[6].getString().toStdString();
-                        }
-                        juce::OSCColour colour;
-                        if (message.size() >= 8 && message[7].isColour()) {
-                            colour = message[7].getColour();
-                        }
-                        // Check if port matches expected registered-plugin port
-                        if (registeredPlugins.size() > 0) {
-                            auto it = std::find_if(registeredPlugins.begin(), registeredPlugins.end(), find_plugin(plugin_port));
-                            auto index = it - registeredPlugins.begin(); // find the index from the found plugin
-                            registeredPlugins[index].isPannerPlugin = true;
-                            registeredPlugins[index].input_mode = input_mode;
-                            registeredPlugins[index].azimuth = azi;
-                            registeredPlugins[index].elevation = ele;
-                            registeredPlugins[index].diverge = div;
-                            registeredPlugins[index].gain = gain;
-                            registeredPlugins[index].name = displayName;
-                        
-                            if (m1_clients.size() > 0) {
-                                for (int client = 0; client < m1_clients.size(); client++) {
-                                    if (m1_clients[client].type == "player") {
-                                        // relay the panner-settings message to the players
-                                        juce::OSCSender sender;
-                                        if (sender.connect("127.0.0.1", m1_clients[client].port)) {
-                                            juce::OSCMessage m = juce::OSCMessage(juce::OSCAddressPattern("/panner-settings"));
-                                            m.addInt32(registeredPlugins[index].port);
-                                            m.addInt32(registeredPlugins[index].input_mode);
-                                            m.addFloat32(registeredPlugins[index].azimuth);
-                                            m.addFloat32(registeredPlugins[index].elevation);
-                                            m.addFloat32(registeredPlugins[index].diverge);
-                                            m.addFloat32(registeredPlugins[index].gain);
-                                            // send optional messages
-                                            m.addString(registeredPlugins[index].name);
-                                            if (message.size() >= 8 && message[7].isColour()) {
-                                                m.addColour(colour);
+                    } else {
+                        // state is 0, 1 or 2
+                        if (message.size() >= 8) {
+                            std::string displayName;
+                            if (message[2].isString()) {
+                                displayName = message[2].getString().toStdString();
+                            }
+                            juce::OSCColour colour;
+                            if (message[3].isColour()) {
+                                colour = message[3].getColour();
+                            }
+                            int input_mode;
+                            if (message[4].isInt32()) {
+                                input_mode = message[4].getInt32();
+                            }
+                            float azi, ele, div, gain;
+                            if (message[5].isFloat32()) {
+                                azi = message[5].getFloat32();
+                            }
+                            if (message[6].isFloat32()) {
+                                ele = message[6].getFloat32();
+                            }
+                            if (message[7].isFloat32()) {
+                                div = message[7].getFloat32();
+                            }
+                            if (message[8].isFloat32()) {
+                                gain = message[8].getFloat32();
+                            }
+                            DBG("[OSC] Panner: port=" + std::to_string(plugin_port) + ", in=" + std::to_string(input_mode) + ", az=" + std::to_string(azi) + ", el=" + std::to_string(ele) + ", di=" + std::to_string(div) + ", gain=" + std::to_string(gain));
+                            
+                            // get optional messages
+                            float st_azi, st_spr;
+                            if (message.size() >= 10) {
+                                if (message[9].isFloat32()) {
+                                    st_azi = message[9].getFloat32();
+                                }
+                                if (message[10].isFloat32()) {
+                                    st_spr = message[10].getFloat32();
+                                }
+                            }
+                            
+                            // Check if port matches expected registered-plugin port
+                            if (registeredPlugins.size() > 0) {
+                                auto it = std::find_if(registeredPlugins.begin(), registeredPlugins.end(), find_plugin(plugin_port));
+                                auto index = it - registeredPlugins.begin(); // find the index from the found plugin
+                                registeredPlugins[index].isPannerPlugin = true;
+                                registeredPlugins[index].state = state;
+                                registeredPlugins[index].name = displayName;
+                                registeredPlugins[index].color = colour;
+                                registeredPlugins[index].input_mode = input_mode;
+                                registeredPlugins[index].azimuth = azi;
+                                registeredPlugins[index].elevation = ele;
+                                registeredPlugins[index].diverge = div;
+                                registeredPlugins[index].gain = gain;
+                                if (message.size() >= 10) {
+                                    registeredPlugins[index].st_orbit_azimuth = st_azi;
+                                    registeredPlugins[index].st_spread = st_spr;
+                                }
+                                
+                                if (m1_clients.size() > 0) {
+                                    for (int client = 0; client < m1_clients.size(); client++) {
+                                        if (m1_clients[client].type == "player") {
+                                            // relay the panner-settings message to the players
+                                            juce::OSCSender sender;
+                                            if (sender.connect("127.0.0.1", m1_clients[client].port)) {
+                                                juce::OSCMessage m = juce::OSCMessage(juce::OSCAddressPattern("/panner-settings"));
+                                                m.addInt32(registeredPlugins[index].port);
+                                                m.addInt32(registeredPlugins[index].state);
+                                                m.addString(registeredPlugins[index].name);
+                                                m.addColour(registeredPlugins[index].color);
+                                                m.addInt32(registeredPlugins[index].input_mode);
+                                                m.addFloat32(registeredPlugins[index].azimuth);
+                                                m.addFloat32(registeredPlugins[index].elevation);
+                                                m.addFloat32(registeredPlugins[index].diverge);
+                                                m.addFloat32(registeredPlugins[index].gain);
+                                                if (message.size() >= 10) {
+                                                    m.addFloat32(registeredPlugins[index].st_orbit_azimuth);
+                                                    m.addFloat32(registeredPlugins[index].st_spread);
+                                                }
+                                                sender.send(m);
+                                                DBG("[OSC] Panner: port=" + std::to_string(registeredPlugins[index].port) + " | Relayed to Player: " + std::to_string(m1_clients[client].port));
                                             }
-                                            
-                                            sender.send(m);
-                                            DBG("[OSC] Panner: port=" + std::to_string(registeredPlugins[index].port) + " | Relayed to Player: " + std::to_string(m1_clients[client].port));
                                         }
                                     }
                                 }
