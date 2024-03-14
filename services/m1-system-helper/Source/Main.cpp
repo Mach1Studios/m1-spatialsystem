@@ -456,11 +456,6 @@ class M1SystemHelperService :
                 }
             }
         }
-        else if (message.getAddressPattern() == "/setMonitoringMode") {
-            // receiving updated monitoring mode or other misc settings for clients
-            master_mode = message[0].getInt32();
-            DBG("[Monitor] Mode: " + std::to_string(master_mode));
-        }
         else if (message.getAddressPattern() == "/setPlayerYPR") {
             // Used for relaying the active player offset to calculate the orientation in the active monitor instance
             DBG("[Player] Yaw Offset: "+std::to_string(message[0].getFloat32()));
@@ -481,12 +476,51 @@ class M1SystemHelperService :
                 }
             }
         }
+        else if (message.getAddressPattern() == "/setMonitoringMode") {
+            // receiving updated monitoring mode or other misc settings for clients
+            master_mode = message[0].getInt32();
+            DBG("[Monitor] Mode: " + std::to_string(master_mode));
+            
+            // relay change to registered plugins
+            if (registeredPlugins.size() > 0) {
+                for (auto &i: registeredPlugins) {
+                    juce::OSCMessage m = juce::OSCMessage(juce::OSCAddressPattern("/monitor-settings"));
+                    m.addInt32(master_mode);
+                    m.addFloat32(master_yaw);   // expected normalised
+                    //m.addInt32(monitor_output_mode); // TODO: add the output configuration to sync plugins when requested
+                    i.messageSender->send(m);
+                }
+                // update stored monitor values for checking changes in next loop
+                prev_master_mode = master_mode;
+            }
+        }
         else if (message.getAddressPattern() == "/setMasterYPR") {
             // Used for relaying a master calculated orientation to registered plugins that require this for GUI systems
-            DBG("[Monitor] Yaw: "+std::to_string(message[0].getFloat32()));
+            DBG("[Monitor] Yaw: "+std::to_string(message[0].getFloat32())+", Pitch: "+std::to_string(message[1].getFloat32()));
             master_yaw = message[0].getFloat32();
             master_pitch = message[1].getFloat32();
             master_roll = message[2].getFloat32();
+            
+            // relay change to registered plugins
+            if (registeredPlugins.size() > 0) {
+                // check if any values have changed since last loop
+                if (master_mode != prev_master_mode || master_yaw != prev_master_yaw || master_pitch != prev_master_pitch || master_roll != prev_master_roll) {
+                    for (auto &i: registeredPlugins) {
+                        juce::OSCMessage m = juce::OSCMessage(juce::OSCAddressPattern("/monitor-settings"));
+                        m.addInt32(master_mode);
+                        m.addFloat32(master_yaw);   // expected normalised
+                        m.addFloat32(master_pitch); // expected normalised
+                        m.addFloat32(master_roll);  // expected normalised
+                        //m.addInt32(monitor_output_mode); // TODO: add the output configuration to sync plugins when requested
+                        i.messageSender->send(m);
+                    }
+                    // update stored monitor values for checking changes in next loop
+                    prev_master_mode = master_mode;
+                    prev_master_yaw = master_yaw;
+                    prev_master_pitch = master_pitch;
+                    prev_master_roll = master_roll;
+                }
+            }
         }
         else if (message.getAddressPattern() == "/m1-register-plugin") {
             // registering new panner instance
@@ -723,24 +757,6 @@ class M1SystemHelperService :
         }
 
         if (registeredPlugins.size() > 0) {
-            // check if any values have changed since last loop
-            if (master_mode != prev_master_mode || master_yaw != prev_master_yaw || master_pitch != prev_master_pitch || master_roll != prev_master_roll) {
-                for (auto &i: registeredPlugins) {
-                    juce::OSCMessage m = juce::OSCMessage(juce::OSCAddressPattern("/monitor-settings"));
-                    m.addInt32(master_mode);
-                    m.addFloat32(master_yaw);   // expected normalised
-                    m.addFloat32(master_pitch); // expected normalised
-                    m.addFloat32(master_roll);  // expected normalised
-                    //m.addInt32(monitor_output_mode); // TODO: add the output configuration to sync plugins when requested
-                    i.messageSender->send(m);
-                }
-                // update stored monitor values for checking changes in next loop
-                prev_master_mode = master_mode;
-                prev_master_yaw = master_yaw;
-                prev_master_pitch = master_pitch;
-                prev_master_roll = master_roll;
-            }
-            
             // send a ping to all registered plugins every 2 seconds
             if ((currentTime - timeWhenWeLastStartedAManager) > 2000) {
                 for (auto &i: registeredPlugins) {
