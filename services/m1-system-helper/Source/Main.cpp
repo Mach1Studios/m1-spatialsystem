@@ -31,7 +31,9 @@ public:
     float azimuth, elevation, diverge; // values expected unnormalized
     float gain; // values expected unnormalized
     float st_orbit_azimuth, st_spread; // values expected unnormalized
-    
+    int panner_mode;
+    bool auto_orbit;
+
     bool isPannerPlugin = false;
 
     // pointer to store osc sender to communicate to registered plugin
@@ -611,14 +613,23 @@ class M1SystemHelperService :
                             }
                             DBG("[OSC] Panner: port=" + std::to_string(plugin_port) + ", in=" + std::to_string(input_mode) + ", az=" + std::to_string(azi) + ", el=" + std::to_string(ele) + ", di=" + std::to_string(div) + ", gain=" + std::to_string(gain));
                             
+                            int panner_mode;
+                            if (message[9].isInt32()) {
+                                panner_mode = message[9].getInt32();
+                            }
+                            int auto_orbit;
+                            if (message[10].isInt32()) {
+                                auto_orbit = message[10].getInt32();
+                            }
+
                             // get optional messages
                             float st_azi, st_spr;
-                            if (message.size() >= 10) {
-                                if (message[9].isFloat32()) {
-                                    st_azi = message[9].getFloat32();
+                            if (message.size() >= 12) {
+                                if (message[11].isFloat32()) {
+                                    st_azi = message[11].getFloat32();
                                 }
-                                if (message[10].isFloat32()) {
-                                    st_spr = message[10].getFloat32();
+                                if (message[12].isFloat32()) {
+                                    st_spr = message[12].getFloat32();
                                 }
                             }
                             
@@ -635,7 +646,10 @@ class M1SystemHelperService :
                                 registeredPlugins[index].elevation = ele;
                                 registeredPlugins[index].diverge = div;
                                 registeredPlugins[index].gain = gain;
-                                if (message.size() >= 10) {
+                                registeredPlugins[index].panner_mode = panner_mode;
+                                registeredPlugins[index].auto_orbit = auto_orbit;
+
+                                if (message.size() >= 12) {
                                     registeredPlugins[index].st_orbit_azimuth = st_azi;
                                     registeredPlugins[index].st_spread = st_spr;
                                 }
@@ -656,7 +670,9 @@ class M1SystemHelperService :
                                                 m.addFloat32(registeredPlugins[index].elevation);
                                                 m.addFloat32(registeredPlugins[index].diverge);
                                                 m.addFloat32(registeredPlugins[index].gain);
-                                                if (message.size() >= 10) {
+                                                m.addInt32(registeredPlugins[index].panner_mode);
+                                                m.addInt32(registeredPlugins[index].auto_orbit);
+                                                if (message.size() >= 12) {
                                                     m.addFloat32(registeredPlugins[index].st_orbit_azimuth);
                                                     m.addFloat32(registeredPlugins[index].st_spread);
                                                 }
