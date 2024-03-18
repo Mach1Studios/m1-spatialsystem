@@ -585,7 +585,7 @@ class M1SystemHelperService :
                         }
                     } else {
                         // state is 0, 1 or 2
-                        if (message.size() >= 8) {
+                        if (message.size() >= 10) {
                             std::string displayName;
                             if (message[2].isString()) {
                                 displayName = message[2].getString().toStdString();
@@ -617,14 +617,14 @@ class M1SystemHelperService :
                             if (message[9].isInt32()) {
                                 panner_mode = message[9].getInt32();
                             }
-                            int auto_orbit;
-                            if (message[10].isInt32()) {
-                                auto_orbit = message[10].getInt32();
-                            }
 
                             // get optional messages
+                            int auto_orbit;
                             float st_azi, st_spr;
-                            if (message.size() >= 12) {
+                            if (message.size() >= 13) {
+                                if (message[10].isInt32()) {
+                                    auto_orbit = message[10].getInt32();
+                                }
                                 if (message[11].isFloat32()) {
                                     st_azi = message[11].getFloat32();
                                 }
@@ -647,9 +647,9 @@ class M1SystemHelperService :
                                 registeredPlugins[index].diverge = div;
                                 registeredPlugins[index].gain = gain;
                                 registeredPlugins[index].panner_mode = panner_mode;
-                                registeredPlugins[index].auto_orbit = auto_orbit;
 
-                                if (message.size() >= 12) {
+                                if (message.size() >= 13) {
+                                    registeredPlugins[index].auto_orbit = auto_orbit;
                                     registeredPlugins[index].st_orbit_azimuth = st_azi;
                                     registeredPlugins[index].st_spread = st_spr;
                                 }
@@ -671,8 +671,8 @@ class M1SystemHelperService :
                                                 m.addFloat32(registeredPlugins[index].diverge);
                                                 m.addFloat32(registeredPlugins[index].gain);
                                                 m.addInt32(registeredPlugins[index].panner_mode);
-                                                m.addInt32(registeredPlugins[index].auto_orbit);
-                                                if (message.size() >= 12) {
+                                                if (message.size() >= 13) {
+                                                    m.addInt32(registeredPlugins[index].auto_orbit);
                                                     m.addFloat32(registeredPlugins[index].st_orbit_azimuth);
                                                     m.addFloat32(registeredPlugins[index].st_spread);
                                                 }
