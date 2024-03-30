@@ -15,6 +15,12 @@ endif
 pull:
 	git pull --recurse-submodules
 
+setup: 
+ifeq ($(detected_OS),Darwin)
+	brew install yasm
+	cd m1-transcoder && ./scripts/setup.sh
+endif
+
 setup-codeisgning:
 ifeq ($(detected_OS),Darwin)
 	security find-identity -p basic -v
