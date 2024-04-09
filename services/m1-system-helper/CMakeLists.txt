@@ -33,6 +33,8 @@ set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 add_subdirectory(../../m1-orientationmanager/JUCE "${CMAKE_CURRENT_BINARY_DIR}/JUCE_build")
 add_subdirectory(../../m1-orientationmanager/Modules "${CMAKE_CURRENT_BINARY_DIR}/Modules_build")
 
+add_subdirectory(../../m1-orientationmanager/m1-mathematics "${CMAKE_CURRENT_BINARY_DIR}/m1-mathematics_build")
+
 # PLUGIN/APP NAME & ID  (for dynamic naming schemes)
 set(CUSTOM_BUNDLE_ID "com.mach1.spatial.helper")
 set(CUSTOM_APP_CODE "M1SW")
@@ -85,6 +87,7 @@ target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE
         juce::juce_gui_basics
         juce::juce_osc
         m1_orientation_client
+        m1_mathematics
         )
 
 ### setup info.plist and entitlements for macos
