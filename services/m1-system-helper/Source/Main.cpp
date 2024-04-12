@@ -45,7 +45,7 @@ public:
 struct find_plugin {
     int port;
     find_plugin(int port) : port(port) {}
-    bool operator () ( const M1RegisteredPlugin& p ) const
+    bool operator () (const M1RegisteredPlugin& p) const
     {
         return p.port == port;
     }
@@ -61,7 +61,7 @@ struct M1OrientationClientConnection {
 struct find_client_by_type {
     std::string type;
     find_client_by_type(std::string type) : type(type) {}
-    bool operator () ( const M1OrientationClientConnection& c ) const
+    bool operator () (const M1OrientationClientConnection& c) const
     {
         return c.type == type;
     }
@@ -70,6 +70,7 @@ struct find_client_by_type {
 int serverPort, helperPort;
 juce::int64 shutdownCounterTime = 0;
 juce::int64 pingTime = 0;
+juce::DatagramSocket sock(false);
 
 // run process m1-orientationmanager.exe from the same folder
 juce::ChildProcess orientationManagerProcess;
@@ -78,7 +79,8 @@ bool initFromSettings(std::string jsonSettingsFilePath) {
     juce::File settingsFile = juce::File(jsonSettingsFilePath);
     if (!settingsFile.exists()) {
         return false;
-    } else {
+    }
+    else {
         // Found the settings.json
         juce::var mainVar = juce::JSON::parse(juce::File(jsonSettingsFilePath));
         serverPort = mainVar["serverPort"];
@@ -88,24 +90,24 @@ bool initFromSettings(std::string jsonSettingsFilePath) {
 }
 
 #if defined(__APPLE__)
-    uid_t uid = getuid();
-    auto domain_target = (std::stringstream() << "gui/" << uid).str();
-    auto service_target = (std::stringstream() << "gui/" << uid << "/com.mach1.spatial.orientationmanager").str();
-    auto service_path = "/Library/LaunchAgents/com.mach1.spatial.orientationmanager.plist";
+uid_t uid = getuid();
+auto domain_target = (std::stringstream() << "gui/" << uid).str();
+auto service_target = (std::stringstream() << "gui/" << uid << "/com.mach1.spatial.orientationmanager").str();
+auto service_path = "/Library/LaunchAgents/com.mach1.spatial.orientationmanager.plist";
 #elif defined(_WIN32) || defined(_WIN64)
-    auto domain_target = (std::stringstream() << "gui/").str();
-    auto service_target = (std::stringstream() << "gui/" << "/com.mach1.spatial.orientationmanager").str();
-    std::string service_path = "";
+auto domain_target = (std::stringstream() << "gui/").str();
+auto service_target = (std::stringstream() << "gui/" << "/com.mach1.spatial.orientationmanager").str();
+std::string service_path = "";
 #endif
 
-void killProcessByName(const char *name)
+void killProcessByName(const char* name)
 {
     std::string service_name;
     if (std::string(name) == "m1-orientationmanager") {
         // for launchctl we need to use the service name instead of the executable name
         service_name = "com.mach1.spatial.orientationmanager";
     }
-    
+
     DBG("Killing " + std::string(name) + "...");
     std::string command;
     if ((juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_7) ||
@@ -158,12 +160,12 @@ void startOrientationManager()
     socket.setEnablePortReuse(false);
     if (socket.bindToPort(serverPort)) {
         socket.shutdown();
-        
+
         // We will assume the folders are properly created during the installation step
         // Using common support files installation location
         juce::File m1SupportDirectory = juce::File::getSpecialLocation(juce::File::commonApplicationDataDirectory);
         juce::File orientationManagerExe; // for linux and win
-        
+
         if ((juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_7) ||
             (juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_8) ||
             (juce::SystemStats::getOperatingSystemType() == juce::SystemStats::MacOSX_10_9)) {
@@ -187,7 +189,8 @@ void startOrientationManager()
             std::string command = "/bin/launchctl start com.mach1.spatial.orientationmanager";
             DBG("Executing: " + command);
             system(command.c_str());
-        } else if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::MacOSX) != 0) {
+        }
+        else if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::MacOSX) != 0) {
             // All newer MacOS, launchd v2.0
 
             // load process m1-orientationmanager
@@ -196,12 +199,13 @@ void startOrientationManager()
             DBG("Executing: " + load_command);
             system(load_command.c_str());
             */
-            
+
             // start process m1-orientationmanager
             auto command = std::string("/bin/launchctl kickstart -p ") + service_target;
             DBG("Executing: " + command);
             system(command.c_str());
-        } else if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::Windows) != 0) {
+        }
+        else if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::Windows) != 0) {
             // Any windows OS
             // Windows Service Manager
             DBG("Starting m1-orientationmanager service");
@@ -223,7 +227,8 @@ void startOrientationManager()
             else {
                 DBG("Unknown Error");
             }
-        } else {
+        }
+        else {
             // TODO: factor out linux using systemd service
             orientationManagerExe = m1SupportDirectory.getChildFile("Mach1").getChildFile("m1-orientationmanager");
             juce::StringArray arguments;
@@ -231,7 +236,8 @@ void startOrientationManager()
             DBG("Starting m1-orientationmanager: " + orientationManagerExe.getFullPathName());
             if (orientationManagerProcess.start(arguments)) {
                 DBG("Started m1-orientationmanager server");
-            } else {
+            }
+            else {
                 // Failed to start the process
                 DBG("Failed to start the m1-orientationmanager");
                 juce::JUCEApplicationBase::quit();
@@ -249,11 +255,13 @@ bool send(const std::vector<M1OrientationClientConnection>& m1_clients, juce::OS
             if (sender.send(msg)) {
                 return true;
                 // TODO: we need some feedback because we can send messages without error even when there is no client receiving
-            } else {
+            }
+            else {
                 // TODO: ERROR: Issue with sending OSC message on server side
                 return false;
             }
-        } else {
+        }
+        else {
             // TODO: ERROR: Issue with sending OSC message on server side
             return false;
         }
@@ -267,7 +275,7 @@ bool send(const std::vector<M1OrientationClientConnection>& m1_clients, std::str
 
 //==============================================================================
 class M1SystemHelperService :
-    public juce::Timer, 
+    public juce::Timer,
     public juce::OSCReceiver::Listener<juce::OSCReceiver::RealtimeCallback> {
 
     juce::OSCReceiver receiver;
@@ -460,7 +468,7 @@ class M1SystemHelperService :
         }
         else if (message.getAddressPattern() == "/setPlayerYPR") {
             // Used for relaying the active player offset to calculate the orientation in the active monitor instance
-            DBG("[Player] Yaw Offset: "+std::to_string(message[0].getFloat32()));
+            DBG("[Player] Yaw Offset: " + std::to_string(message[0].getFloat32()));
             if (monitors.size() > 0) {
                 for (int index = 0; index < m1_clients.size(); index++) {
                     // TODO: refactor using callback to send a message when an update is received
@@ -482,10 +490,10 @@ class M1SystemHelperService :
             // receiving updated monitoring mode or other misc settings for clients
             master_mode = message[0].getInt32();
             DBG("[Monitor] Mode: " + std::to_string(master_mode));
-            
+
             // relay change to registered plugins
             if (registeredPlugins.size() > 0) {
-                for (auto &i: registeredPlugins) {
+                for (auto& i : registeredPlugins) {
                     juce::OSCMessage m = juce::OSCMessage(juce::OSCAddressPattern("/monitor-settings"));
                     m.addInt32(master_mode);
                     m.addFloat32(master_yaw);   // expected normalised
@@ -498,16 +506,16 @@ class M1SystemHelperService :
         }
         else if (message.getAddressPattern() == "/setMasterYPR") {
             // Used for relaying a master calculated orientation to registered plugins that require this for GUI systems
-            DBG("[Monitor] Yaw: "+std::to_string(message[0].getFloat32())+", Pitch: "+std::to_string(message[1].getFloat32()));
+            DBG("[Monitor] Yaw: " + std::to_string(message[0].getFloat32()) + ", Pitch: " + std::to_string(message[1].getFloat32()));
             master_yaw = message[0].getFloat32();
             master_pitch = message[1].getFloat32();
             master_roll = message[2].getFloat32();
-            
+
             // relay change to registered plugins
             if (registeredPlugins.size() > 0) {
                 // check if any values have changed since last loop
                 if (master_mode != prev_master_mode || master_yaw != prev_master_yaw || master_pitch != prev_master_pitch || master_roll != prev_master_roll) {
-                    for (auto &i: registeredPlugins) {
+                    for (auto& i : registeredPlugins) {
                         juce::OSCMessage m = juce::OSCMessage(juce::OSCAddressPattern("/monitor-settings"));
                         m.addInt32(master_mode);
                         m.addFloat32(master_yaw);   // expected normalised
@@ -535,6 +543,19 @@ class M1SystemHelperService :
                 foundPlugin.messageSender->connect("127.0.0.1", port); // connect to that newly discovered panner locally
                 registeredPlugins.push_back(foundPlugin);
                 DBG("Plugin registered: " + std::to_string(port));
+
+                // send monitor settings
+                for (const auto& client : m1_clients) {
+                    if (client.type == "monitor") {
+                        juce::OSCMessage m = juce::OSCMessage(juce::OSCAddressPattern("/monitor-settings"));
+                        m.addInt32(master_mode);
+                        m.addFloat32(master_yaw);   // expected normalised
+                        m.addFloat32(master_pitch); // expected normalised
+                        m.addFloat32(master_roll);  // expected normalised
+                        foundPlugin.messageSender->send(m);
+                        break;
+                    }
+                }
             }
             else {
                 DBG("Plugin port already registered: " + std::to_string(port));
@@ -554,15 +575,15 @@ class M1SystemHelperService :
         else if (message.getAddressPattern() == "/panner-settings") {
             if (message.size() > 0) { // check message size
                 int plugin_port = message[0].getInt32();
-                
+
                 if (message.size() > 1) {
                     int state = message[1].getInt32();
-                    
+
                     if (state == -1) { // disconnect message received
                         if (registeredPlugins.size() > 0) {
                             auto it = std::find_if(registeredPlugins.begin(), registeredPlugins.end(), find_plugin(plugin_port));
                             auto index = it - registeredPlugins.begin(); // find the index from the found plugin
-                            
+
                             // relay the disconnect message
                             if (m1_clients.size() > 0) {
                                 for (int client = 0; client < m1_clients.size(); client++) {
@@ -583,7 +604,8 @@ class M1SystemHelperService :
                                 registeredPlugins.erase(it);
                             }
                         }
-                    } else {
+                    }
+                    else {
                         // state is 0, 1 or 2
                         if (message.size() >= 10) {
                             std::string displayName;
@@ -612,7 +634,7 @@ class M1SystemHelperService :
                                 gain = message[8].getFloat32();
                             }
                             DBG("[OSC] Panner: port=" + std::to_string(plugin_port) + ", in=" + std::to_string(input_mode) + ", az=" + std::to_string(azi) + ", el=" + std::to_string(ele) + ", di=" + std::to_string(div) + ", gain=" + std::to_string(gain));
-                            
+
                             int panner_mode;
                             if (message[9].isInt32()) {
                                 panner_mode = message[9].getInt32();
@@ -632,7 +654,7 @@ class M1SystemHelperService :
                                     st_spr = message[12].getFloat32();
                                 }
                             }
-                            
+
                             // Check if port matches expected registered-plugin port
                             if (registeredPlugins.size() > 0) {
                                 auto it = std::find_if(registeredPlugins.begin(), registeredPlugins.end(), find_plugin(plugin_port));
@@ -653,7 +675,7 @@ class M1SystemHelperService :
                                     registeredPlugins[index].st_orbit_azimuth = st_azi;
                                     registeredPlugins[index].st_spread = st_spr;
                                 }
-                                
+
                                 if (m1_clients.size() > 0) {
                                     for (int client = 0; client < m1_clients.size(); client++) {
                                         if (m1_clients[client].type == "player") {
@@ -719,17 +741,16 @@ class M1SystemHelperService :
 
         initFromSettings(settingsFile.getFullPathName().toStdString());
 
-        juce::DatagramSocket socket(false);
-        socket.setEnablePortReuse(true);
-        if (!socket.bindToPort(helperPort)) {
-            socket.shutdown();
+        sock.setEnablePortReuse(true);
+        if (!sock.bindToPort(helperPort)) {
+            sock.shutdown();
 
             juce::String message = "Failed to bind to port " + std::to_string(helperPort);
             DBG(message);
             juce::JUCEApplicationBase::quit();
         }
         else {
-            socket.shutdown();
+            sock.shutdown();
 
             receiver.connect(helperPort);
             receiver.addListener(this);
@@ -760,7 +781,7 @@ class M1SystemHelperService :
             killProcessByName("m1-orientationmanager");
             timeWhenHelperLastSeenAClient = currentTime;
         }
-        
+
         // this is used for when a client has lost connection to the orientationmanager and signals here for the orientationmanager to be restarted (should ideally be avoided)
         if ((clientRequestsServer) && ((currentTime - timeWhenWeLastStartedAManager) > 10000)) {
             // Every 10 seconds we may restart or start a server if requested
@@ -775,12 +796,12 @@ class M1SystemHelperService :
         if (registeredPlugins.size() > 0) {
             // send a ping to all registered plugins every 2 seconds
             if ((currentTime - timeWhenWeLastStartedAManager) > 2000) {
-                for (auto &i: registeredPlugins) {
+                for (auto& i : registeredPlugins) {
                     juce::OSCMessage m = juce::OSCMessage(juce::OSCAddressPattern("/m1-ping"));
                     i.messageSender->send(m);
                 }
             }
-            
+
             // TODO: check if any registered plugins closed
             //for (auto &i: registeredPlugins) {
             //}
@@ -988,7 +1009,6 @@ public:
                 DocumentWindow::allButtons)
         {
             setUsingNativeTitleBar(true);
-            setContentOwned(new MainComponent(), true);
 
 #if JUCE_IOS || JUCE_ANDROID
             setFullScreen(true);
