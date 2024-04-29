@@ -15,5 +15,3 @@ if exist "%ProgramData%\Mach1\" (
 	sc create M1-OrientationManager binPath= "%ProgramData%\Mach1\m1-orientationmanager.exe" DisplayName= "M1-OrientationManager"
 	sc description M1-OrientationManager "Watches for known 3rd party IMU or headtracking sesnors and manages them."
 )
-
-pause

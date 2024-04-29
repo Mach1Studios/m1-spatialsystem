@@ -58,6 +58,7 @@ Source: "..\..\m1-player\build\M1-Player_artefacts\Release\M1-Player.exe"; Exclu
 
 Source: "service_setup.bat"; DestDir: "{commonappdata}\Mach1"; Components: m1services; Flags: noencryption ignoreversion
 Source: "service_stopper.bat"; DestDir: "{commonappdata}\Mach1"; Components: m1services; Flags: noencryption ignoreversion
+Source: "service_uninstall.bat"; DestDir: "{commonappdata}\Mach1"; Components: m1services; Flags: noencryption ignoreversion
 Source: "..\..\m1-orientationmanager\build\M1-orientationmanager_artefacts\Release\m1-orientationmanager.exe"; Excludes: "ffmpeg*.zip,*.exp,*m1-orientationmanager.lib,*av*.dll,postproc*.dll,sw*.dll"; DestDir: "{commonappdata}\Mach1"; Components: m1services; Flags: ignoreversion recursesubdirs createallsubdirs; BeforeInstall: StopServices
 Source: "..\..\services\m1-system-helper\build\M1-system-helper_artefacts\Release\m1-system-helper.exe"; DestDir: "{commonappdata}\Mach1"; Components: m1services; Flags: ignoreversion recursesubdirs createallsubdirs;
 Source: "..\..\m1-orientationmanager\Resources\settings.json"; DestDir: "{commonappdata}\Mach1"; Components: m1services; Flags: ignoreversion recursesubdirs createallsubdirs; BeforeInstall: StopServices
@@ -66,6 +67,9 @@ Source: "..\..\m1-orientationmanager\Resources\settings.json"; DestDir: "{common
 Filename: "{commonappdata}\Mach1\service_stopper.bat"; Parameters: "install"; Flags: runascurrentuser runhidden; StatusMsg: "Stopping any existing services..."
 Filename: "{app}\download_ffmpeg.bat"; Parameters: "install"; Flags: postinstall runascurrentuser runhidden; StatusMsg: "Downloading required ffmpeg libs..."
 Filename: "{commonappdata}\Mach1\service_setup.bat"; Parameters: "install"; Flags: postinstall runascurrentuser runhidden; StatusMsg: "Setting up and starting the services..."
+
+[UninstallRun]
+Filename: "{commonappdata}\Mach1\service_uninstall.bat"; Parameters: ""; Flags: runascurrentuser runhidden; 
 
 [Messages]
 SetupWindowTitle=Install Mach1 Spatial System
