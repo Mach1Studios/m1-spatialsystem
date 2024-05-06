@@ -29,11 +29,13 @@ option(JUCE_ENABLE_MODULE_SOURCE_GROUPS "Show all module sources in IDE projects
 #static linking in Windows
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
+# Adds the Mach1 math
+# (Please ensure this is added before the `m1_orientation_client` JUCE module)
+add_subdirectory(../../m1-orientationmanager/Modules/m1_orientation_client/libs/m1-mathematics "${CMAKE_CURRENT_BINARY_DIR}/m1-mathematics_build")
+
 # add JUCE and other custom modules
 add_subdirectory(../../m1-orientationmanager/JUCE "${CMAKE_CURRENT_BINARY_DIR}/JUCE_build")
 add_subdirectory(../../m1-orientationmanager/Modules "${CMAKE_CURRENT_BINARY_DIR}/Modules_build")
-
-add_subdirectory(../../m1-orientationmanager/m1-mathematics "${CMAKE_CURRENT_BINARY_DIR}/m1-mathematics_build")
 
 # PLUGIN/APP NAME & ID  (for dynamic naming schemes)
 set(CUSTOM_BUNDLE_ID "com.mach1.spatial.helper")
