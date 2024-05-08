@@ -486,6 +486,28 @@ class M1SystemHelperService :
                 }
             }
         }
+        else if (message.getAddressPattern() == "/setMonitorActiveReq") {
+            // receiving a request for a specific monitor instance to be rotated to the first index for command_activeClient
+            int monitor_making_request = message[0].getInt32();
+            DBG("[Monitor] Port: " + std::to_string(monitor_making_request) + " is requesting first index");
+
+            if (monitors.size() > 1) {
+                auto pivot = std::find_if(monitors.begin(),
+                                          monitors.end(),
+                                          [&monitor_making_request](const M1OrientationClientConnection& c) -> bool {
+                                            return (c.port == monitor_making_request) && (c.type == "monitor");
+                                          });
+                if (pivot != monitors.end()) {
+                    std::rotate(monitors.begin(), pivot, pivot + 1);
+                }
+            } else {
+                DBG("[Monitor] Port: " + std::to_string(monitor_making_request) + " is requesting first index but there are no other instances to be found...");
+                // figure out why we landed here?
+            }
+            
+            // retrigger now that the requested client is first index
+            command_activateClients();
+        }
         else if (message.getAddressPattern() == "/setMonitoringMode") {
             // receiving updated monitoring mode or other misc settings for clients
             master_mode = message[0].getInt32();
