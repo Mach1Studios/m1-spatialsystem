@@ -4516,7 +4516,7 @@
 										<key>LANGUAGE</key>
 										<string>English</string>
 										<key>VALUE</key>
-										<string>VST plugins. Includes Reaper session templates. </string>
+										<string>VST3 Plugins.</string>
 									</dict>
 								</array>
 								<key>OPTIONS</key>
@@ -4525,41 +4525,6 @@
 									<false/>
 									<key>STATE</key>
 									<integer>1</integer>
-								</dict>
-								<key>PACKAGE_UUID</key>
-								<string>1B268F9E-CBA6-47BB-8A3E-39E0F57BDDB8</string>
-								<key>TITLE</key>
-								<array>
-									<dict>
-										<key>LANGUAGE</key>
-										<string>English</string>
-										<key>VALUE</key>
-										<string>VST Plugins</string>
-									</dict>
-								</array>
-								<key>TYPE</key>
-								<integer>0</integer>
-								<key>UUID</key>
-								<string>20DE3A11-45B9-4BA2-A3E3-0DA16B30B4F1</string>
-							</dict>
-							<dict>
-								<key>CHILDREN</key>
-								<array/>
-								<key>DESCRIPTION</key>
-								<array>
-									<dict>
-										<key>LANGUAGE</key>
-										<string>English</string>
-										<key>VALUE</key>
-										<string>VST3 plugins. Not recommended unless required by a specific DAW host</string>
-									</dict>
-								</array>
-								<key>OPTIONS</key>
-								<dict>
-									<key>HIDDEN</key>
-									<false/>
-									<key>STATE</key>
-									<integer>2</integer>
 								</dict>
 								<key>PACKAGE_UUID</key>
 								<string>EC9213A7-62D1-4EBF-8BF7-A22531DAA1E8</string>
@@ -4586,7 +4551,7 @@
 										<key>LANGUAGE</key>
 										<string>English</string>
 										<key>VALUE</key>
-										<string>AU plugins</string>
+										<string>VST plugins. Not recommended unless required by a specific DAW host, some features may be missing.</string>
 									</dict>
 								</array>
 								<key>OPTIONS</key>
@@ -4595,6 +4560,55 @@
 									<false/>
 									<key>STATE</key>
 									<integer>2</integer>
+								</dict>
+								<key>PACKAGE_UUID</key>
+								<string>1B268F9E-CBA6-47BB-8A3E-39E0F57BDDB8</string>
+								<key>TITLE</key>
+								<array>
+									<dict>
+										<key>LANGUAGE</key>
+										<string>English</string>
+										<key>VALUE</key>
+										<string>VST Plugins</string>
+									</dict>
+								</array>
+								<key>TYPE</key>
+								<integer>0</integer>
+								<key>UUID</key>
+								<string>20DE3A11-45B9-4BA2-A3E3-0DA16B30B4F1</string>
+							</dict>
+							<dict>
+								<key>CHILDREN</key>
+								<array/>
+								<key>DESCRIPTION</key>
+								<array>
+									<dict>
+										<key>LANGUAGE</key>
+										<string>English</string>
+										<key>VALUE</key>
+										<string>AU plugins (NOT RECOMMENDED) Use at own risk</string>
+									</dict>
+								</array>
+								<key>OPTIONS</key>
+								<dict>
+									<key>DEPENDENCY</key>
+									<dict>
+										<key>ENABLED_MODE</key>
+										<integer>1</integer>
+										<key>SELECTED_DEPENDENCY</key>
+										<dict>
+											<key>COMPARATOR</key>
+											<integer>0</integer>
+											<key>OBJECT</key>
+											<integer>0</integer>
+											<key>UUID</key>
+											<string>F7C60EBB-81B1-43E7-B6E9-82CAFF240DC9</string>
+										</dict>
+									</dict>
+									<key>HIDDEN</key>
+									<false/>
+									<key>STATE</key>
+									<integer>3</integer>
 								</dict>
 								<key>PACKAGE_UUID</key>
 								<string>5B8636D6-2B7F-486F-940B-2907882C296A</string>
