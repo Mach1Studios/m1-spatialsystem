@@ -15,12 +15,12 @@ endif
 pull:
 	git pull --recurse-submodules
 
-setup: 
+setup:
 ifeq ($(detected_OS),Darwin)
 	# Assumes you have installed Homebrew package manager
 	brew install yasm cmake
 	cd m1-transcoder && ./scripts/setup.sh
-ifeq($(detected_OS),Windows)
+else ifeq ($(detected_OS),Windows)
 	# Assumes you have installed Chocolatey package manager
 	choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' --apply-install-arguments-to-dependencies
 endif
@@ -29,7 +29,7 @@ setup-codeisgning:
 ifeq ($(detected_OS),Darwin)
 	security find-identity -p basic -v
 	xcrun notarytool store-credentials 'notarize-app' --apple-id $(APPLE_USERNAME) --team-id $(APPLE_TEAM_CODE) --password $(ALTOOL_APPPASS)
-endif 
+endif
 
 clear:
 ifeq ($(detected_OS),Darwin)
