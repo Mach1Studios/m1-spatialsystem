@@ -15,10 +15,9 @@ endif
 pull:
 	git pull --recurse-submodules
 
-get-fucked:
-	# git submodule deinit -f .
-	# git submodule update --init --recursive --checkout # used for recusive
-	# git submodule foreach --recursive git clean -x -f -d
+git-nuke:
+	git submodule foreach --recursive git clean -x -f -d
+	make pull
 
 setup:
 ifeq ($(detected_OS),Darwin)
