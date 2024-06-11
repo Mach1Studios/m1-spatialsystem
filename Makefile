@@ -15,6 +15,11 @@ endif
 pull:
 	git pull --recurse-submodules
 
+get-fucked:
+	# git submodule deinit -f .
+	# git submodule update --init --recursive --checkout # used for recusive
+	# git submodule foreach --recursive git clean -x -f -d
+
 setup:
 ifeq ($(detected_OS),Darwin)
 	# Assumes you have installed Homebrew package manager
