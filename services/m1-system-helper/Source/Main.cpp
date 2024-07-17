@@ -335,6 +335,10 @@ class M1SystemHelperService :
             if (sender.connect("127.0.0.1", players[0].port)) {
                 juce::OSCMessage msg("/m1-activate-client");
                 msg.addInt32(1); // send true / activate message
+                if (monitors.size() != NULL) {
+                    // TODO: implement a better system for this
+                    msg.addInt32(monitors.size()); // add number of monitor instances for detecting playmode
+                }
                 sender.send(msg);
             }
             // from 2nd index onward send a de-activate message
