@@ -133,24 +133,6 @@ else
 	cd m1-transcoder && ./scripts/setup.sh && npm install
 endif
 
-dev-sdk:
-ifeq ($(detected_OS),Darwin)
-	rm -rf m1-monitor/build-dev
-	rm -rf m1-panner/build-dev
-	cmake m1-monitor -Bm1-monitor/build-dev -G "Xcode" -DEXTERNAL_M1SDK_PATH=$(M1SDK_PATH) -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_AAX=ON -DAAX_PATH=$(AAX_PATH) -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DBUILD_STANDALONE=ON
-	cmake m1-panner -Bm1-panner/build-dev -G "Xcode" -DEXTERNAL_M1SDK_PATH=$(M1SDK_PATH) -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_AAX=ON -DAAX_PATH=$(AAX_PATH) -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DBUILD_STANDALONE=ON
-else ifeq ($(detected_OS),Windows)
-	-del /F /S /Q m1-monitor\build
-	-del /F /S /Q m1-panner\build
-	cmake m1-monitor -Bm1-monitor/build-dev -G "Visual Studio 17 2022" -DEXTERNAL_M1SDK_PATH=$(M1SDK_PATH) -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF -DBUILD_VST3=ON -DBUILD_STANDALONE=ON
-	cmake m1-panner -Bm1-panner/build-dev -G "Visual Studio 17 2022" -DEXTERNAL_M1SDK_PATH=$(M1SDK_PATH) -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF -DBUILD_VST3=ON -DBUILD_STANDALONE=ON
-else
-	rm -rf m1-monitor/build-dev
-	rm -rf m1-panner/build-dev
-	cmake m1-monitor -Bm1-monitor/build-dev -DEXTERNAL_M1SDK_PATH=$(M1SDK_PATH) -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_STANDALONE=ON
-	cmake m1-panner -Bm1-panner/build-dev -DEXTERNAL_M1SDK_PATH=$(M1SDK_PATH) -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_STANDALONE=ON
-endif
-
 # run configure first
 package: build codesign notarize installer-pkg
 
