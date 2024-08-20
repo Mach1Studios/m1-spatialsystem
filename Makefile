@@ -22,7 +22,7 @@ git-nuke:
 setup:
 ifeq ($(detected_OS),Darwin)
 	# Assumes you have installed Homebrew package manager
-	brew install yasm cmake
+	brew install yasm cmake p7zip ninja act
 	cd m1-transcoder && ./scripts/setup.sh
 else ifeq ($(detected_OS),Windows)
 	# Assumes you have installed Chocolatey package manager
