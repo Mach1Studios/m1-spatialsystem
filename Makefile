@@ -40,12 +40,12 @@ ifeq ($(detected_OS),Darwin)
 	rm -rf installer/osx/build
 endif
 ifeq ($(detected_OS),Windows)
-	-del /F /S /Q m1-monitor\build
-	-del /F /S /Q m1-panner\build
-	-del /F /S /Q m1-player\build
-	-del /F /S /Q m1-transcoder\dist
-	-del /F /S /Q m1-orientationmanager\build
-	-del /F /S /Q services\m1-system-helper\build
+	@if exist m1-monitor\\build (rmdir /s /q m1-monitor\\build)
+	@if exist m1-panner\\build (rmdir /s /q m1-panner\\build)
+	@if exist m1-player\\build (rmdir /s /q m1-player\\build)
+	@if exist m1-transcoder\\dist (rmdir /s /q m1-transcoder\\dist)
+	@if exist m1-orientationmanager\\build (rmdir /s /q m1-orientationmanager\\build)
+	@if exist services\\m1-system-helper\\build (rmdir /s /q services\\m1-system-helper\\build)
 else
 	rm -rf m1-monitor/build
 	rm -rf m1-panner/build
@@ -60,12 +60,12 @@ ifeq ($(detected_OS),Darwin)
 	rm -rf installer/osx/build
 endif
 ifeq ($(detected_OS),Windows)
-	-del /F /S /Q m1-monitor\build-dev
-	-del /F /S /Q m1-panner\build-dev
-	-del /F /S /Q m1-player\build-dev
-	-del /F /S /Q m1-transcoder\dist
-	-del /F /S /Q m1-orientationmanager\build-dev
-	-del /F /S /Q services\m1-system-helper\build-dev
+	@if exist m1-monitor\\build-dev (rmdir /s /q m1-monitor\\build-dev)
+	@if exist m1-panner\\build-dev (rmdir /s /q m1-panner\\build-dev)
+	@if exist m1-player\\build-dev (rmdir /s /q m1-player\\build-dev)
+	@if exist m1-transcoder\\dist (rmdir /s /q m1-transcoder\\dist)
+	@if exist m1-orientationmanager\\build-dev (rmdir /s /q m1-orientationmanager\\build-dev)
+	@if exist services\\m1-system-helper\\build-dev (rmdir /s /q services\\m1-system-helper\\build-dev)
 else
 	rm -rf m1-monitor/build-dev
 	rm -rf m1-panner/build-dev
