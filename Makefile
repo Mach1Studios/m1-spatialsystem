@@ -35,7 +35,7 @@ ifeq ($(detected_OS),Darwin)
 	xcrun notarytool store-credentials 'notarize-app' --apple-id $(APPLE_USERNAME) --team-id $(APPLE_TEAM_CODE) --password $(ALTOOL_APPPASS)
 endif
 
-clear:
+clean:
 ifeq ($(detected_OS),Darwin)
 	rm -rf installer/osx/build
 endif
@@ -55,7 +55,7 @@ else
 	rm -rf services/m1-system-helper/build
 endif
 
-clear-dev:
+clean-dev:
 ifeq ($(detected_OS),Darwin)
 	rm -rf installer/osx/build
 endif
@@ -75,7 +75,7 @@ else
 	rm -rf services/m1-system-helper/build-dev
 endif
 
-clear-installs:
+clean-installs:
 ifeq ($(detected_OS),Darwin)
 	sudo rm -rf /Applications/Mach1\ Spatial\ System/M1-Transcoder.app
 	sudo rm -rf /Applications/Mach1\ Spatial\ System/M1-VideoPlayer.app
@@ -106,18 +106,18 @@ ifeq ($(detected_OS),Darwin)
 endif
 
 # configure for debug and setup dev envs with common IDEs
-dev: clear-dev
+dev: clean-dev
 ifeq ($(detected_OS),Darwin)
-	cmake m1-monitor -Bm1-monitor/build-dev -G "Xcode" -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_AAX=ON -DAAX_PATH=$(AAX_PATH) -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DBUILD_STANDALONE=ON
-	cmake m1-panner -Bm1-panner/build-dev -G "Xcode" -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_AAX=ON -DAAX_PATH=$(AAX_PATH) -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DBUILD_STANDALONE=ON
+	cmake m1-monitor -Bm1-monitor/build-dev -G "Xcode" -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DBUILD_STANDALONE=ON
+	cmake m1-panner -Bm1-panner/build-dev -G "Xcode" -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DBUILD_STANDALONE=ON
 	cmake m1-player -Bm1-player/build-dev -G "Xcode"
 	cmake m1-orientationmanager -Bm1-orientationmanager/build-dev -G "Xcode" -DCMAKE_INSTALL_PREFIX="/Library/Application Support/Mach1"
 	cmake services/m1-system-helper -Bservices/m1-system-helper/build-dev -G "Xcode" -DCMAKE_INSTALL_PREFIX="/Library/Application Support/Mach1"
 	cmake m1-orientationmanager/osc_client -Bm1-orientationmanager/osc_client/build-dev -G "Xcode"
 	cd m1-transcoder && ./scripts/setup.sh && npm install
 else ifeq ($(detected_OS),Windows)
-	cmake m1-monitor -Bm1-monitor/build-dev -G "Visual Studio 17 2022" -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_STANDALONE=ON
-	cmake m1-panner -Bm1-panner/build-dev -G "Visual Studio 17 2022" -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_STANDALONE=ON
+	cmake m1-monitor -Bm1-monitor/build-dev -G "Visual Studio 17 2022" -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_STANDALONE=ON
+	cmake m1-panner -Bm1-panner/build-dev -G "Visual Studio 17 2022" -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_STANDALONE=ON
 	cmake m1-player -Bm1-player/build-dev -G "Visual Studio 17 2022"
 	cmake m1-orientationmanager -Bm1-orientationmanager/build-dev -G "Visual Studio 17 2022" -DCMAKE_INSTALL_PREFIX="\Documents and Settings\All Users\Application Data\Mach1"
 	cmake services/m1-system-helper -Bservices/m1-system-helper/build-dev -G "Visual Studio 17 2022" -DCMAKE_INSTALL_PREFIX="\Documents and Settings\All Users\Application Data\Mach1"
@@ -136,10 +136,10 @@ endif
 # run configure first
 package: build codesign notarize installer-pkg
 
-# clear and configure for release
-configure: clear
-	cmake m1-monitor -Bm1-monitor/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DAAX_PATH=$(AAX_PATH) -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF
-	cmake m1-panner -Bm1-panner/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DAAX_PATH=$(AAX_PATH) -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF
+# clean and configure for release
+configure: clean
+	cmake m1-monitor -Bm1-monitor/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF
+	cmake m1-panner -Bm1-panner/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF
 ifeq ($(detected_OS),Darwin)
 	cmake m1-player -Bm1-player/build -G "Xcode"
 else
