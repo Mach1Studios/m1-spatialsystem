@@ -116,12 +116,12 @@ ifeq ($(detected_OS),Darwin)
 	cmake m1-orientationmanager/osc_client -Bm1-orientationmanager/osc_client/build-dev -G "Xcode"
 	cd m1-transcoder && ./scripts/setup.sh && npm install
 else ifeq ($(detected_OS),Windows)
-	cmake m1-monitor -Bm1-monitor/build-dev -G "Visual Studio 17 2022" -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_STANDALONE=ON
-	cmake m1-panner -Bm1-panner/build-dev -G "Visual Studio 17 2022" -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_STANDALONE=ON
-	cmake m1-player -Bm1-player/build-dev -G "Visual Studio 17 2022"
-	cmake m1-orientationmanager -Bm1-orientationmanager/build-dev -G "Visual Studio 17 2022" -DCMAKE_INSTALL_PREFIX="\Documents and Settings\All Users\Application Data\Mach1"
-	cmake services/m1-system-helper -Bservices/m1-system-helper/build-dev -G "Visual Studio 17 2022" -DCMAKE_INSTALL_PREFIX="\Documents and Settings\All Users\Application Data\Mach1"
-	cmake m1-orientationmanager/osc_client -Bm1-orientationmanager/osc_client/build-dev -G "Visual Studio 17 2022"
+	cmake m1-monitor -Bm1-monitor/build-dev -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_STANDALONE=ON
+	cmake m1-panner -Bm1-panner/build-dev -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_STANDALONE=ON
+	cmake m1-player -Bm1-player/build-dev
+	cmake m1-orientationmanager -Bm1-orientationmanager/build-dev -DCMAKE_INSTALL_PREFIX="\Documents and Settings\All Users\Application Data\Mach1"
+	cmake services/m1-system-helper -Bservices/m1-system-helper/build-dev -DCMAKE_INSTALL_PREFIX="\Documents and Settings\All Users\Application Data\Mach1"
+	cmake m1-orientationmanager/osc_client -Bm1-orientationmanager/osc_client/build-dev
 	cd m1-transcoder && scripts\setup.sh && npm install
 else
 	cmake m1-monitor -Bm1-monitor/build-dev -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_STANDALONE=ON
