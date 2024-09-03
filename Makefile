@@ -25,8 +25,9 @@ ifeq ($(detected_OS),Darwin)
 	brew install yasm cmake p7zip ninja act
 	cd m1-transcoder && ./scripts/setup.sh
 else ifeq ($(detected_OS),Windows)
-	# Assumes you have installed Chocolatey package manager
-	choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' --apply-install-arguments-to-dependencies
+	@choco version >nul || (echo "chocolately is not working or installed" && exit 1)
+	@echo "choco is installed and working"
+	@choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' --apply-install-arguments-to-dependencies
 endif
 
 setup-codeisgning:
