@@ -22,12 +22,17 @@ git-nuke:
 setup:
 ifeq ($(detected_OS),Darwin)
 	# Assumes you have installed Homebrew package manager
-	brew install yasm cmake p7zip ninja act
+	brew install yasm cmake p7zip ninja act pre-commit
 	cd m1-transcoder && ./scripts/setup.sh
+	cd m1-panner && pre-commit install
+	cd m1-monitor && pre-commit install
 else ifeq ($(detected_OS),Windows)
 	@choco version >nul || (echo "chocolately is not working or installed" && exit 1)
 	@echo "choco is installed and working"
 	@choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' --apply-install-arguments-to-dependencies
+	@if not exist "$(pip show pre-commit)" (pip install pre-commit)
+	cd m1-panner && pre-commit install
+	cd m1-monitor && pre-commit install
 endif
 
 setup-codeisgning:
