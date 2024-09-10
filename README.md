@@ -34,8 +34,8 @@ To properly debug the services [m1-system-helper](services/m1-system-helper) and
 - Add Camera and fusion orientation to OrientationManager
 - ~Add Panner position drawing to M1-Player~
 - Add ~windows and~ linux service handling
-- Add id system to clients to detect more than one M1-Monitor instance
-- Add better angle reset and offset adding management for clients
+- ~Add id system to clients to detect more than one M1-Monitor instance~
+- ~Add better angle reset and offset adding management for clients~
 - ~Fix PostInstall script for m1-orientationmanager on macos to support installing without requiring restarts~
 
 ## Communication Map
