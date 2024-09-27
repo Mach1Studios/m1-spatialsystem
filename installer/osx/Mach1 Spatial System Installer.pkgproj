@@ -815,7 +815,7 @@
 													<key>GID</key>
 													<integer>80</integer>
 													<key>PATH</key>
-													<string>../../m1-orientationmanager/Resources/settings.json</string>
+													<string>../resources/settings.json</string>
 													<key>PATH_TYPE</key>
 													<integer>1</integer>
 													<key>PERMISSIONS</key>
