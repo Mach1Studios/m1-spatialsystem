@@ -112,32 +112,63 @@ ifeq ($(detected_OS),Darwin)
 endif
 
 # configure for debug and setup dev envs with common IDEs
-dev: clean-dev
+dev: clean-dev dev-monitor dev-panner dev-player dev-orientationmanager dev-system-helper dev-transcoder
+
+dev-monitor:
 ifeq ($(detected_OS),Darwin)
 	cmake m1-monitor -Bm1-monitor/build-dev -G "Xcode" -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DBUILD_STANDALONE=ON
-	cmake m1-panner -Bm1-panner/build-dev -G "Xcode" -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DBUILD_STANDALONE=ON
-	cmake m1-player -Bm1-player/build-dev -G "Xcode"
-	cmake m1-orientationmanager -Bm1-orientationmanager/build-dev -G "Xcode" -DENABLE_DEBUG_EMULATOR_DEVICE=ON -DCMAKE_INSTALL_PREFIX="/Library/Application Support/Mach1"
-	cmake services/m1-system-helper -Bservices/m1-system-helper/build-dev -G "Xcode" -DCMAKE_INSTALL_PREFIX="/Library/Application Support/Mach1"
-	cmake m1-orientationmanager/osc_client -Bm1-orientationmanager/osc_client/build-dev -G "Xcode"
-	cd m1-transcoder && ./scripts/setup.sh && npm install
-else ifeq ($(detected_OS),Windows)
-	cmake m1-monitor -Bm1-monitor/build-dev -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_STANDALONE=ON
-	cmake m1-panner -Bm1-panner/build-dev -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_STANDALONE=ON
-	cmake m1-player -Bm1-player/build-dev
-	cmake m1-orientationmanager -Bm1-orientationmanager/build-dev -DENABLE_DEBUG_EMULATOR_DEVICE=ON -DCMAKE_INSTALL_PREFIX="\Documents and Settings\All Users\Application Data\Mach1"
-	cmake services/m1-system-helper -Bservices/m1-system-helper/build-dev -DCMAKE_INSTALL_PREFIX="\Documents and Settings\All Users\Application Data\Mach1"
-	cmake m1-orientationmanager/osc_client -Bm1-orientationmanager/osc_client/build-dev
-	cd m1-transcoder && scripts\setup.sh && npm install
 else
 	cmake m1-monitor -Bm1-monitor/build-dev -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_STANDALONE=ON
-	cmake m1-panner -Bm1-panner/build-dev -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_STANDALONE=ON
+endif
+
+dev-panner:
+ifeq ($(detected_OS),Darwin)
+	cmake m1-panner -Bm1-panner/build-dev -G "Xcode" -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DBUILD_STANDALONE=ON
+else
+	cmake m1-panner -Bm1-panner/build-dev -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_STANDALONE=ON
+endif
+
+dev-player:
+ifeq ($(detected_OS),Darwin)
+	cmake m1-player -Bm1-player/build-dev -G "Xcode"
+else
 	cmake m1-player -Bm1-player/build-dev
+endif
+
+dev-orientationmanager:
+ifeq ($(detected_OS),Darwin)
+	cmake m1-orientationmanager -Bm1-orientationmanager/build-dev -G "Xcode" -DENABLE_DEBUG_EMULATOR_DEVICE=ON -DCMAKE_INSTALL_PREFIX="/Library/Application Support/Mach1"
+else ifeq ($(detected_OS),Windows)
+	cmake m1-orientationmanager -Bm1-orientationmanager/build-dev -DENABLE_DEBUG_EMULATOR_DEVICE=ON -DCMAKE_INSTALL_PREFIX="\Documents and Settings\All Users\Application Data\Mach1"
+else
 	cmake m1-orientationmanager -Bm1-orientationmanager/build-dev -DENABLE_DEBUG_EMULATOR_DEVICE=ON -DCMAKE_INSTALL_PREFIX="/opt/Mach1"
-	cmake services/m1-system-helper -Bservices/m1-system-helper/build-dev -DCMAKE_INSTALL_PREFIX="/opt/Mach1"
+endif
+
+dev-oscclient:
+ifeq ($(detected_OS),Darwin)
+	cmake m1-orientationmanager/osc_client -Bm1-orientationmanager/osc_client/build-dev -G "Xcode"
+else
 	cmake m1-orientationmanager/osc_client -Bm1-orientationmanager/osc_client/build-dev
+endif
+
+dev-system-helper:
+ifeq ($(detected_OS),Darwin)
+	cmake services/m1-system-helper -Bservices/m1-system-helper/build-dev -G "Xcode" -DCMAKE_INSTALL_PREFIX="/Library/Application Support/Mach1"
+else ifeq ($(detected_OS),Windows)
+	cmake services/m1-system-helper -Bservices/m1-system-helper/build-dev -DCMAKE_INSTALL_PREFIX="\Documents and Settings\All Users\Application Data\Mach1"
+else
+	cmake services/m1-system-helper -Bservices/m1-system-helper/build-dev -DCMAKE_INSTALL_PREFIX="/opt/Mach1"
+endif
+
+dev-transcoder:
+ifeq ($(detected_OS),Windows)
+	cd m1-transcoder && scripts\setup.sh && npm install
+else 
 	cd m1-transcoder && ./scripts/setup.sh && npm install
 endif
+
+# configure for debug and setup dev envs with common IDEs
+dev: clean-dev dev-monitor dev-panner dev-player dev-orientationmanager dev-system-helper
 
 # run configure first
 package: build codesign notarize installer-pkg
@@ -157,17 +188,31 @@ ifeq ($(detected_OS),Darwin)
 	cd m1-transcoder && ./scripts/setup.sh && npm install
 endif
 
-build: 
+# Build targets for individual components
+build-monitor:
 	cmake --build m1-monitor/build --config "Release"
+
+build-panner:
 	cmake --build m1-panner/build --config "Release"
+
+build-player:
 	cmake --build m1-player/build --config "Release"
+
+build-orientationmanager:
 	cmake --build m1-orientationmanager/build --config "Release"
+
+build-system-helper:
 	cmake --build services/m1-system-helper/build --config "Release"
+
+build-transcoder:
 ifeq ($(detected_OS),Darwin)
 	cd m1-transcoder && npm run package-mac
 else ifeq ($(detected_OS),Windows)
 	cd m1-transcoder && npm run package-win
 endif
+
+# Build configured release
+build: build-monitor build-panner build-player build-orientationmanager build-system-helper build-transcoder
 
 codesign:
 ifeq ($(detected_OS),Darwin)
