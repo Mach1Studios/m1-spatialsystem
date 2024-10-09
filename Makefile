@@ -22,7 +22,7 @@ git-nuke:
 setup:
 ifeq ($(detected_OS),Darwin)
 	# Assumes you have installed Homebrew package manager
-	brew install yasm cmake p7zip ninja act pre-commit
+	brew install yasm cmake p7zip ninja act pre-commit launchcontrol
 	cd m1-transcoder && ./scripts/setup.sh
 	cd m1-panner && pre-commit install
 	cd m1-monitor && pre-commit install
@@ -43,12 +43,14 @@ endif
 
 setup-services: clean-services
 ifeq ($(detected_OS),Darwin)
+	sudo cp m1-orientationmanager/Resources/settings.json /Library/Application\ Support/Mach1/settings.json
 	sudo cp m1-orientationmanager/Resources/com.mach1.spatial.orientationmanager.plist /Library/LaunchAgents/com.mach1.spatial.orientationmanager.plist
 	sudo cp services/m1-system-helper/com.mach1.spatial.helper.plist /Library/LaunchAgents/com.mach1.spatial.helper.plist
 endif
 
 clean-services:
 ifeq ($(detected_OS),Darwin)
+	rm -f /Library/Application\ Support/Mach1/settings.json
 	rm -f /Library/LaunchAgents/com.mach1.spatial.orientationmanager.plist
 	rm -f /Library/LaunchAgents/com.mach1.spatial.helper.plist
 endif
