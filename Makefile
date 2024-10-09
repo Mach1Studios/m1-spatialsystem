@@ -41,6 +41,18 @@ ifeq ($(detected_OS),Darwin)
 	xcrun notarytool store-credentials 'notarize-app' --apple-id $(APPLE_USERNAME) --team-id $(APPLE_TEAM_CODE) --password $(ALTOOL_APPPASS)
 endif
 
+setup-services: clean-services
+ifeq ($(detected_OS),Darwin)
+	sudo cp m1-orientationmanager/Resources/com.mach1.spatial.orientationmanager.plist /Library/LaunchAgents/com.mach1.spatial.orientationmanager.plist
+	sudo cp services/m1-system-helper/com.mach1.spatial.helper.plist /Library/LaunchAgents/com.mach1.spatial.helper.plist
+endif
+
+clean-services:
+ifeq ($(detected_OS),Darwin)
+	rm -f /Library/LaunchAgents/com.mach1.spatial.orientationmanager.plist
+	rm -f /Library/LaunchAgents/com.mach1.spatial.helper.plist
+endif
+
 clean:
 ifeq ($(detected_OS),Darwin)
 	rm -rf installer/osx/build
