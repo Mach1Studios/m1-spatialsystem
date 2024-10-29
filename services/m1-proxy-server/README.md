@@ -1,5 +1,7 @@
 # M1 Proxy Server
 
+### Currently not in use!
+
 ## Deploying to AWS EC2
 ### Create an EC2 Instance
 - Select AMI: Use the latest Amazon Linux 2 AMI.

@@ -97,14 +97,11 @@ endif
 
 clean-installs:
 ifeq ($(detected_OS),Darwin)
-	sudo rm -rf /Applications/Mach1\ Spatial\ System/M1-Transcoder.app
-	sudo rm -rf /Applications/Mach1\ Spatial\ System/M1-VideoPlayer.app
-	sudo rm -rf /Applications/Mach1/M1-Transcoder.app
-	sudo rm -rf /Applications/Mach1/M1-Player.app
+	sudo rm -rf /Applications/Mach1\ Spatial\ System
+	sudo rm -rf /Applications/Mach1
 	sudo rm -rf /Library/LaunchAgents/com.mach1.spatial.orientationmanager.plist
 	sudo rm -rf /Library/LaunchAgents/com.mach1.spatial.helper.plist
-	sudo rm -rf /Library/Application Support/Mach1/m1-orientationmanager
-	sudo rm -rf /Library/Application Support/Mach1/m1-system-helper
+	sudo rm -rf /Library/Application\ Support/Mach1
 	# removing global
 	sudo rm -rf "/Library/Application Support/Avid/Audio/Plug-Ins/M1-Monitor.aaxplugin"
 	sudo rm -rf "/Library/Application Support/Avid/Audio/Plug-Ins/M1-Panner.aaxplugin"
@@ -152,6 +149,8 @@ endif
 dev-orientationmanager:
 ifeq ($(detected_OS),Darwin)
 	cmake m1-orientationmanager -Bm1-orientationmanager/build-dev -G "Xcode" -DENABLE_DEBUG_EMULATOR_DEVICE=ON -DCMAKE_INSTALL_PREFIX="/Library/Application Support/Mach1"
+	sudo mkdir -p /Library/Application\ Support/Mach1
+	sudo cp m1-orientationmanager/Resources/settings.json /Library/Application\ Support/Mach1/settings.json
 else ifeq ($(detected_OS),Windows)
 	cmake m1-orientationmanager -Bm1-orientationmanager/build-dev -DENABLE_DEBUG_EMULATOR_DEVICE=ON -DCMAKE_INSTALL_PREFIX="\Documents and Settings\All Users\Application Data\Mach1"
 else
@@ -168,6 +167,8 @@ endif
 dev-system-helper:
 ifeq ($(detected_OS),Darwin)
 	cmake services/m1-system-helper -Bservices/m1-system-helper/build-dev -G "Xcode" -DCMAKE_INSTALL_PREFIX="/Library/Application Support/Mach1"
+	sudo mkdir -p /Library/Application\ Support/Mach1
+	sudo cp m1-orientationmanager/Resources/settings.json /Library/Application\ Support/Mach1/settings.json
 else ifeq ($(detected_OS),Windows)
 	cmake services/m1-system-helper -Bservices/m1-system-helper/build-dev -DCMAKE_INSTALL_PREFIX="\Documents and Settings\All Users\Application Data\Mach1"
 else
@@ -180,9 +181,6 @@ ifeq ($(detected_OS),Windows)
 else 
 	cd m1-transcoder && ./scripts/setup.sh && npm install
 endif
-
-# configure for debug and setup dev envs with common IDEs
-dev: clean-dev dev-monitor dev-panner dev-player dev-orientationmanager dev-system-helper
 
 # run configure first
 package: build codesign notarize installer-pkg
