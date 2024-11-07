@@ -28,6 +28,7 @@ public:
     std::string name;
     juce::OSCColour color;
     int input_mode;
+    int output_mode;
     float azimuth, elevation, diverge; // values expected unnormalized
     float gain; // values expected unnormalized
     float st_orbit_azimuth, st_spread; // values expected unnormalized
@@ -68,6 +69,7 @@ struct find_client_by_type {
 };
 
 int serverPort, helperPort;
+int last_system_channel_count = 0;
 juce::int64 shutdownCounterTime = 0;
 juce::int64 pingTime = 0;
 juce::DatagramSocket sock(false);
@@ -307,6 +309,29 @@ class M1SystemHelperService :
         send(clients, msg);
     }
 
+    void command_changeM1ChannelConfig(int channel_count) {
+        if (registeredPlugins.size() > 0) {
+            for (int plugin = 0; plugin < registeredPlugins.size(); plugin++) {
+                juce::OSCSender sender;
+                if (sender.connect("127.0.0.1", registeredPlugins[plugin].port)) {
+                    juce::OSCMessage msg("/m1-channel-config");
+                    msg.addInt32(channel_count); // send channel count
+                    sender.send(msg);
+                }
+            }
+        }
+        if (monitors.size() > 0) {
+            for (int monitor = 0; monitor < monitors.size(); monitor++) {
+                juce::OSCSender sender;
+                if (sender.connect("127.0.0.1", monitors[monitor].port)) {
+                    juce::OSCMessage msg("/m1-channel-config");
+                    msg.addInt32(channel_count); // send channel count
+                    sender.send(msg);
+                }
+            }
+        }
+    }
+        
     void command_activateClients() {
         /// MONITORS
         if (monitors.size() > 0) {
@@ -488,6 +513,16 @@ class M1SystemHelperService :
                         }
                     }
                 }
+            }
+        }
+        else if (message.getAddressPattern() == "/setChannelConfigReq") {
+            // receiving a request for the panner/monitor channel configs to change, likely from one of them changing to a new config
+            int channel_count_for_config = message[0].getInt32();
+            if (last_system_channel_count != channel_count_for_config)
+            {
+                DBG("[Plugin] Config request for: " + std::to_string(channel_count_for_config) + " channels");
+                command_changeM1ChannelConfig(channel_count_for_config);
+                last_system_channel_count = channel_count_for_config; // Set "last known" channel count to reduce messaging
             }
         }
         else if (message.getAddressPattern() == "/setMonitorActiveReq") {
