@@ -363,6 +363,8 @@ class M1SystemHelperService :
                 if (monitors.size() != NULL) {
                     // TODO: implement a better system for this
                     msg.addInt32(monitors.size()); // add number of monitor instances for detecting playmode
+                } else {
+                    msg.addInt32(0);
                 }
                 sender.send(msg);
             }
@@ -422,7 +424,7 @@ class M1SystemHelperService :
                     command_activateClients();
                     msg.addInt32(m1_clients.size() - 1); // send ID for multiple clients to send commands
                     sender.send(msg);
-                    DBG("Number of mach1 clients registered: " + std::to_string(m1_clients.size()) + " | monitors:" + std::to_string(monitors.size()) + " | players:" + std::to_string(players.size()));
+                    DBG("Number of mach1 clients registered: " + std::to_string(m1_clients.size()) + " | monitors: " + std::to_string(monitors.size()) + " | players:" + std::to_string(players.size()));
                 }
             }
 
