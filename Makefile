@@ -12,6 +12,11 @@ else
 	detected_OS := $(shell uname)
 endif
 
+.PHONY: update-versions
+update-versions:
+	@chmod +x ./installer/generate_version.sh
+	@./installer/generate_version.sh
+
 pull:
 	git pull --recurse-submodules
 
@@ -183,10 +188,10 @@ else
 endif
 
 # run configure first
-package: build codesign notarize installer-pkg
+package: update-versions build codesign notarize installer-pkg
 
 # clean and configure for release
-configure: clean
+configure: clean update-versions
 	cmake m1-monitor -Bm1-monitor/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF
 	cmake m1-panner -Bm1-panner/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF
 ifeq ($(detected_OS),Darwin)
