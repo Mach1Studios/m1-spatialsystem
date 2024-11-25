@@ -72,6 +72,7 @@ int serverPort, helperPort;
 int last_system_channel_count = 0;
 juce::int64 shutdownCounterTime = 0;
 juce::int64 pingTime = 0;
+int playerLastUpdate = 0; // tracking last updates for player
 juce::DatagramSocket sock(false);
 
 // run process m1-orientationmanager.exe from the same folder
@@ -774,6 +775,55 @@ class M1SystemHelperService :
             }
             else {
                 // port not found, error here
+            }
+        }
+        else if (message.getAddressPattern() == "/setPlayerFrameRate") {
+            auto frameRate = message[0].getFloat32();
+            
+            // Relay to all player clients
+            if (players.size() > 0) {
+                for (int player = 0; player < players.size(); player++) {
+                    juce::OSCSender sender;
+                    if (sender.connect("127.0.0.1", players[player].port)) {
+                        juce::OSCMessage msg("/playerFrameRate");
+                        msg.addFloat32(frameRate);
+                        sender.send(msg);
+                    }
+                }
+            }
+        }
+        else if (message.getAddressPattern() == "/setPlayerPosition") {
+            playerLastUpdate = message[0].getInt32(); // update time from DAW
+            auto playerPositionInSeconds = message[1].getFloat32();
+
+            // Relay to all player clients
+            if (players.size() > 0) {
+                for (int player = 0; player < players.size(); player++) {
+                    juce::OSCSender sender;
+                    if (sender.connect("127.0.0.1", players[player].port)) {
+                        juce::OSCMessage msg("/playerPosition");
+                        msg.addInt32(playerLastUpdate);
+                        msg.addFloat32(playerPositionInSeconds);
+                        sender.send(msg);
+                    }
+                }
+            }
+        }
+        else if (message.getAddressPattern() == "/setPlayerIsPlaying") {
+            playerLastUpdate = message[0].getInt32(); // update time from DAW
+            auto playerIsPlaying = message[1].getInt32();
+            
+            // Relay to all player clients
+            if (players.size() > 0) {
+                for (int player = 0; player < players.size(); player++) {
+                    juce::OSCSender sender;
+                    if (sender.connect("127.0.0.1", players[player].port)) {
+                        juce::OSCMessage msg("/playerIsPlaying");
+                        msg.addInt32(playerLastUpdate);
+                        msg.addInt32(playerIsPlaying ? 1 : 0);
+                        sender.send(msg);
+                    }
+                }
             }
         }
         else {
