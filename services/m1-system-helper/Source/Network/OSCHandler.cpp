@@ -42,8 +42,6 @@ void OSCHandler::setupMessageHandlers() {
         {"/m1-removeClient", [this](const auto& m) { handleRemoveClient(m); }},
         {"/m1-status", [this](const auto& m) { handleClientStatus(m); }},
         {"/setPlayerYPR", [this](const auto& m) { handleSetPlayerYPR(m); }},
-        {"/setChannelConfig", [this](const auto& m) { handleSetChannelConfig(m); }},
-        {"/setMonitorActive", [this](const auto& m) { handleSetMonitorActive(m); }},
         {"/setMonitoringMode", [this](const auto& m) { handleSetMonitoringMode(m); }},
         {"/setMasterYPR", [this](const auto& m) { handleSetMasterYPR(m); }},
         {"/m1-register-plugin", [this](const auto& m) { handleRegisterPlugin(m); }},
@@ -57,13 +55,14 @@ void OSCHandler::setupMessageHandlers() {
 }
 
 void OSCHandler::oscMessageReceived(const juce::OSCMessage& message) {
+    // Update ping time for every message received
+    pingTime = juce::Time::currentTimeMillis();
     auto address = message.getAddressPattern().toString();
     //DBG("[OSCHandler] Received message: " + address);
     
+    // Handle messages
     if (auto it = messageHandlers.find(address); it != messageHandlers.end()) {
         it->second(message);
-    } else {
-        DBG("Unhandled OSC message: " + address);
     }
 }
 
@@ -98,22 +97,24 @@ void OSCHandler::handleAddClient(const juce::OSCMessage& message) {
 
 void OSCHandler::handleSetMasterYPR(const juce::OSCMessage& message) {
     if (message.size() >= 3) {
-        DBG("[OSCHandler] Received YPR message");
         
         masterYaw = message[0].getFloat32();
         masterPitch = message[1].getFloat32();
         masterRoll = message[2].getFloat32();
         
-        pluginManager->sendMonitorSettings(masterMode, masterYaw, masterPitch, masterRoll);
-        
-        prevMasterYaw = masterYaw;
-        prevMasterPitch = masterPitch;
-        prevMasterRoll = masterRoll;
-        prevMasterMode = masterMode;
-        
-        DBG("[Monitor] YPR updated: Y=" + std::to_string(masterYaw) + 
-            " P=" + std::to_string(masterPitch) + 
-            " R=" + std::to_string(masterRoll));
+        if (prevMasterYaw != masterYaw || prevMasterPitch != masterPitch || prevMasterRoll != masterRoll || prevMasterMode != masterMode)
+        {
+            pluginManager->sendMonitorSettings(masterMode, masterYaw, masterPitch, masterRoll);
+            
+            prevMasterYaw = masterYaw;
+            prevMasterPitch = masterPitch;
+            prevMasterRoll = masterRoll;
+            prevMasterMode = masterMode;
+            
+            DBG("[Monitor] YPR updated: Y=" + std::to_string(masterYaw) +
+                " P=" + std::to_string(masterPitch) +
+                " R=" + std::to_string(masterRoll));
+        }
     } else {
         DBG("[OSCHandler] Invalid YPR message size: " + std::to_string(message.size()));
     }
@@ -165,29 +166,10 @@ void OSCHandler::handleClientStatus(const juce::OSCMessage& message) {
 
 void OSCHandler::handleSetPlayerYPR(const juce::OSCMessage& message) {
     if (message.size() >= 3) {
-        juce::OSCMessage forwardMsg("/setPlayerYPR");
+        juce::OSCMessage forwardMsg("/YPR-Offset");
         forwardMsg.addFloat32(message[0].getFloat32()); // yaw
         forwardMsg.addFloat32(message[1].getFloat32()); // pitch
-        forwardMsg.addFloat32(message[2].getFloat32()); // roll
-        
-        clientManager->sendToClientsOfType(forwardMsg, ClientType::Player);
-    }
-}
-
-void OSCHandler::handleSetChannelConfig(const juce::OSCMessage& message) {
-    if (message.size() >= 2) {
-        juce::OSCMessage forwardMsg("/setChannelConfig");
-        forwardMsg.addInt32(message[0].getInt32());    // channel
-        forwardMsg.addFloat32(message[1].getFloat32()); // value
-        
-        clientManager->sendToAllClients(forwardMsg);
-    }
-}
-
-void OSCHandler::handleSetMonitorActive(const juce::OSCMessage& message) {
-    if (message.size() >= 1) {
-        juce::OSCMessage forwardMsg("/setMonitorActive");
-        forwardMsg.addInt32(message[0].getInt32());
+        //forwardMsg.addFloat32(message[2].getFloat32()); // roll
         
         clientManager->sendToClientsOfType(forwardMsg, ClientType::Monitor);
     }
@@ -279,32 +261,11 @@ void OSCHandler::handlePannerSettings(const juce::OSCMessage& message) {
 }
 
 void OSCHandler::handleClientRequestsServer(const juce::OSCMessage& message) {
-    if (message.size() >= 1) {
-        int port = message[0].getInt32();
-        
-        juce::OSCMessage response("/serverResponse");
-        response.addInt32(1);  // 1 = server is running
-        
-        juce::OSCSender sender;
-        if (sender.connect("127.0.0.1", port)) {
-            sender.send(response);
-        }
-    }
+    processManager->setClientRequestsServer(true);
 }
 
 void OSCHandler::handleClientExists(const juce::OSCMessage& message) {
-    if (message.size() >= 1) {
-        int port = message[0].getInt32();
-        
-        juce::OSCMessage response("/clientExistsResponse");
-        response.addInt32(port);
-        response.addInt32(1);  // 1 = exists
-        
-        juce::OSCSender sender;
-        if (sender.connect("127.0.0.1", port)) {
-            sender.send(response);
-        }
-    }
+    timeWhenHelperLastSeenAClient = pingTime;
 }
 
 void OSCHandler::handlePluginExists(const juce::OSCMessage& message) {
@@ -329,13 +290,13 @@ void OSCHandler::handleSetChannelConfigRequest(const juce::OSCMessage& message) 
         int channelCountForConfig = message[0].getInt32();
         if (lastSystemChannelCount != channelCountForConfig) {
             DBG("[Plugin] Config request for: " + std::to_string(channelCountForConfig) + " channels");
-            // TODO: Implement or integrate command_changeM1ChannelConfig functionality
             lastSystemChannelCount = channelCountForConfig;
             
             // Forward the configuration change to all clients
-            juce::OSCMessage forwardMsg("/setChannelConfig");
+            juce::OSCMessage forwardMsg("/m1-channel-config");
             forwardMsg.addInt32(channelCountForConfig);
-            clientManager->sendToAllClients(forwardMsg);
+            clientManager->sendToClientsOfType(forwardMsg, ClientType::Monitor);
+            pluginManager->sendToPannerPlugins(forwardMsg);
         }
     }
 }

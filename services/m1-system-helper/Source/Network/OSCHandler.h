@@ -58,6 +58,9 @@ private:
     int lastSystemChannelCount = 0;
     int playerLastUpdate = 0;
 
+    juce::int64 pingTime = 0;
+    juce::int64 timeWhenHelperLastSeenAClient = 0;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(OSCHandler)
 };
 
