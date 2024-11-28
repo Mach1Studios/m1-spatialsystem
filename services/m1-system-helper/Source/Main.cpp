@@ -387,10 +387,10 @@ class M1SystemHelperService :
         // restart the ping timer because we received a ping
         pingTime = juce::Time::currentTimeMillis();
 
-        if (message.getAddressPattern() == "/clientExists") {
+        if (message.getAddressPattern() == "/m1-clientExists") {
             timeWhenHelperLastSeenAClient = pingTime;
         }
-        else if (message.getAddressPattern() == "/clientRequestsServer") {
+        else if (message.getAddressPattern() == "/m1-clientRequestsServer") {
             clientRequestsServer = true;
         }
         else if (message.getAddressPattern() == "/m1-addClient") {
