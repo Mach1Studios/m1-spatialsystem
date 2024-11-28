@@ -3,7 +3,7 @@
 #include "../Common/Common.h"
 #include "../Managers/ClientManager.h"
 #include "../Managers/PluginManager.h"
-#include "../Managers/ProcessManager.h"
+#include "../Managers/ServiceManager.h"
 
 namespace Mach1 {
 
@@ -11,7 +11,7 @@ class OSCHandler : public juce::OSCReceiver::Listener<juce::OSCReceiver::Realtim
                   public juce::Timer  // Add Timer
 {
 public:
-    OSCHandler(ClientManager* clientManager, PluginManager* pluginManager, ProcessManager* processManager);
+    OSCHandler(ClientManager* clientManager, PluginManager* pluginManager, ServiceManager* processManager);
     ~OSCHandler() override;
 
     bool startListening(int port);
@@ -25,7 +25,7 @@ private:
     // Message handlers
     void handleAddClient(const juce::OSCMessage& message);
     void handleRemoveClient(const juce::OSCMessage& message);
-    void handleClientStatus(const juce::OSCMessage& message);
+    void handleClientPulse(const juce::OSCMessage& message);
     void handleSetPlayerYPR(const juce::OSCMessage& message);
     void handleSetChannelConfig(const juce::OSCMessage& message);
     void handleSetMonitorActive(const juce::OSCMessage& message);
@@ -34,8 +34,8 @@ private:
     void handleRegisterPlugin(const juce::OSCMessage& message);
     void handlePannerSettings(const juce::OSCMessage& message);
     void handleClientRequestsServer(const juce::OSCMessage& message);
-    void handleClientExists(const juce::OSCMessage& message);
-    void handlePluginExists(const juce::OSCMessage& message);
+    void handleOMClientPulse(const juce::OSCMessage& message);
+    void handlePluginPulse(const juce::OSCMessage& message);
     void handleSetChannelConfigRequest(const juce::OSCMessage& message);
     void handleSetMonitorActiveRequest(const juce::OSCMessage& message);
     void handleSetPlayerFrameRate(const juce::OSCMessage& message);
@@ -44,7 +44,7 @@ private:
 
     ClientManager* clientManager;
     PluginManager* pluginManager;
-    ProcessManager* processManager;
+    ServiceManager* processManager;
     
     juce::OSCReceiver receiver;
     using MessageHandler = std::function<void(const juce::OSCMessage&)>;

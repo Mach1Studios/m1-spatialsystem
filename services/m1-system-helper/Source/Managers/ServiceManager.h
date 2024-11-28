@@ -1,13 +1,22 @@
+/*
+    ProcessManager.h
+    -----------------
+    Manages the orientation manager process.
+    Starts, stops, and restarts the orientation manager as needed.
+
+    Designed to manage background services that are required for the system to function.
+*/
+
 #pragma once
 
 #include "../Common/Common.h"
 
 namespace Mach1 {
 
-class ProcessManager {
+class ServiceManager {
 public:
-    explicit ProcessManager(int serverPort);
-    ~ProcessManager();
+    explicit ServiceManager(int serverPort);
+    ~ServiceManager();
 
     void startOrientationManager();
     void killOrientationManager();
@@ -34,7 +43,7 @@ private:
     uid_t uid;
 #endif
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ProcessManager)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ServiceManager)
 };
 
 } // namespace Mach1

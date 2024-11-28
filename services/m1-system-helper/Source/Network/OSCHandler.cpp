@@ -3,7 +3,7 @@
 
 namespace Mach1 {
 
-OSCHandler::OSCHandler(ClientManager* clientManager, PluginManager* pluginManager, ProcessManager* processManager)
+OSCHandler::OSCHandler(ClientManager* clientManager, PluginManager* pluginManager, ServiceManager* processManager)
     : clientManager(clientManager)
     , pluginManager(pluginManager)
     , processManager(processManager)
@@ -34,17 +34,23 @@ void OSCHandler::stopListening() {
 
 void OSCHandler::setupMessageHandlers() {
     messageHandlers = {
-        {"/removeClient", [this](const auto& m) { handleRemoveClient(m); }},
-        {"/clientRequestsServer", [this](const auto& m) { handleClientRequestsServer(m); }},
-        {"/clientExists", [this](const auto& m) { handleClientExists(m); }},
-        {"/pluginExists", [this](const auto& m) { handlePluginExists(m); }},
-        {"/m1-addClient", [this](const auto& m) { handleAddClient(m); }},
-        {"/m1-removeClient", [this](const auto& m) { handleRemoveClient(m); }},
-        {"/m1-status", [this](const auto& m) { handleClientStatus(m); }},
+        // OrientationManager signals
+        {"/m1-clientRequestsServer", [this](const auto& m) { handleClientRequestsServer(m); }}, // used for m1_orientation_client comms
+        {"/m1-clientExists", [this](const auto& m) { handleOMClientPulse(m); }}, // used for an OM_client of any client to signal
+
+        // Client signals
+        {"/m1-addClient", [this](const auto& m) { handleAddClient(m); }}, // used for clients only
+        {"/m1-removeClient", [this](const auto& m) { handleRemoveClient(m); }}, // used for clients only
+        {"/m1-status", [this](const auto& m) { handleClientPulse(m); }}, // used to signal a pulse from any client
+
+        // Plugin signals
+        {"/m1-register-plugin", [this](const auto& m) { handleRegisterPlugin(m); }}, // used for plugins only
+        {"/m1-status-plugin", [this](const auto& m) { handlePluginPulse(m); }},
+
+        // General signals
         {"/setPlayerYPR", [this](const auto& m) { handleSetPlayerYPR(m); }},
         {"/setMonitoringMode", [this](const auto& m) { handleSetMonitoringMode(m); }},
         {"/setMasterYPR", [this](const auto& m) { handleSetMasterYPR(m); }},
-        {"/m1-register-plugin", [this](const auto& m) { handleRegisterPlugin(m); }},
         {"/panner-settings", [this](const auto& m) { handlePannerSettings(m); }},
         {"/setChannelConfigReq", [this](const auto& m) { handleSetChannelConfigRequest(m); }},
         {"/setMonitorActiveReq", [this](const auto& m) { handleSetMonitorActiveRequest(m); }},
@@ -57,10 +63,10 @@ void OSCHandler::setupMessageHandlers() {
 void OSCHandler::oscMessageReceived(const juce::OSCMessage& message) {
     // Update ping time for every message received
     pingTime = juce::Time::currentTimeMillis();
-    auto address = message.getAddressPattern().toString();
-    //DBG("[OSCHandler] Received message: " + address);
     
-    // Handle messages
+    auto address = message.getAddressPattern().toString();
+    
+    // Handle other messages
     if (auto it = messageHandlers.find(address); it != messageHandlers.end()) {
         it->second(message);
     }
@@ -135,7 +141,7 @@ void OSCHandler::handleRemoveClient(const juce::OSCMessage& message) {
     }
 }
 
-void OSCHandler::handleClientStatus(const juce::OSCMessage& message) {
+void OSCHandler::handleClientPulse(const juce::OSCMessage& message) {
     if (message.size() >= 1) {
         int port = message[0].getInt32();
         bool clientExists = clientManager->updateClientTime(port);
@@ -213,6 +219,9 @@ void OSCHandler::handlePannerSettings(const juce::OSCMessage& message) {
             clientManager->sendToClientsOfType(forwardMsg, ClientType::Player);
             DBG("[OSCHandler] Relayed panner disconnect for port: " + std::to_string(port));
             return;
+        } else {
+            // Update plugin time
+            pluginManager->updatePluginTime(port);
         }
         
         // Handle regular panner settings (state is 0, 1, or 2)
@@ -264,23 +273,18 @@ void OSCHandler::handleClientRequestsServer(const juce::OSCMessage& message) {
     processManager->setClientRequestsServer(true);
 }
 
-void OSCHandler::handleClientExists(const juce::OSCMessage& message) {
+void OSCHandler::handleOMClientPulse(const juce::OSCMessage& message) {
     timeWhenHelperLastSeenAClient = pingTime;
 }
 
-void OSCHandler::handlePluginExists(const juce::OSCMessage& message) {
+void OSCHandler::handlePluginPulse(const juce::OSCMessage& message) {
     if (message.size() >= 1) {
         int port = message[0].getInt32();
         
         // Check if plugin exists and is active
-        bool exists = pluginManager->hasActivePlugin(port);
-        
-        // Send response
-        juce::OSCSender sender;
-        if (sender.connect("127.0.0.1", port)) {
-            juce::OSCMessage response("/pluginExistsResponse");
-            response.addInt32(exists ? 1 : 0);
-            sender.send(response);
+        if (pluginManager->hasActivePlugin(port)) // exists
+        {
+            pluginManager->updatePluginTime(port);
         }
     }
 }
@@ -289,13 +293,12 @@ void OSCHandler::handleSetChannelConfigRequest(const juce::OSCMessage& message) 
     if (message.size() >= 1) {
         int channelCountForConfig = message[0].getInt32();
         if (lastSystemChannelCount != channelCountForConfig) {
-            DBG("[Plugin] Config request for: " + std::to_string(channelCountForConfig) + " channels");
+            DBG("[Client] Config request for: " + std::to_string(channelCountForConfig) + " channels");
             lastSystemChannelCount = channelCountForConfig;
             
             // Forward the configuration change to all clients
             juce::OSCMessage forwardMsg("/m1-channel-config");
             forwardMsg.addInt32(channelCountForConfig);
-            clientManager->sendToClientsOfType(forwardMsg, ClientType::Monitor);
             pluginManager->sendToPannerPlugins(forwardMsg);
         }
     }
@@ -357,9 +360,7 @@ void OSCHandler::timerCallback() {
     // Send pings to maintain connections
     juce::OSCMessage pingMsg("/m1-ping");
     clientManager->sendToAllClients(pingMsg);
-    
-    // Send plugin pings
-    pluginManager->sendPingToAll();
+    pluginManager->sendToAllPlugins(pingMsg);
     
     // Cleanup inactive clients and plugins
     clientManager->cleanupInactiveClients();

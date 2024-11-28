@@ -21,6 +21,7 @@ juce::Result PluginManager::registerPlugin(const M1RegisteredPlugin& plugin) {
         // Update existing plugin
         *it = plugin;
         setupPluginConnection(*it);
+        updatePluginTime(plugin.port);
         eventSystem->publish("PluginUpdated", plugin.port);
         DBG("[PluginManager] Updated existing plugin");
     } else {
@@ -30,8 +31,7 @@ juce::Result PluginManager::registerPlugin(const M1RegisteredPlugin& plugin) {
         plugins.push_back(newPlugin);
         
         eventSystem->publish("PluginAdded", plugin.port);
-        DBG("[PluginManager] New plugin added: isPanner? " + std::to_string(plugin.isPannerPlugin) + 
-            ", port: " + std::to_string(plugin.port));
+        DBG("[PluginManager] New plugin added on port: " + std::to_string(plugin.port));
     }
     
     return juce::Result::ok();
@@ -80,27 +80,6 @@ void PluginManager::updatePluginSettings(int port, const juce::OSCMessage& messa
         
         it->isPannerPlugin = true;  // Mark as panner plugin
         eventSystem->publish("PluginSettingsUpdated", port);
-    }
-}
-
-void PluginManager::sendPingToAll() {
-    const juce::ScopedLock lock(mutex);
-    auto currentTime = juce::Time::currentTimeMillis();
-    
-    // Only send pings every 5 seconds
-    if (currentTime - lastPingTime < 5000) {
-        return;
-    }
-    
-    lastPingTime = currentTime;
-    
-    juce::OSCMessage pingMsg("/ping");
-    for (auto& plugin : plugins) {
-        if (plugin.messageSender) {
-            if (!plugin.messageSender->send(pingMsg)) {
-                DBG("Failed to send ping to plugin on port " + juce::String(plugin.port));
-            }
-        }
     }
 }
 
@@ -198,6 +177,7 @@ void PluginManager::cleanupInactivePlugins() {
         std::remove_if(plugins.begin(), plugins.end(),
             [currentTime](const auto& plugin) {
                 // Remove plugins that haven't responded to pings
+                DBG("[PluginManager] Removing instance at port: " + std::to_string(plugin.port));
                 return (currentTime - plugin.time) > CLIENT_TIMEOUT_MS;
             }),
         plugins.end()
@@ -214,6 +194,17 @@ bool PluginManager::hasActivePlugin(int port) const {
         });
         
     return it != plugins.end();
+}
+
+void PluginManager::updatePluginTime(int port) {
+    const juce::ScopedLock lock(mutex);
+    
+    for (auto& plugin : plugins) {
+        if (plugin.port == port) {
+            plugin.time = juce::Time::currentTimeMillis();
+            break;
+        }
+    }
 }
 
 } // namespace Mach1

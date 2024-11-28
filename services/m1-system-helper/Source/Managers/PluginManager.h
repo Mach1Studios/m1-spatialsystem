@@ -1,3 +1,13 @@
+/*
+    PluginManager.h
+    -----------------
+    Manages plugins registered with the system helper.
+    Sends and receives OSC messages to plugins.
+    Tracks plugin state and pings them to keep them alive.
+
+    Designed for less critical plugins to support supplemental UI features on those plugins.
+*/
+
 #pragma once
 
 #include "../Common/Common.h"
@@ -12,7 +22,6 @@ public:
     juce::Result registerPlugin(const M1RegisteredPlugin& plugin);
     void removePlugin(int port);
     void updatePluginSettings(int port, const juce::OSCMessage& message);
-    void sendPingToAll();
     void sendMonitorSettings(int mode, float yaw, float pitch, float roll);
     void sendToAllPlugins(const juce::OSCMessage& message);
     void sendToPannerPlugins(const juce::OSCMessage& message);
@@ -21,6 +30,7 @@ public:
     
     const std::vector<M1RegisteredPlugin>& getPlugins() const;
     bool hasActivePlugin(int port) const;
+    void updatePluginTime(int port);
 
 private:
     void setupPluginConnection(M1RegisteredPlugin& plugin);

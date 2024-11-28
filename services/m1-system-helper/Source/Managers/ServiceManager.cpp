@@ -1,18 +1,18 @@
-#include "ProcessManager.h"
+#include "ServiceManager.h"
 
 namespace Mach1 {
 
-ProcessManager::ProcessManager(int serverPort) : serverPort(serverPort) {
+ServiceManager::ServiceManager(int serverPort) : serverPort(serverPort) {
 #if defined(__APPLE__)
     uid = getuid();
 #endif
 }
 
-ProcessManager::~ProcessManager() {
+ServiceManager::~ServiceManager() {
     killOrientationManager();
 }
 
-void ProcessManager::startOrientationManager() {
+void ServiceManager::startOrientationManager() {
     // Check if port is available
     juce::DatagramSocket socket(false);
     socket.setEnablePortReuse(false);
@@ -56,7 +56,7 @@ void ProcessManager::startOrientationManager() {
     timeWhenWeLastStartedAManager = juce::Time::currentTimeMillis();
 }
 
-void ProcessManager::killOrientationManager() {
+void ServiceManager::killOrientationManager() {
 #if JUCE_MAC
     if (juce::SystemStats::getOperatingSystemType() <= juce::SystemStats::MacOSX_10_9) {
         system(("launchctl stop " + getServiceName()).toStdString().c_str());
@@ -71,7 +71,7 @@ void ProcessManager::killOrientationManager() {
 #endif
 }
 
-void ProcessManager::restartOrientationManagerIfNeeded() {
+void ServiceManager::restartOrientationManagerIfNeeded() {
     auto currentTime = juce::Time::currentTimeMillis();
     if (clientRequestsServer && (currentTime - timeWhenWeLastStartedAManager) > 10000) {
         killOrientationManager();
@@ -84,11 +84,11 @@ void ProcessManager::restartOrientationManagerIfNeeded() {
 }
 
 // Platform-specific implementations...
-juce::String ProcessManager::getServiceName() const {
+juce::String ServiceManager::getServiceName() const {
     return "com.mach1.spatial.orientationmanager";
 }
 
-juce::String ProcessManager::getServicePath() const {
+juce::String ServiceManager::getServicePath() const {
 #if JUCE_MAC
     return "/Library/LaunchAgents/com.mach1.spatial.orientationmanager.plist";
 #else
@@ -96,7 +96,7 @@ juce::String ProcessManager::getServicePath() const {
 #endif
 }
 
-juce::String ProcessManager::getServiceTarget() const {
+juce::String ServiceManager::getServiceTarget() const {
 #if JUCE_MAC
     return "gui/" + juce::String(uid) + "/" + getServiceName();
 #else
@@ -104,7 +104,7 @@ juce::String ProcessManager::getServiceTarget() const {
 #endif
 }
 
-juce::Result ProcessManager::handleServiceOperation(ServiceOperation operation, int result) {
+juce::Result ServiceManager::handleServiceOperation(ServiceOperation operation, int result) {
     switch (result) {
         case 0:
             return juce::Result::ok();

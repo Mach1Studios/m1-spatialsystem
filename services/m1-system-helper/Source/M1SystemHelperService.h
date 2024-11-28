@@ -5,7 +5,7 @@
 #include "Core/ConfigManager.h"
 #include "Managers/ClientManager.h"
 #include "Managers/PluginManager.h"
-#include "Managers/ProcessManager.h"
+#include "Managers/ServiceManager.h"
 #include "Network/OSCHandler.h"
 #include <memory>
 
@@ -21,7 +21,7 @@ public:
     // Accessors for managers
     ClientManager& getClientManager() { return *clientManager; }
     PluginManager& getPluginManager() { return *pluginManager; }
-    ProcessManager& getProcessManager() { return *processManager; }
+    ServiceManager& getServiceManager() { return *serviceManager; }
     
 private:
     M1SystemHelperService();
@@ -33,7 +33,7 @@ private:
     std::shared_ptr<EventSystem> eventSystem;
     std::unique_ptr<ClientManager> clientManager;
     std::unique_ptr<PluginManager> pluginManager;
-    std::unique_ptr<ProcessManager> processManager;
+    std::unique_ptr<ServiceManager> serviceManager;
     std::unique_ptr<ConfigManager> configManager;
     std::unique_ptr<OSCHandler> oscHandler;
     

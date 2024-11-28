@@ -23,10 +23,10 @@ M1SystemHelperService::M1SystemHelperService() {
     // Initialize managers with configured ports
     clientManager = std::make_unique<ClientManager>(eventSystem);
     pluginManager = std::make_unique<PluginManager>(eventSystem);
-    processManager = std::make_unique<ProcessManager>(configManager->getServerPort());
+    serviceManager = std::make_unique<ServiceManager>(configManager->getServerPort());
     oscHandler = std::make_unique<OSCHandler>(clientManager.get(), 
                                             pluginManager.get(), 
-                                            processManager.get());
+                                            serviceManager.get());
     
     // Start listening on helper port
     if (!oscHandler->startListening(configManager->getHelperPort())) {
@@ -38,6 +38,11 @@ M1SystemHelperService::M1SystemHelperService() {
     
     // Register service for dependency injection
     Mach1::ServiceLocator::getInstance().registerService(eventSystem);
+    
+//    // Add this event subscription
+//    eventSystem->subscribe("ClientSeen", [this](const juce::var& time) {
+//        timeWhenHelperLastSeenAClient = time;
+//    });
 }
 
 M1SystemHelperService& M1SystemHelperService::getInstance() {
@@ -47,27 +52,23 @@ M1SystemHelperService& M1SystemHelperService::getInstance() {
 
 void M1SystemHelperService::initialise() {
     startTimer(1000); // Check status every second
-    processManager->startOrientationManager();
+    serviceManager->startOrientationManager();
 }
 
 void M1SystemHelperService::timerCallback() {
     auto currentTime = juce::Time::currentTimeMillis();
     
     // Check for inactive clients
-    if ((currentTime - timeWhenHelperLastSeenAClient) > 20000) {
-        processManager->killOrientationManager();
+    if ((currentTime - timeWhenHelperLastSeenAClient) > CLIENT_TIMEOUT_MS) {
+        serviceManager->killOrientationManager();
         timeWhenHelperLastSeenAClient = currentTime;
     }
     
     // Handle client server requests
     if (clientRequestsServer) {
-        processManager->restartOrientationManagerIfNeeded();
+        serviceManager->restartOrientationManagerIfNeeded();
         clientRequestsServer = false;
     }
-    
-    // Cleanup and maintenance
-    clientManager->cleanupInactiveClients();
-    pluginManager->sendPingToAll();
 }
 
 void M1SystemHelperService::start() {
@@ -82,7 +83,7 @@ void M1SystemHelperService::start() {
 
 void M1SystemHelperService::shutdown() {
     stopTimer();
-    processManager->killOrientationManager();
+    serviceManager->killOrientationManager();
 }
 
 M1SystemHelperService::~M1SystemHelperService() {

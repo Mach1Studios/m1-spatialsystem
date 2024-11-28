@@ -1,3 +1,12 @@
+/*
+    ClientManager.h
+    -----------------
+    Manages clients connected to the system helper.
+    Tracks client state and pings them to keep them alive.
+
+    Designed for critical clients that are required for the system to function.
+*/
+
 #pragma once
 
 #include "../Common/Common.h"

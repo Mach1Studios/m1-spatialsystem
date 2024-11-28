@@ -43,7 +43,8 @@ void ClientManager::cleanupInactiveClients() {
     auto currentTime = juce::Time::currentTimeMillis();
     
     auto isInactive = [currentTime](const auto& client) {
-        return (currentTime - client.time) > 10000;
+        DBG("[ClientManager] Client removed on port: " + std::to_string(client.port));
+        return (currentTime - client.time) > CLIENT_TIMEOUT_MS;
     };
     
     // Remove from type-specific collections
