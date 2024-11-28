@@ -43,13 +43,23 @@ void ClientManager::cleanupInactiveClients() {
     auto currentTime = juce::Time::currentTimeMillis();
     
     auto isInactive = [currentTime](const auto& client) {
-        DBG("[ClientManager] Client removed on port: " + std::to_string(client.port));
         return (currentTime - client.time) > CLIENT_TIMEOUT_MS;
     };
     
-    // Remove from type-specific collections
-    monitors.erase(std::remove_if(monitors.begin(), monitors.end(), isInactive), monitors.end());
-    players.erase(std::remove_if(players.begin(), players.end(), isInactive), players.end());
+    // Remove from type-specific collections and log only actual removals
+    auto removeAndLog = [&isInactive](auto& vec) {
+        auto partition = std::partition(vec.begin(), vec.end(), 
+            [&isInactive](const auto& client) { return !isInactive(client); });
+            
+        for (auto it = partition; it != vec.end(); ++it) {
+            DBG("[ClientManager] Client removed on port: " + std::to_string(it->port));
+        }
+        
+        vec.erase(partition, vec.end());
+    };
+    
+    removeAndLog(monitors);
+    removeAndLog(players);
     
     // Remove from main collection
     for (auto it = clients.begin(); it != clients.end();) {

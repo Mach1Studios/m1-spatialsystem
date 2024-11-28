@@ -176,15 +176,20 @@ void PluginManager::cleanupInactivePlugins() {
     const juce::ScopedLock lock(mutex);
     auto currentTime = juce::Time::currentTimeMillis();
     
-    plugins.erase(
-        std::remove_if(plugins.begin(), plugins.end(),
-            [currentTime](const auto& plugin) {
-                // Remove plugins that haven't responded to pings
-                DBG("[PluginManager] Removing instance at port: " + std::to_string(plugin.port));
-                return (currentTime - plugin.time) > CLIENT_TIMEOUT_MS;
-            }),
-        plugins.end()
-    );
+    // Create partition point between active and inactive plugins
+    auto partition = std::partition(plugins.begin(), plugins.end(),
+        [currentTime](const auto& plugin) {
+            return (currentTime - plugin.time) <= CLIENT_TIMEOUT_MS;
+        });
+    
+    // Log removals and notify for inactive plugins
+    for (auto it = partition; it != plugins.end(); ++it) {
+        DBG("[PluginManager] Removing instance at port: " + std::to_string(it->port));
+        eventSystem->publish("PluginRemoved", it->port);
+    }
+    
+    // Erase inactive plugins
+    plugins.erase(partition, plugins.end());
 }
 
 bool PluginManager::hasActivePlugin(int port) const {
