@@ -129,6 +129,9 @@ void PluginManager::sendToAllPlugins(const juce::OSCMessage& message) {
 void PluginManager::sendToPannerPlugins(const juce::OSCMessage& message) {
     const juce::ScopedLock lock(mutex);
     
+    // TODO: force verification of each plugin type before using this function
+    // Can cause false positives for discovered plugins that are not labeled as panner yet
+    
     for (auto& plugin : plugins) {
         if (plugin.isPannerPlugin && plugin.messageSender) {
             if (!plugin.messageSender->send(message)) {

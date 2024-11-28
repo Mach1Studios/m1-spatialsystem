@@ -294,12 +294,12 @@ void OSCHandler::handleSetChannelConfigRequest(const juce::OSCMessage& message) 
         int channelCountForConfig = message[0].getInt32();
         if (lastSystemChannelCount != channelCountForConfig) {
             DBG("[Client] Config request for: " + std::to_string(channelCountForConfig) + " channels");
-            lastSystemChannelCount = channelCountForConfig;
             
             // Forward the configuration change to all clients
             juce::OSCMessage forwardMsg("/m1-channel-config");
             forwardMsg.addInt32(channelCountForConfig);
-            pluginManager->sendToPannerPlugins(forwardMsg);
+            pluginManager->sendToAllPlugins(forwardMsg);
+            lastSystemChannelCount = channelCountForConfig;
         }
     }
 }
