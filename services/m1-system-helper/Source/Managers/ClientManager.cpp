@@ -122,6 +122,12 @@ void ClientManager::activateClients() {
 void ClientManager::removeClient(int port) {
     const juce::ScopedLock lock(mutex);
     
+    // First, find if this was an active monitor before removing it
+    auto monitorIt = std::find_if(monitors.begin(), monitors.end(),
+        [port](const auto& client) { return client.port == port; });
+    bool wasActiveMonitor = (monitorIt != monitors.end() && monitorIt->active);
+    size_t removedIndex = std::distance(monitors.begin(), monitorIt);
+
     auto removeFromVector = [port](auto& vec) {
         vec.erase(
             std::remove_if(vec.begin(), vec.end(),
@@ -141,6 +147,15 @@ void ClientManager::removeClient(int port) {
     if (it != clients.end()) {
         eventSystem->publish("ClientRemoved", port);
         clients.erase(it);
+    }
+
+    // If we removed an active monitor and there are still monitors left,
+    // activate the previous monitor in the list (or the last one if we removed the first)
+    if (wasActiveMonitor && !monitors.empty()) {
+        size_t newActiveIndex = (removedIndex > 0) ? removedIndex - 1 : monitors.size() - 1;
+        if (newActiveIndex < monitors.size()) {
+            rotateMonitorToActive(monitors[newActiveIndex].port);
+        }
     }
 }
 
@@ -250,12 +265,6 @@ bool ClientManager::hasActiveClientOfType(int port, const juce::String& type) co
 bool ClientManager::rotateMonitorToActive(int port) {
     const juce::ScopedLock lock(mutex);
     
-    if (monitors.size() <= 1) {
-        DBG("[Monitor] Port: " + std::to_string(port) + 
-            " is requesting first index but there are no other instances to be found...");
-        return false;
-    }
-    
     // Find the monitor with the specified port
     auto pivot = std::find_if(monitors.begin(), monitors.end(),
         [port](const auto& client) {
@@ -280,6 +289,9 @@ bool ClientManager::rotateMonitorToActive(int port) {
                 mainPivot + 1
             );
         }
+        
+        // Make sure to call activateClients to update the active states
+        activateClients();
         
         DBG("[Monitor] Successfully rotated monitor port: " + std::to_string(port) + " to active position");
         return true;
