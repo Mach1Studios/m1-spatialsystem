@@ -1,10 +1,10 @@
 [Setup]
 AppName=Mach1 Spatial System
-AppVersion=2.0.20241127
+AppVersion=2.0.20241206
 AppPublisher=Mach1
 DefaultDirName={pf64}\Mach1
 DisableProgramGroupPage=yes
-VersionInfoVersion=2.0.20241127
+VersionInfoVersion=2.0.20241206
 VersionInfoDescription=
 SetupIconFile=data\mach1logo.ico
 OutputDir=Output
