@@ -13,7 +13,7 @@ generate_version() {
         local major=$(echo $base_version | cut -d. -f1)
         local minor=$(echo $base_version | cut -d. -f2)
         # Generate new version without newlines
-        echo -n "$major.$minor.$date"
+        echo "$major.$minor.$date"
     elif [ -d "./.git/modules/$dir" ]; then
         # Get the short hash
         local hash=$(cd $dir && git rev-parse --short HEAD)
@@ -22,9 +22,9 @@ generate_version() {
         local major=$(echo $base_version | cut -d. -f1)
         local minor=$(echo $base_version | cut -d. -f2)
         # Generate new version without newlines
-        echo -n "$major.$minor.$date"
+        echo "$major.$minor.$date"
     else
-        echo -n "$base_version"
+        echo "$base_version"
     fi
 }
 
