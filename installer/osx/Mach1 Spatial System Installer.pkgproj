@@ -518,7 +518,7 @@
 				<key>USE_HFS+_COMPRESSION</key>
 				<false/>
 				<key>VERSION</key>
-				<string>2.0.20241220</string>
+				<string>2.0.20241223</string>
 			</dict>
 			<key>TYPE</key>
 			<integer>0</integer>
@@ -1324,7 +1324,7 @@
 				<key>USE_HFS+_COMPRESSION</key>
 				<false/>
 				<key>VERSION</key>
-				<string>0.9.20241127</string>
+				<string>0.9.20241219</string>
 			</dict>
 			<key>TYPE</key>
 			<integer>0</integer>
@@ -3825,7 +3825,7 @@
 				<key>USE_HFS+_COMPRESSION</key>
 				<false/>
 				<key>VERSION</key>
-				<string>2.0.20241220</string>
+				<string>2.0.20241223</string>
 			</dict>
 			<key>TYPE</key>
 			<integer>0</integer>
@@ -4948,7 +4948,7 @@
 				<key>USE_HFS+_COMPRESSION</key>
 				<false/>
 				<key>VERSION</key>
-				<string>2.0.20241220</string>
+				<string>2.0.20241223</string>
 			</dict>
 			<key>TYPE</key>
 			<integer>0</integer>
@@ -6054,7 +6054,7 @@
 				<key>USE_HFS+_COMPRESSION</key>
 				<false/>
 				<key>VERSION</key>
-				<string>2.0.20241220</string>
+				<string>2.0.20241223</string>
 			</dict>
 			<key>TYPE</key>
 			<integer>0</integer>
@@ -7160,7 +7160,7 @@
 				<key>USE_HFS+_COMPRESSION</key>
 				<false/>
 				<key>VERSION</key>
-				<string>2.0.20241220</string>
+				<string>2.0.20241223</string>
 			</dict>
 			<key>TYPE</key>
 			<integer>0</integer>
@@ -8266,7 +8266,7 @@
 				<key>USE_HFS+_COMPRESSION</key>
 				<false/>
 				<key>VERSION</key>
-				<string>2.0.20241220</string>
+				<string>2.0.20241223</string>
 			</dict>
 			<key>TYPE</key>
 			<integer>0</integer>
