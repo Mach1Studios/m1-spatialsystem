@@ -30,7 +30,7 @@ To properly debug the services [m1-system-helper](services/m1-system-helper) and
 - [MacOS] m1-orientationmanager and external BLE device handling issues in macOS versions 12.0, 12.1 and 12.2
 
 ## TODO
-- Add "Sync Panner instances to Monitor" button this updates all panners to monitor's current outputMode
+- ~Add "Sync Panner instances to Monitor" button this updates all panners to monitor's current outputMode~
 - Add Camera and fusion orientation to OrientationManager
 - ~Add Panner position drawing to M1-Player~
 - Add ~windows and~ linux service handling
