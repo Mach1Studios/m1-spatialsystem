@@ -30,21 +30,15 @@ To properly debug the services [m1-system-helper](services/m1-system-helper) and
 - [MacOS] m1-orientationmanager and external BLE device handling issues in macOS versions 12.0, 12.1 and 12.2
 
 ## TODO
-- Add "Sync Panner instances to Monitor" button this updates all panners to monitor's current outputMode
-- Add Camera and fusion orientation to OrientationManager
-- ~Add Panner position drawing to M1-Player~
-- Add ~windows and~ linux service handling
-- ~Add id system to clients to detect more than one M1-Monitor instance~
-- ~Add better angle reset and offset adding management for clients~
-- ~Fix PostInstall script for m1-orientationmanager on macos to support installing without requiring restarts~
+[Github Project Board](https://github.com/orgs/Mach1Studios/projects/4)
 
 ## Communication Map
 The following describes what is communicated between all apps and plugins via OSC and UDP, the ports are described and set by the [settings.json](m1-orientationmanager/Resources/settings.json) file.
 
 - OrientationManager -> Monitor [sends 3rd party orientation]
 - OrientationManager -> Player [sends 3rd party orientation]
-- Monitor -> Panners [sends calculated orientation for GUI]
-- Panners -> Player [sends panner settings for drawing in Player]
-- Player -> Monitor [sends mouse offset orientation to monitor]
-- Monitor -> OrientationManager [transport]
-- OrientationManager -> Player [transport]
+- Monitor -> m1-system-helper -> Panners [sends calculated orientation for GUI]
+- Panners -> m1-system-helper -> Player [sends panner settings for drawing in Player]
+- Player -> m1-system-helper -> Monitor [sends mouse offset orientation to monitor]
+- Monitor -> m1-system-helper [transport]
+- m1-system-helper -> Player [transport]
