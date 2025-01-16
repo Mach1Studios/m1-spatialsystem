@@ -48,6 +48,7 @@ endif
 
 setup-services: clean-services
 ifeq ($(detected_OS),Darwin)
+	sudo mkdir -p /Library/Application\ Support/Mach1
 	sudo cp m1-orientationmanager/Resources/settings.json /Library/Application\ Support/Mach1/settings.json
 	sudo cp m1-orientationmanager/Resources/com.mach1.spatial.orientationmanager.plist /Library/LaunchAgents/com.mach1.spatial.orientationmanager.plist
 	sudo cp services/m1-system-helper/com.mach1.spatial.helper.plist /Library/LaunchAgents/com.mach1.spatial.helper.plist
