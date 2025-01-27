@@ -70,6 +70,8 @@ IDENTIFIERS=(
     "com.mach1.spatial.plugins.vst2.installer"
     "com.mach1.spatial.installer"              # Main installer
     "com.mach1.spatial.helper.installer"       # Helper installer
+    "com.mach1.monitor.installer"      # Monitor installer
+    "com.mach1.panner.installer"       # Panner installer
     "com.mach1.spatial.monitor.installer"      # Monitor installer
     "com.mach1.spatial.panner.installer"       # Panner installer
     "com.mach1.spatial.notifier.installer"     # Notifier installer
