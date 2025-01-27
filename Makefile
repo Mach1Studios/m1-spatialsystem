@@ -14,8 +14,10 @@ endif
 
 .PHONY: update-versions
 update-versions:
+ifneq ($(detected_OS),Windows)
 	@chmod +x ./installer/generate_version.sh
 	@./installer/generate_version.sh
+endif
 
 pull:
 	git pull --recurse-submodules
