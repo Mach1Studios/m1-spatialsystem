@@ -83,6 +83,8 @@ done
 sudo tccutil reset All com.mach1.spatial.panner
 sudo tccutil reset All com.mach1.spatial.monitor
 sudo tccutil reset All com.mach1.spatial.player
+sudo tccutil reset All com.mach1.spatial.orientationmanager
+sudo tccutil reset All com.mach1.spatial.helper
 
 # Clean up logs
 sudo /bin/rm -f /var/log/mach1*.log

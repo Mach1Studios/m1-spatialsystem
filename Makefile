@@ -190,6 +190,9 @@ else
 	cd m1-transcoder && ./scripts/setup.sh && npm install
 endif
 
+overlay-debug:
+	cd m1-panner/Resources/overlay_debug && ./run_simulator.sh --title "Avid Video Engine"
+
 # run configure first
 package: update-versions build codesign notarize installer-pkg
 
