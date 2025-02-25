@@ -79,6 +79,11 @@ for identifier in "${IDENTIFIERS[@]}"; do
     sudo /usr/sbin/pkgutil --forget "$identifier"
 done
 
+# Reset specific permissions
+sudo tccutil reset All com.mach1.spatial.panner
+sudo tccutil reset All com.mach1.spatial.monitor
+sudo tccutil reset All com.mach1.spatial.player
+
 # Clean up logs
 sudo /bin/rm -f /var/log/mach1*.log
 
