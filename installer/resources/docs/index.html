@@ -48,12 +48,6 @@
             flex: 1;
         }
         
-        .side-bar {
-            width: var(--sidebar-width);
-            background-color: var(--dark-bg);
-            flex-shrink: 0;
-        }
-        
         /* New TOC Sidebar */
         .toc-sidebar {
             width: var(--toc-width);
@@ -61,14 +55,14 @@
             padding: 30px 0;
             position: fixed;
             top: 0;
-            left: var(--sidebar-width);
+            left: 0;
             height: 100vh;
             overflow-y: auto;
             border-right: 1px solid var(--border-color);
             z-index: 10;
-            display: none;
             scrollbar-width: thin;
             scrollbar-color: var(--border-color) var(--dark-bg-lightest);
+            display: block;
         }
         
         .toc-sidebar::-webkit-scrollbar {
@@ -82,10 +76,6 @@
         .toc-sidebar::-webkit-scrollbar-thumb {
             background-color: var(--border-color);
             border-radius: 6px;
-        }
-        
-        .toc-sidebar.active {
-            display: block;
         }
         
         .toc-sidebar-inner {
@@ -117,12 +107,12 @@
         }
         
         .toc-sidebar li {
-            margin-bottom: 8px;
+            margin-bottom: 4px;
         }
         
         .toc-sidebar a {
             display: block;
-            padding: 8px 10px;
+            padding: 6px 10px;
             text-decoration: none;
             color: var(--text-primary);
             border-left: 3px solid transparent;
@@ -137,6 +127,13 @@
             border-left: 3px solid var(--accent-color);
             transform: translateX(5px);
             font-weight: bold;
+        }
+        
+        /* Make active link stand out more */
+        .toc-sidebar a.active {
+            background-color: rgba(255, 193, 7, 0.25);
+            color: var(--accent-color);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
         }
         
         .toc-sidebar a::after {
@@ -155,6 +152,75 @@
         
         .toc-sidebar a:hover::after {
             opacity: 1;
+        }
+        
+        /* Add accordion styling */
+        .toc-sidebar .has-submenu {
+            margin-bottom: 8px;
+        }
+        
+        .toc-sidebar .has-submenu > a {
+            font-weight: 600;
+            background-color: rgba(255, 193, 7, 0.05);
+            border-radius: 4px;
+        }
+        
+        .toc-sidebar .has-submenu > a::after {
+            content: '\f078'; /* Chevron down */
+            opacity: 1;
+        }
+        
+        .toc-sidebar .has-submenu.collapsed > a::after {
+            content: '\f054'; /* Chevron right */
+            opacity: 1;
+        }
+        
+        .toc-sidebar .has-submenu:not(.collapsed) > a {
+            font-weight: bold;
+            color: var(--accent-color);
+            background-color: rgba(255, 193, 7, 0.1);
+        }
+        
+        .toc-sidebar ul ul {
+            padding-left: 10px;
+            max-height: 1000px;
+            overflow: hidden;
+            transition: max-height 0.3s ease-in-out;
+        }
+        
+        .toc-sidebar ul ul ul {
+            padding-left: 15px;
+            font-size: 0.9em;
+        }
+        
+        .toc-sidebar .collapsed > ul {
+            max-height: 0;
+        }
+        
+        .toc-sidebar li.has-submenu > a {
+            cursor: pointer;
+        }
+        
+        /* Style top-level sections */
+        .toc-sidebar > .toc-sidebar-inner > ul > li.has-submenu {
+            margin-bottom: 15px;
+            border-bottom: 1px solid rgba(255, 193, 7, 0.1);
+            padding-bottom: 10px;
+        }
+        
+        .toc-sidebar > .toc-sidebar-inner > ul > li.has-submenu > a {
+            font-size: 1.05rem;
+            padding: 8px 10px;
+            background-color: rgba(255, 193, 7, 0.08);
+            border-radius: 4px;
+        }
+        
+        .toc-sidebar > .toc-sidebar-inner > ul > li.has-submenu > a:hover {
+            background-color: rgba(255, 193, 7, 0.15);
+        }
+        
+        .toc-sidebar > .toc-sidebar-inner > ul > li.has-submenu:not(.collapsed) > a {
+            background-color: rgba(255, 193, 7, 0.2);
         }
         
         .main-content {
@@ -613,7 +679,7 @@
                 flex-direction: column;
             }
             
-            .side-bar, .toc-sidebar {
+            .toc-sidebar {
                 width: 100%;
                 height: auto;
                 position: relative;
@@ -653,12 +719,6 @@
         @media (max-width: 992px) {
             .container {
                 flex-direction: column;
-            }
-            
-            .side-bar {
-                width: 100%;
-                height: auto;
-                min-height: 20px;
             }
             
             .toc-sidebar {
@@ -796,122 +856,119 @@
 </head>
 <body>
     <div class="container">
-        <!-- Left black sidebar -->
-        <div class="side-bar"></div>
-        
-        <!-- New TOC sidebar for each product -->
-        <div id="panner-toc" class="toc-sidebar">
+        <div id="sidebar" class="toc-sidebar active">
             <div class="toc-sidebar-inner">
-                <h3>Table of Contents</h3>
+                <h3>Documentation</h3>
                 <ul>
-                    <li><a href="#panner-description">Description & User Story</a></li>
-                    <li><a href="#panner-spatial-format">Mach1 Spatial Format</a></li>
-                    <li><a href="#panner-encoding">Encoding Explained</a></li>
-                    <li><a href="#panner-features">Plugin Features</a></li>
-                    <li><a href="#panner-general-params">General Parameters</a></li>
-                    <li><a href="#panner-stereo-params">Stereo Parameters</a></li>
-                    <li><a href="#panner-quad-params">Quad Parameters</a></li>
-                    <li><a href="#panner-notes">Notes</a></li>
-                    <li><a href="#panner-upcoming">Upcoming Features</a></li>
-                </ul>
-            </div>
-        </div>
-        
-        <div id="monitor-toc" class="toc-sidebar active">
-            <div class="toc-sidebar-inner">
-                <h3>Table of Contents</h3>
-                <ul>
-                    <li><a href="#description">Description & User Story</a></li>
-                    <li><a href="#spatial-format">Mach1 Spatial Format Explained</a></li>
-                    <li><a href="#decoding">Decoding Explained</a></li>
-                    <li><a href="#headlocked">Headlocked/Static Stereo</a></li>
-                    <li><a href="#plugin-features">Plugin Features</a></li>
-                    <li><a href="#general-parameters">General Parameters</a></li>
-                    <li><a href="#settings">Settings</a></li>
-                    <li><a href="#monitor-modes">Monitor Modes</a></li>
-                    <li><a href="#timecode-offset">Timecode Offset</a></li>
-                    <li><a href="#upcoming-features">Upcoming Features</a></li>
-                </ul>
-            </div>
-        </div>
-        
-        <div id="player-toc" class="toc-sidebar">
-            <div class="toc-sidebar-inner">
-                <h3>Table of Contents</h3>
-                <ul>
-                    <li><a href="#player-overview">Overview</a></li>
-                    <li><a href="#player-features">Features</a></li>
-                    <li><a href="#player-getting-started">Getting Started</a></li>
-                    <li><a href="#player-playback">Playback Options</a></li>
-                </ul>
-            </div>
-        </div>
-        
-        <div id="transcoder-toc" class="toc-sidebar">
-            <div class="toc-sidebar-inner">
-                <h3>Table of Contents</h3>
-                <ul>
-                    <li><a href="#transcoder-description">Description & User Story</a></li>
-                    <li><a href="#transcoder-spatial-format">Mach1 Spatial Format</a></li>
-                    <li><a href="#transcoder-explained">Transcoder Explained</a></li>
-                    <li><a href="#transcoder-conversion">Format Conversion</a></li>
-                    <li><a href="#transcoder-headlocked">Headlocked/Static Stereo</a></li>
-                    <li><a href="#transcoder-features">Transcoding Features</a></li>
-                    <li><a href="#transcoder-input">Input Options</a></li>
-                    <li><a href="#transcoder-output">Output Types</a></li>
-                    <li><a href="#transcoder-additional">Additional Features</a></li>
-                    <li><a href="#transcoder-upcoming">Upcoming Features</a></li>
-                </ul>
-            </div>
-        </div>
-        
-        <div id="sdk-toc" class="toc-sidebar">
-            <div class="toc-sidebar-inner">
-                <h3>Table of Contents</h3>
-                <ul>
-                    <li><a href="#sdk-overview">Overview</a></li>
-                    <li><a href="#sdk-integration">Integration Guide</a></li>
-                    <li><a href="#sdk-api">API Reference</a></li>
-                    <li><a href="#sdk-examples">Examples</a></li>
-                    <li><a href="#sdk-platforms">Platform Support</a></li>
-                </ul>
-            </div>
-        </div>
-        
-        <!-- Add new TOC sidebar for User Guide after the SDK TOC -->
-        <div id="guide-toc" class="toc-sidebar">
-            <div class="toc-sidebar-inner">
-                <h3>Table of Contents</h3>
-                <ul>
-                    <li><a href="#guide-multichannel">Mach1 Spatial Multichannel Layouts</a>
+                    <li class="has-submenu">
+                        <a href="#panner">Mach1 Panner</a>
                         <ul>
-                            <li><a href="#guide-format-description">Format Description & User Story</a></li>
-                            <li><a href="#guide-spatial">Mach1 Spatial</a></li>
-                            <li><a href="#guide-deliverable">Multichannel Deliverable</a></li>
+                            <li><a href="#panner-description">Description & User Story</a>
+                                <ul>
+                                    <li><a href="#panner-spatial-format">Mach1 Spatial Format Explained</a></li>
+                                    <li><a href="#panner-encoding">Encoding Explained</a></li>
+                                </ul>
+                            </li>
+                            <li><a href="#panner-features">Plugin Features</a>
+                                <ul>
+                                    <li><a href="#panner-general-params">General Parameters</a></li>
+                                    <li><a href="#panner-stereo-params">Stereo Parameters</a></li>
+                                    <li><a href="#panner-quad-params">Quad Parameters</a></li>
+                                </ul>
+                            </li>
+                            <li><a href="#panner-notes">Notes</a>
+                            <li><a href="#panner-upcoming">Upcoming Features</a>
                         </ul>
                     </li>
-                    <li><a href="#guide-tools">Mach1 Spatial System Tools</a>
+                    <li class="has-submenu">
+                        <a href="#monitor">Mach1 Monitor</a>
                         <ul>
-                            <li><a href="#guide-general-params">General Parameters</a></li>
-                            <li><a href="#guide-panner">Mach1 Panner (M1-Panner)</a></li>
-                            <li><a href="#guide-monitor">Mach1 Monitor (M1-Monitor)</a></li>
-                            <li><a href="#guide-transcoder">Mach1 Transcoder (M1-Transcoder)</a></li>
-                            <li><a href="#guide-player">Mach1 Player (M1-Player)</a></li>
+                            <li><a href="#description">Description & User Story</a>
+                                <ul>
+                                    <li><a href="#spatial-format">Mach1 Spatial Format Explained</a></li>
+                                    <li><a href="#decoding">Decoding Explained</a></li>
+                                </ul>
+                            </li>
+                            <li><a href="#headlocked">Headlocked/Static Stereo</a></li>
+                            <li><a href="#plugin-features">Plugin Features</a>
+                                <ul>
+                                    <li><a href="#general-parameters">General Parameters</a></li>
+                                    <li><a href="#settings">Settings</a></li>
+                                    <li><a href="#monitor-modes">Monitor Modes</a></li>
+                                    <li><a href="#timecode-offset">Timecode Offset</a></li>
+                                </ul>
+                            </li>
+                            <li><a href="#upcoming-features">Upcoming Features</a></li>
                         </ul>
                     </li>
-                    <li><a href="#guide-deployment">Game Engine Deployment</a>
+                    <li class="has-submenu">
+                        <a href="#player">Mach1 Player</a>
                         <ul>
-                            <li><a href="#guide-unreal">Unreal Engine</a></li>
-                            <li><a href="#guide-unity">Unity</a></li>
-                            <li><a href="#guide-wwise">Wwise</a></li>
+                            <li><a href="#player-overview">Overview</a></li>
+                            <li><a href="#player-features">Features</a></li>
+                            <li><a href="#player-playback">Playback</a>
+                                <ul>
+                                    <li><a href="#player-getting-started">Getting Started</a></li>
+                                    <li><a href="#player-playback">Playback Options</a></li>
+                                </ul>
+                            </li>
                         </ul>
                     </li>
-                    <li><a href="#guide-sdk">M1 Spatial SDK Integration</a></li>
-                    <li><a href="#guide-hacker">Mach1 Spatial System Hacker Help</a>
+                    <li class="has-submenu">
+                        <a href="#transcoder">Mach1 Transcoder</a>
                         <ul>
-                            <li><a href="#guide-udp">UDP/OSC Ports</a></li>
-                            <li><a href="#guide-orientation">Orientation OSC Data</a></li>
-                            <li><a href="#guide-other-ports">Other UDP/OSC Ports</a></li>
+                            <li><a href="#transcoder-description">Description & User Story</a>
+                                <ul>
+                                    <li><a href="#transcoder-spatial-format">Mach1 Spatial Format</a></li>
+                                    <li><a href="#transcoder-explained">Transcoder Explained</a></li>
+                                    <li><a href="#transcoder-conversion">Format Conversion</a></li>
+                                    <li><a href="#transcoder-headlocked">Headlocked/Static Stereo</a></li>
+                                </ul>
+                            </li>
+                            <li><a href="#transcoder-features">Transcoding Features</a>
+                                <ul>
+                                    <li><a href="#transcoder-input">Input Options</a></li>
+                                    <li><a href="#transcoder-output">Output Types</a></li>
+                                    <li><a href="#transcoder-additional">Additional Features</a></li>
+                                </ul>
+                            </li>
+                            <li><a href="#transcoder-upcoming">Upcoming Features</a></li>
+                        </ul>
+                    </li>
+                    <li class="has-submenu">
+                        <a href="#guide">User Guide</a>
+                        <ul>
+                            <li><a href="#guide-multichannel">Mach1 Spatial Multichannel Layouts</a>
+                                <ul>
+                                    <li><a href="#guide-format-description">Format Description & User Story</a></li>
+                                    <li><a href="#guide-spatial">Mach1 Spatial</a></li>
+                                    <li><a href="#guide-deliverable">Multichannel Deliverable</a></li>
+                                </ul>
+                            </li>
+                            <li><a href="#guide-tools">Mach1 Spatial System Tools</a>
+                                <ul>
+                                    <li><a href="#guide-general-params">General Parameters</a></li>
+                                    <li><a href="#guide-panner">Mach1 Panner (M1-Panner)</a></li>
+                                    <li><a href="#guide-monitor">Mach1 Monitor (M1-Monitor)</a></li>
+                                    <li><a href="#guide-transcoder">Mach1 Transcoder (M1-Transcoder)</a></li>
+                                    <li><a href="#guide-player">Mach1 Player (M1-Player)</a></li>
+                                </ul>
+                            </li>
+                            <li><a href="#guide-deployment">Game Engine Deployment</a>
+                                <ul>
+                                    <li><a href="#guide-unreal">Unreal Engine</a></li>
+                                    <li><a href="#guide-unity">Unity</a></li>
+                                    <li><a href="#guide-wwise">Wwise</a></li>
+                                </ul>
+                            </li>
+                            <li><a href="#guide-sdk">M1 Spatial SDK Integration</a></li>
+                            <li><a href="#guide-hacker">Mach1 Spatial System Hacker Help</a>
+                                <ul>
+                                    <li><a href="#guide-udp">UDP/OSC Ports</a></li>
+                                    <li><a href="#guide-orientation">Orientation OSC Data</a></li>
+                                    <li><a href="#guide-other-ports">Other UDP/OSC Ports</a></li>
+                                </ul>
+                            </li>
                         </ul>
                     </li>
                 </ul>
@@ -925,15 +982,11 @@
                 <h1 class="product-title">Mach1 Spatial System<span class="tm">™</span></h1>
                 <ul class="product-list">
                     <li><a href="#panner">Mach1 Panner</a></li>
-                    <li><a href="#monitor" class="active">Mach1 Monitor</a></li>
+                    <li><a href="#monitor">Mach1 Monitor</a></li>
                     <li><a href="#player">Mach1 Player</a></li>
                     <li><a href="#transcoder">Mach1 Transcoder</a></li>
                     <li><a href="#guide">User Guide</a></li>
                 </ul>
-            </div>
-            
-            <div class="secondary-product">
-                <a href="#sdk">Mach1 Spatial SDK</a>
             </div>
             
             <!-- Documentation content area -->
@@ -1068,20 +1121,24 @@
                             <img src="./panner-images/PannerQuadParams.png" alt="Mach1 Panner Quad Mode Interface" style="max-width: 500px; width: 100%;">
                         </div>
                         
-                        <h4>Quad - AFormat Ambisonics</h4>
-                        <p>M1-Panner mode for stereo input channels/tracks of audio (FLU, FRD, BLU, BRD)</p>
+                        <h4 id="a-format-params">Quad - AFormat Ambisonics</h4>
+                        <div class="parameter">
+                            <div class="parameter-description">M1-Panner mode for stereo input channels/tracks of audio (FLU, FRD, BLU, BRD)</div>
+                        </div>
                         
-                        <h4>Quad - BFormat Ambisonics</h4>
-                        <p>M1-Panner mode for stereo input channels/tracks of audio (W, X, Y, Z ACNSN3D)</p>
+                        <h4 id="b-format-params">Quad - BFormat Ambisonics</h4>
+                        <div class="parameter">
+                            <div class="parameter-description">M1-Panner mode for stereo input channels/tracks of audio (W, X, Y, Z ACNSN3D)</div>
+                        </div>
                         
-                        <h4>Quad General Parameters</h4>
+                        <h4 id="quad-general-params">Quad General Parameters</h4>
                         
                         <div class="parameter">
                             <div class="parameter-title">Quad Mode Dropdown</div>
                             <div class="parameter-description">Allows the user to change/select their 4 channel Quad mode for their audio track.</div>
                         </div>
                         
-                        <h4>BFormat & AFormat Parameters</h4>
+                        <h4 id="ba-format-params">BFormat & AFormat Parameters</h4>
                         
                         <div class="parameter">
                             <div class="parameter-title">AFormat</div>
@@ -1150,7 +1207,7 @@
                 </div>
                 
                 <!-- Monitor Documentation -->
-                <div id="monitor-content" class="product-content active">
+                <div id="monitor-content" class="product-content">
                     <h2>Mach1 Monitor</h2>
                     <p>The Mach1 Monitor is a powerful tool designed for monitoring spatial audio content. It provides an intuitive interface for monitoring and validating spatial audio mixes created with the Mach1 Spatial System.</p>
                     
@@ -1369,68 +1426,68 @@
                     <div id="transcoder-features" class="doc-section">
                         <h3>Transcoding Features</h3>
                         
-                        <h4 id="transcoder-input">Input</h4>
-                        
-                        <h4>Audio</h4>
-                        <div class="parameter">
-                            <div class="parameter-title">Mach1 Spatial Input</div>
-                            <div class="parameter-description">Single multichannel file of 8 channels exported/rendered from preferred DAW, supports aif or wav files. (automatically detects Pro Tools HD multichannel .wav file and reorder the channels correctly during transcoding process from the 7.1 channel order)</div>
-                        </div>
-                        
-                        <div class="parameter">
-                            <div class="parameter-title">Mach1 Horizon Pairs Inputs</div>
-                            <div class="parameter-description">
-                                Drag in the 4 exported stereo files. Add the following to the end of the file names to safely encode:<br>
-                                <strong>_000</strong> (front)<br>
-                                <strong>_090</strong> (right)<br>
-                                <strong>_180</strong> (back)<br>
-                                <strong>_270</strong> (left)<br>
-                                The M1-Transcoder app will only display the available/relevant transcoding options for the Mach1 Horizon Pairs input type.
+                        <div id="transcoder-input" class="doc-subsection">
+                            <h4>Input Options</h4>
+                            
+                            <h5>Audio</h5>
+                            <div class="parameter">
+                                <div class="parameter-title">Mach1 Spatial Input</div>
+                                <div class="parameter-description">Single multichannel file of 8 channels exported/rendered from preferred DAW, supports aif or wav files. (automatically detects Pro Tools HD multichannel .wav file and reorder the channels correctly during transcoding process from the 7.1 channel order)</div>
                             </div>
+                            
+                            <div class="parameter">
+                                <div class="parameter-title">Mach1 Horizon Pairs Inputs</div>
+                                <div class="parameter-description">
+                                    Drag in the 4 exported stereo files. Add the following to the end of the file names to safely encode:<br>
+                                    <strong>_000</strong> (front)<br>
+                                    <strong>_090</strong> (right)<br>
+                                    <strong>_180</strong> (back)<br>
+                                    <strong>_270</strong> (left)<br>
+                                    The M1-Transcoder app will only display the available/relevant transcoding options for the Mach1 Horizon Pairs input type.
+                                </div>
+                            </div>
+                            
+                            <h5>Video</h5>
+                            <p>Supports mp4 & mov video files, all conversions/encoding/transcodings use pass through video so that nothing is re-encoded or effecting the video streams of files.</p>
                         </div>
                         
-                        <h4>Video</h4>
-                        <p>Supports mp4 & mov video files, all conversions/encoding/transcodings use pass through video so that nothing is re-encoded or effecting the video streams of files.</p>
+                        <div id="transcoder-output" class="doc-subsection">
+                            <h4>Output Types</h4>
+                            
+                            <h5>Spatial Format & File Type Allowed</h5>
+                            <ul>
+                                <li>Mach1 Spatial (Audio & Video)</li>
+                                <li>Mach1 Horizon (Audio & Video)</li>
+                                <li>Mach1 Horizon Pairs (Single Stream) (Audio & Video)</li>
+                                <li>Mach1 Horizon Pairs / Quad-Binaural (Multiple Streams) (Audio & Video)</li>
+                                <li>First Order Ambisonic ACNSN3D [Youtube] (Audio & Video) [Applies metadata for direct upload to Youtube depending on selected File Type]</li>
+                                <li>First Order Ambisonic FuMa (Audio & Video)</li>
+                                <li>Second Order Ambisonic ACNSN3D (Audio Only)</li>
+                                <li>Second Order Ambisonic FuMa (Audio Only)</li>
+                                <li>Third Order Ambisonic ACNSN3D (Audio Only)</li>
+                                <li>Third Order Ambisonic FuMa (Audio Only)</li>
+                                <li>5.0 Surround (L,C,R,Ls,Rs) (Audio & Video)</li>
+                                <li>5.1 Surround (L,C,R,Ls,Rs,LFE) (Audio & Video)</li>
+                                <li>5.1 Surround SMPTE (L,R,C,LFE,Ls,Rs) (Audio & Video)</li>
+                                <li>5.1 Surround DTS (L,R,Ls,Rs,C,LFE) (Audio & Video)</li>
+                                <li>5.0.2 Surround (L,C,R,Ls,Rs,Lts,Rts) (Audio Only)</li>
+                                <li>5.1.2 Surround (L,C,R,Ls,Rs,LFE,Lts,Rts) (Audio Only)</li>
+                                <li>5.0.4 Surround (L,C,R,Ls,Rs,FLts,FRts,BLts,BRts) (Audio Only)</li>
+                                <li>5.1.4 Surround (L,C,R,Ls,Rs,LFE,FLts,FRts,BLts,BRts) (Audio Only)</li>
+                                <li>7.0 Surround (L,C,R,Lss,Rss,Lsr,Rsr) (Audio & Video)</li>
+                                <li>7.1 Surround (L,C,R,Lss,Rss,Lsr,Rsr,LFE) (Audio & Video)</li>
+                                <li>7.1 Surround SDDS (L,Lc,C,Rc,R,Ls,Rs,LFE) (Audio & Video)</li>
+                                <li>7.1.2 Surround (L,C,R,Lss,Rss,Lsr,Rsr,LFE,Lts,Rts) (Audio Only)</li>
+                                <li>7.1.4 Surround (L,C,R,Lss,Rss,Lsr,Rsr,LFE,FLts,FRts,BLts,BRts) (Audio Only)</li>
+                                <li>FB360/TBE (8ch) (Audio Only)</li>
+                            </ul>
+                            
+                            <p>This list is maintained here: <a href="https://dev.mach1.tech/#formats-supported" target="_blank">https://dev.mach1.tech/#formats-supported</a></p>
+                            
+                            <h5>Output</h5>
+                            <p>The output options are dependent on what is possible per selected format as the list above shows.</p>
+                        </div>
                     </div>
-                    
-                    <!-- Output Types Section -->
-                    <div id="transcoder-output" class="doc-section">
-                        <h3>Output Types</h3>
-                        <h4>Spatial Format & File Type Allowed</h4>
-                        
-                        <ul>
-                            <li>Mach1 Spatial (Audio & Video)</li>
-                            <li>Mach1 Horizon (Audio & Video)</li>
-                            <li>Mach1 Horizon Pairs (Single Stream) (Audio & Video)</li>
-                            <li>Mach1 Horizon Pairs / Quad-Binaural (Multiple Streams) (Audio & Video)</li>
-                            <li>First Order Ambisonic ACNSN3D [Youtube] (Audio & Video) [Applies metadata for direct upload to Youtube depending on selected File Type]</li>
-                            <li>First Order Ambisonic FuMa (Audio & Video)</li>
-                            <li>Second Order Ambisonic ACNSN3D (Audio Only)</li>
-                            <li>Second Order Ambisonic FuMa (Audio Only)</li>
-                            <li>Third Order Ambisonic ACNSN3D (Audio Only)</li>
-                            <li>Third Order Ambisonic FuMa (Audio Only)</li>
-                            <li>5.0 Surround (L,C,R,Ls,Rs) (Audio & Video)</li>
-                            <li>5.1 Surround (L,C,R,Ls,Rs,LFE) (Audio & Video)</li>
-                            <li>5.1 Surround SMPTE (L,R,C,LFE,Ls,Rs) (Audio & Video)</li>
-                            <li>5.1 Surround DTS (L,R,Ls,Rs,C,LFE) (Audio & Video)</li>
-                            <li>5.0.2 Surround (L,C,R,Ls,Rs,Lts,Rts) (Audio Only)</li>
-                            <li>5.1.2 Surround (L,C,R,Ls,Rs,LFE,Lts,Rts) (Audio Only)</li>
-                            <li>5.0.4 Surround (L,C,R,Ls,Rs,FLts,FRts,BLts,BRts) (Audio Only)</li>
-                            <li>5.1.4 Surround (L,C,R,Ls,Rs,LFE,FLts,FRts,BLts,BRts) (Audio Only)</li>
-                            <li>7.0 Surround (L,C,R,Lss,Rss,Lsr,Rsr) (Audio & Video)</li>
-                            <li>7.1 Surround (L,C,R,Lss,Rss,Lsr,Rsr,LFE) (Audio & Video)</li>
-                            <li>7.1 Surround SDDS (L,Lc,C,Rc,R,Ls,Rs,LFE) (Audio & Video)</li>
-                            <li>7.1.2 Surround (L,C,R,Lss,Rss,Lsr,Rsr,LFE,Lts,Rts) (Audio Only)</li>
-                            <li>7.1.4 Surround (L,C,R,Lss,Rss,Lsr,Rsr,LFE,FLts,FRts,BLts,BRts) (Audio Only)</li>
-                            <li>FB360/TBE (8ch) (Audio Only)</li>
-                        </ul>
-                        
-                        <p>This list is maintained here: <a href="https://dev.mach1.tech/#formats-supported" target="_blank">https://dev.mach1.tech/#formats-supported</a></p>
-                        
-                        <h4>Output</h4>
-                        <p>The output options are dependent on what is possible per selected format as the list above shows.</p>
-                    </div>
-                    
                     <!-- Additional Features Section -->
                     <div id="transcoder-additional" class="doc-section">
                         <h3>Additional Features</h3>
@@ -1474,47 +1531,6 @@
                         
                         <a href="#" class="btn btn-primary">Request Feature</a>
                         <a href="#" class="btn">Report Issue</a>
-                    </div>
-                </div>
-                
-                <!-- SDK Documentation -->
-                <div id="sdk-content" class="product-content">
-                    <h2>Mach1 Spatial SDK</h2>
-                    <p>The Mach1 Spatial SDK provides developers with tools to integrate Mach1 Spatial Audio into their applications and platforms.</p>
-                    
-                    <div id="sdk-overview" class="doc-section">
-                        <h3>Overview</h3>
-                        <div class="doc-edit-area">
-                            <p>Add Mach1 Spatial SDK overview documentation here.</p>
-                        </div>
-                    </div>
-                    
-                    <div id="sdk-integration" class="doc-section">
-                        <h3>Integration Guide</h3>
-                        <div class="doc-edit-area">
-                            <p>Add Mach1 Spatial SDK integration guide here.</p>
-                        </div>
-                    </div>
-                    
-                    <div id="sdk-api" class="doc-section">
-                        <h3>API Reference</h3>
-                        <div class="doc-edit-area">
-                            <p>Add Mach1 Spatial SDK API reference documentation here.</p>
-                        </div>
-                    </div>
-                    
-                    <div id="sdk-examples" class="doc-section">
-                        <h3>Examples</h3>
-                        <div class="doc-edit-area">
-                            <p>Add Mach1 Spatial SDK code examples here.</p>
-                        </div>
-                    </div>
-                    
-                    <div id="sdk-platforms" class="doc-section">
-                        <h3>Platform Support</h3>
-                        <div class="doc-edit-area">
-                            <p>Add Mach1 Spatial SDK platform support documentation here.</p>
-                        </div>
                     </div>
                 </div>
                 
@@ -1724,14 +1740,50 @@
                 </div>
             </div>
         </div>
-        
-        <!-- Right black sidebar -->
-        <div class="side-bar"></div>
     </div>
 
     <script>
         // Script to handle content switching and TOC navigation
         document.addEventListener('DOMContentLoaded', function() {
+            // Setup TOC accordion
+            const setupTOCAccordion = function() {
+                // Get all TOC sidebars
+                const sidebar = document.querySelector('#sidebar');
+                
+                // Find all links with submenu
+                const menuItems = sidebar.querySelectorAll('li');
+                
+                menuItems.forEach(item => {
+                    const link = item.querySelector(':scope > a');
+                    const subMenu = item.querySelector(':scope > ul');
+                    
+                    if (subMenu && link) {
+                        item.classList.add('has-submenu');
+                        item.classList.add('collapsed'); // Start collapsed
+                        
+                        // We're removing the click handler here as it's handled in the main TOC link handler
+                    }
+                });
+                
+                // Ensure all sections start collapsed on page load
+                document.querySelectorAll('#sidebar .has-submenu').forEach(item => {
+                    item.classList.add('collapsed');
+                });
+                
+                // Remove active class from main navigation on page load
+                document.querySelectorAll('.product-list a').forEach(link => {
+                    link.classList.remove('active');
+                });
+                
+                // Make sure no content section is active by default
+                document.querySelectorAll('.product-content').forEach(content => {
+                    content.classList.remove('active');
+                });
+            };
+            
+            // Call setup function
+            setupTOCAccordion();
+            
             // Add smooth scrolling for tooltip areas
             const tooltipAreas = document.querySelectorAll('.tooltip-area');
             tooltipAreas.forEach(area => {
@@ -1758,6 +1810,12 @@
                         if (tocLink) {
                             document.querySelectorAll('.toc-sidebar a').forEach(l => l.classList.remove('active'));
                             tocLink.classList.add('active');
+                            
+                            // Expand parent if in collapsed menu
+                            const parentLi = tocLink.closest('li.has-submenu');
+                            if (parentLi) {
+                                parentLi.classList.remove('collapsed');
+                            }
                         }
                     }
                 });
@@ -1769,8 +1827,8 @@
             // Get all content sections
             const contentSections = document.querySelectorAll('.product-content');
             
-            // Get all TOC sidebars
-            const tocSidebars = document.querySelectorAll('.toc-sidebar');
+            // Update the sidebar reference
+            const sidebar = document.querySelector('#sidebar');
             
             // Add click event listeners for product navigation
             navLinks.forEach(link => {
@@ -1794,13 +1852,20 @@
                     // Show the selected content section
                     document.getElementById(contentId + '-content').classList.add('active');
                     
-                    // Hide all TOC sidebars
-                    tocSidebars.forEach(sidebar => {
-                        sidebar.classList.remove('active');
-                    });
-                    
-                    // Show the corresponding TOC sidebar
-                    document.getElementById(contentId + '-toc').classList.add('active');
+                    // Find and expand the corresponding TOC section
+                    const sectionLink = document.querySelector(`#sidebar .has-submenu > a[href="#${contentId}"]`);
+                    if (sectionLink) {
+                        // Collapse all TOC sections first
+                        document.querySelectorAll('#sidebar .has-submenu').forEach(item => {
+                            item.classList.add('collapsed');
+                        });
+                        
+                        // Expand the selected section
+                        const parentLi = sectionLink.closest('.has-submenu');
+                        if (parentLi) {
+                            parentLi.classList.remove('collapsed');
+                        }
+                    }
                     
                     // Reset scroll position for the selected content
                     window.scrollTo({
@@ -1819,14 +1884,71 @@
             tocLinks.forEach(link => {
                 link.addEventListener('click', function(e) {
                     e.preventDefault();
+                    
                     const targetId = this.getAttribute('href');
                     const targetElement = document.querySelector(targetId);
                     
-                    // Store which link was clicked and when
-                    userClickedLink = this;
-                    clickTimestamp = Date.now();
+                    // Check if this is a parent menu item with submenu
+                    const isSubmenuParent = link.parentElement.classList.contains('has-submenu');
                     
+                    if (isSubmenuParent) {
+                        // Find the direct parent li of the clicked link
+                        const parentLi = link.parentElement;
+                        
+                        // Get the href of the clicked link
+                        const linkHref = link.getAttribute('href');
+                        
+                        // Check if this is a top-level menu item (direct child of the main ul)
+                        const isTopLevel = parentLi.parentNode.parentNode.classList.contains('toc-sidebar-inner');
+                        
+                        // If it's a top-level accordion header
+                        if (isTopLevel) {
+                            // First collapse all top-level accordions
+                            document.querySelectorAll('.toc-sidebar > .toc-sidebar-inner > ul > li.has-submenu').forEach(item => {
+                                item.classList.add('collapsed');
+                            });
+                            
+                            // Then expand only the clicked one
+                            parentLi.classList.remove('collapsed');
+                        } else {
+                            // For non top-level items, just toggle as before
+                            parentLi.classList.toggle('collapsed');
+                        }
+                        
+                        // For any parent with submenu, prevent navigation if it has child elements
+                        const hasChildSubmenu = parentLi.querySelector('ul') !== null;
+                        if (hasChildSubmenu) {
+                            return; // Don't navigate, just toggle
+                        }
+                    }
+                    
+                    // Only navigate if there's a target element
                     if (targetElement) {
+                        // Store which link was clicked and when
+                        userClickedLink = this;
+                        clickTimestamp = Date.now();
+                        
+                        // Make the corresponding product section active
+                        const productId = getProductIdFromLink(link);
+                        if (productId) {
+                            const targetProduct = document.getElementById(productId + '-content');
+                            if (targetProduct) {
+                                // Update main content section
+                                document.querySelectorAll('.product-content').forEach(content => {
+                                    content.classList.remove('active');
+                                });
+                                targetProduct.classList.add('active');
+                                
+                                // Update main navigation
+                                navLinks.forEach(navLink => {
+                                    navLink.classList.remove('active');
+                                    if (navLink.getAttribute('href') === '#' + productId) {
+                                        navLink.classList.add('active');
+                                    }
+                                });
+                            }
+                        }
+                        
                         // Calculate the scroll offset with some padding
                         const offset = targetElement.getBoundingClientRect().top + window.pageYOffset - 60;
                         
@@ -1843,14 +1965,12 @@
                         // Update URL hash for better navigation history
                         history.pushState(null, null, targetId);
                         
-                        // Keep this link active for a few seconds to prevent auto-highlighting
-                        // from immediately changing it
-                        setTimeout(() => {
-                            tocLinks.forEach(l => l.classList.remove('active'));
-                            this.classList.add('active');
-                        }, 200);
-                    } else {
-                        console.warn('Target element not found:', targetId);
+                        // Expand all parent accordions
+                        let parent = link.closest('li.has-submenu');
+                        while (parent) {
+                            parent.classList.remove('collapsed');
+                            parent = parent.parentElement.closest('li.has-submenu');
+                        }
                     }
                 });
             });
@@ -1859,13 +1979,22 @@
             function isElementInViewport(el) {
                 const rect = el.getBoundingClientRect();
                 const windowHeight = window.innerHeight || document.documentElement.clientHeight;
+                const headerOffset = 100; // Account for header/navigation
                 
-                // Consider an element in viewport if its top is in view or it fills the viewport
-                return (
-                    (rect.top >= 0 && rect.top <= windowHeight * 0.7) || 
-                    (rect.bottom >= windowHeight * 0.3 && rect.bottom <= windowHeight) ||
-                    (rect.top <= 0 && rect.bottom >= windowHeight)
-                );
+                // Calculate how much of the element is visible
+                const visibleHeight = Math.min(rect.bottom, windowHeight) - Math.max(rect.top, headerOffset);
+                const elementVisibleRatio = visibleHeight / rect.height;
+                
+                // Check if element is entering from top of viewport
+                const isEnteringTop = rect.top >= headerOffset && rect.top <= windowHeight * 0.5;
+                
+                // Check if element takes significant portion of the viewport
+                const isSignificantPortion = visibleHeight > 100 && elementVisibleRatio > 0.3;
+                
+                // Check if element's top is close to the top of the viewport
+                const isNearTop = rect.top >= -150 && rect.top <= windowHeight * 0.3;
+                
+                return isEnteringTop || isSignificantPortion || isNearTop;
             }
             
             // Enhanced section highlighting based on scroll position
@@ -1939,9 +2068,12 @@
                     });
                     
                     // Add active class to the TOC link for the current element
-                    const activeTocLink = document.querySelector(`.toc-sidebar a[href="#${currentElementId}"]`);
+                    const activeTocLink = document.querySelector(`#sidebar a[href="#${currentElementId}"]`);
                     if (activeTocLink) {
                         activeTocLink.classList.add('active');
+                        
+                        // Expand accordion for the active link
+                        expandActiveAccordion();
                     }
                 }
             };
@@ -1950,11 +2082,79 @@
             let scrollTimer;
             window.addEventListener('scroll', function() {
                 clearTimeout(scrollTimer);
+                scrollTimer = setTimeout(highlightCurrentSection, 50); // Reduced from 100ms to 50ms for faster response
+            });
+            
+            // Also trigger highlight on window resize as this can change what's in viewport
+            window.addEventListener('resize', function() {
+                clearTimeout(scrollTimer);
                 scrollTimer = setTimeout(highlightCurrentSection, 100);
             });
             
+            // Function to expand parent accordions of an active link
+            const expandActiveAccordion = function() {
+                const activeLink = document.querySelector('#sidebar a.active');
+                if (!activeLink) return;
+                
+                // Find all parent accordions and expand them
+                let parent = activeLink.closest('li.has-submenu');
+                while (parent) {
+                    parent.classList.remove('collapsed');
+                    parent = parent.parentElement.closest('li.has-submenu');
+                }
+                
+                // Determine which main section this belongs to
+                const productId = getProductIdFromLink(activeLink);
+                if (productId) {
+                    // Make that product content active if it's not already
+                    const activeProduct = document.querySelector('.product-content.active');
+                    const targetProduct = document.getElementById(productId + '-content');
+                    
+                    if (activeProduct !== targetProduct && targetProduct) {
+                        document.querySelectorAll('.product-content').forEach(content => {
+                            content.classList.remove('active');
+                        });
+                        targetProduct.classList.add('active');
+                        
+                        // Also update the main navigation
+                        navLinks.forEach(link => {
+                            link.classList.remove('active');
+                            if (link.getAttribute('href') === '#' + productId) {
+                                link.classList.add('active');
+                            }
+                        });
+                    }
+                }
+            };
+            
+            // Helper function to get product ID from a TOC link
+            function getProductIdFromLink(link) {
+                // Look at parent .has-submenu elements to find the top-level one
+                let topParent = link.closest('li.has-submenu');
+                
+                while (topParent && topParent.parentElement && 
+                       topParent.parentElement.closest('li.has-submenu')) {
+                    topParent = topParent.parentElement.closest('li.has-submenu');
+                }
+                
+                if (topParent) {
+                    const topLink = topParent.querySelector(':scope > a');
+                    if (topLink) {
+                        const href = topLink.getAttribute('href');
+                        if (href && href.startsWith('#')) {
+                            return href.substring(1);
+                        }
+                    }
+                }
+                
+                return null;
+            }
+            
             // Initial highlighting on page load
             highlightCurrentSection();
+            
+            // Expand accordion sections for the active link
+            expandActiveAccordion();
             
             // Handle hash navigation on page load
             if (window.location.hash) {
@@ -1975,6 +2175,9 @@
                         if (tocLink) {
                             tocLinks.forEach(l => l.classList.remove('active'));
                             tocLink.classList.add('active');
+                            
+                            // Expand parent accordions
+                            expandActiveAccordion();
                         }
                     }, 300);
                 }
