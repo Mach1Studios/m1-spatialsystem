@@ -32,8 +32,6 @@
         
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
-            padding: 0;
             line-height: 1.6;
             color: var(--text-primary);
             background-color: var(--dark-bg);
@@ -48,7 +46,7 @@
             flex: 1;
         }
         
-        /* New TOC Sidebar */
+        /* TOC Sidebar */
         .toc-sidebar {
             width: var(--toc-width);
             background-color: var(--dark-bg-lightest);
@@ -62,7 +60,6 @@
             z-index: 10;
             scrollbar-width: thin;
             scrollbar-color: var(--border-color) var(--dark-bg-lightest);
-            display: block;
         }
         
         .toc-sidebar::-webkit-scrollbar {
@@ -129,15 +126,25 @@
             font-weight: bold;
         }
         
-        /* Make active link stand out more */
+        /* Active link styling */
         .toc-sidebar a.active {
             background-color: rgba(255, 193, 7, 0.25);
             color: var(--accent-color);
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
         }
         
-        .toc-sidebar a::after {
-            content: '\f054';
+        /* Accordion styling */
+        .toc-sidebar .has-submenu {
+            margin-bottom: 8px;
+        }
+        
+        .toc-sidebar .has-submenu > a {
+            font-weight: 600;
+            border-radius: 4px;
+        }
+        
+        .toc-sidebar .has-submenu > a::after {
+            content: '\f078'; /* Chevron down */
             font-family: 'Font Awesome 5 Free';
             font-weight: 900;
             font-size: 0.7rem;
@@ -146,33 +153,11 @@
             top: 50%;
             transform: translateY(-50%);
             color: var(--accent-color);
-            opacity: 0;
-            transition: opacity var(--transition-speed);
-        }
-        
-        .toc-sidebar a:hover::after {
-            opacity: 1;
-        }
-        
-        /* Add accordion styling */
-        .toc-sidebar .has-submenu {
-            margin-bottom: 8px;
-        }
-        
-        .toc-sidebar .has-submenu > a {
-            font-weight: 600;
-            background-color: rgba(255, 193, 7, 0.05);
-            border-radius: 4px;
-        }
-        
-        .toc-sidebar .has-submenu > a::after {
-            content: '\f078'; /* Chevron down */
             opacity: 1;
         }
         
         .toc-sidebar .has-submenu.collapsed > a::after {
             content: '\f054'; /* Chevron right */
-            opacity: 1;
         }
         
         .toc-sidebar .has-submenu:not(.collapsed) > a {
@@ -188,11 +173,6 @@
             transition: max-height 0.3s ease-in-out;
         }
         
-        .toc-sidebar ul ul ul {
-            padding-left: 15px;
-            font-size: 0.9em;
-        }
-        
         .toc-sidebar .collapsed > ul {
             max-height: 0;
         }
@@ -201,7 +181,7 @@
             cursor: pointer;
         }
         
-        /* Style top-level sections */
+        /* Top-level sections */
         .toc-sidebar > .toc-sidebar-inner > ul > li.has-submenu {
             margin-bottom: 15px;
             border-bottom: 1px solid rgba(255, 193, 7, 0.1);
@@ -211,7 +191,6 @@
         .toc-sidebar > .toc-sidebar-inner > ul > li.has-submenu > a {
             font-size: 1.05rem;
             padding: 8px 10px;
-            background-color: rgba(255, 193, 7, 0.08);
             border-radius: 4px;
         }
         
@@ -223,19 +202,13 @@
             background-color: rgba(255, 193, 7, 0.2);
         }
         
+        /* Main content area */
         .main-content {
             flex: 1;
             background-color: var(--dark-bg-lighter);
             padding: 40px;
             min-height: 100vh;
-            box-sizing: border-box;
             margin-left: var(--toc-width);
-        }
-        
-        /* Header area */
-        .header {
-            background-color: var(--dark-bg-lighter);
-            padding: 40px;
         }
         
         /* Product sections */
@@ -246,7 +219,6 @@
         .product-title {
             font-size: 1.8rem;
             margin-bottom: 20px;
-            position: relative;
             display: flex;
             align-items: baseline;
             color: var(--accent-color);
@@ -262,7 +234,6 @@
         
         .product-list {
             list-style: none;
-            padding: 0;
             margin: 0 0 0 20px;
         }
         
@@ -285,41 +256,16 @@
             border-left: 2px solid transparent;
         }
         
-        .product-list a:hover {
+        .product-list a:hover,
+        .product-list a.active {
             color: var(--accent-color);
             border-left: 2px solid var(--accent-color);
         }
         
         .product-list a.active {
             font-weight: bold;
-            color: var(--accent-color);
-            border-left: 2px solid var(--accent-color);
         }
         
-        .secondary-product {
-            text-align: right;
-            margin-top: -60px;
-            margin-bottom: 40px;
-        }
-        
-        .secondary-product a {
-            text-decoration: none;
-            color: var(--text-secondary);
-            font-size: 1.6rem;
-            transition: all var(--transition-speed);
-        }
-        
-        .secondary-product a:hover {
-            color: var(--accent-color);
-        }
-        
-        /* Doc content */
-        .doc-content {
-            margin-top: 60px;
-            border-top: 1px solid var(--border-color);
-            padding-top: 30px;
-            min-height: 400px;
-        }
         
         /* Product content sections */
         .product-content {
@@ -336,6 +282,7 @@
             to { opacity: 1; }
         }
         
+        /* Product content typography */
         .product-content h2 {
             color: var(--accent-color);
             font-size: 2rem;
@@ -358,7 +305,6 @@
             color: var(--text-primary);
             font-size: 1.5rem;
             margin: 30px 0 15px;
-            position: relative;
         }
         
         .product-content p {
@@ -373,34 +319,12 @@
         
         .product-content li {
             margin-bottom: 10px;
-            position: relative;
         }
         
-        /* Documentation edit placeholders */
-        .doc-edit-area {
-            margin: 20px 0;
-            padding: 20px;
-            border: 1px dashed var(--border-color);
-            border-radius: 5px;
-            background-color: var(--dark-bg-lightest);
-            transition: all var(--transition-speed);
-        }
-        
-        .doc-edit-area:hover {
-            border-color: var(--accent-color);
-            box-shadow: 0 0 10px rgba(255, 193, 7, 0.1);
-        }
-        
-        .doc-edit-area p {
-            color: var(--text-muted);
-            font-style: italic;
-        }
-        
-        /* Documentation styling */
+        /* Documentation sections */
         .doc-section {
             margin-bottom: 40px;
             padding-bottom: 20px;
-            position: relative;
         }
         
         .doc-section h3 {
@@ -428,7 +352,7 @@
             margin: 25px 0 10px;
         }
         
-        .doc-section p {
+        .doc-section p, .doc-subsection p {
             margin: 15px 0;
             line-height: 1.7;
         }
@@ -438,24 +362,19 @@
             font-weight: 600;
         }
         
-        .doc-section em {
-            font-style: italic;
-            color: var(--text-secondary);
-        }
-        
-        .doc-section ul {
+        .doc-section ul, .doc-subsection ul {
             margin: 15px 0;
             padding-left: 25px;
             list-style-type: none;
         }
         
-        .doc-section ul li {
+        .doc-section ul li, .doc-subsection ul li {
             margin-bottom: 8px;
             position: relative;
             padding-left: 20px;
         }
         
-        .doc-section ul li::before {
+        .doc-section ul li::before, .doc-subsection ul li::before {
             content: '•';
             color: var(--accent-color);
             position: absolute;
@@ -463,37 +382,20 @@
             font-size: 1.2rem;
         }
         
-        .doc-section img {
-            max-width: 100%;
+        /* Special styles */
+        .doc-section .note, .doc-section .warning {
+            background-color: var(--dark-bg-lightest);
+            padding: 15px;
             margin: 20px 0;
-            border: 1px solid var(--border-color);
-            border-radius: 4px;
-            transition: all var(--transition-speed);
-        }
-        
-        .doc-section img:hover {
-            border-color: var(--accent-color);
-            box-shadow: 0 0 15px rgba(255, 193, 7, 0.2);
-        }
-        
-        .doc-section .highlight {
-            color: var(--accent-color);
+            border-radius: 0 4px 4px 0;
         }
         
         .doc-section .note {
-            background-color: var(--dark-bg-lightest);
             border-left: 4px solid var(--accent-color);
-            padding: 15px;
-            margin: 20px 0;
-            border-radius: 0 4px 4px 0;
         }
         
         .doc-section .warning {
-            background-color: var(--dark-bg-lightest);
             border-left: 4px solid #e74c3c;
-            padding: 15px;
-            margin: 20px 0;
-            border-radius: 0 4px 4px 0;
         }
         
         .doc-section .parameter {
@@ -525,15 +427,7 @@
         }
         
         .doc-section .parameter-description {
-            margin-left: 0;
             color: var(--text-primary);
-        }
-        
-        .doc-section .page-number {
-            text-align: right;
-            color: var(--text-muted);
-            margin-top: 40px;
-            font-size: 0.9rem;
         }
         
         .doc-section .image-caption {
@@ -543,108 +437,20 @@
             margin-top: 5px;
         }
         
-        /* Modern Table of Contents */
-        .toc-section {
-            margin-bottom: 40px;
-            padding: 20px;
-            background-color: var(--dark-bg-lightest);
-            border-radius: 8px;
-            border-left: 4px solid var(--accent-color);
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        /* Doc subsection styling */
+        .doc-subsection {
+            margin: 25px 0 20px;
+            padding-left: 15px;
+            border-left: 2px solid var(--border-color);
         }
         
-        .toc-section h3 {
+        .doc-subsection h4 {
             color: var(--accent-color);
-            border-bottom: none;
-            margin-top: 0;
-            padding-bottom: 15px;
-            font-size: 1.5rem;
-            display: flex;
-            align-items: center;
+            font-size: 1.2rem;
+            margin: 15px 0 10px;
         }
         
-        .toc-section h3::after {
-            display: none;
-        }
-        
-        .toc-section h3::before {
-            content: '\f02e';
-            font-family: 'Font Awesome 5 Free';
-            font-weight: 900;
-            margin-right: 10px;
-            color: var(--accent-color);
-        }
-        
-        .toc-section ul {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-            gap: 10px;
-            margin: 0;
-            padding: 0;
-        }
-        
-        .toc-section li {
-            padding: 0;
-            margin: 0;
-        }
-        
-        .toc-section li::before {
-            display: none;
-        }
-        
-        .toc-section a {
-            display: block;
-            padding: 10px 15px;
-            text-decoration: none;
-            color: var(--text-primary);
-            background-color: var(--dark-bg);
-            border-radius: 5px;
-            border-left: 3px solid transparent;
-            transition: all var(--transition-speed);
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .toc-section a::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 3px;
-            height: 100%;
-            background-color: var(--accent-color);
-            transform: scaleY(0);
-            transition: transform var(--transition-speed);
-        }
-        
-        .toc-section a:hover {
-            background-color: rgba(255, 193, 7, 0.1);
-            transform: translateX(5px);
-        }
-        
-        .toc-section a:hover::before {
-            transform: scaleY(1);
-        }
-        
-        .toc-section a::after {
-            content: '\f054';
-            font-family: 'Font Awesome 5 Free';
-            font-weight: 900;
-            font-size: 0.8rem;
-            position: absolute;
-            right: 15px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: var(--accent-color);
-            opacity: 0;
-            transition: opacity var(--transition-speed);
-        }
-        
-        .toc-section a:hover::after {
-            opacity: 1;
-        }
-        
-        /* Buttons and interactive elements */
+        /* Buttons */
         .btn {
             display: inline-block;
             background-color: var(--dark-bg-lightest);
@@ -656,6 +462,7 @@
             border: 1px solid var(--border-color);
             font-size: 0.9rem;
             cursor: pointer;
+            margin-right: 10px;
         }
         
         .btn:hover {
@@ -673,6 +480,58 @@
             background-color: var(--mach1-yellow-dark);
         }
         
+        /* Image and tooltip styling */
+        .image-container {
+            margin: 20px 0;
+            text-align: center;
+        }
+        
+        .tooltip-area {
+            position: absolute;
+            z-index: 10;
+            border: 2px solid transparent;
+            transition: border-color 0.3s;
+            text-decoration: none;
+            display: block;
+        }
+        
+        .tooltip-area[href] {
+            cursor: pointer;
+        }
+        
+        .tooltip-area:not([href]) {
+            cursor: help;
+        }
+        
+        .tooltip-area:hover {
+            border-color: var(--accent-color);
+        }
+        
+        .tooltip-area::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 8px 12px;
+            background-color: var(--dark-bg-lightest);
+            color: var(--text-primary);
+            border: 1px solid var(--accent-color);
+            border-radius: 4px;
+            font-size: 0.9rem;
+            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            pointer-events: none;
+        }
+        
+        .tooltip-area:hover::after {
+            opacity: 1;
+            visibility: visible;
+        }
+        
         /* Mobile adjustments */
         @media (max-width: 992px) {
             .container {
@@ -682,71 +541,14 @@
             .toc-sidebar {
                 width: 100%;
                 height: auto;
-                position: relative;
-            }
-            
-            .toc-sidebar {
-                height: auto;
                 max-height: 300px;
+                position: relative;
                 overflow-y: auto;
                 border-bottom: 1px solid var(--border-color);
-            }
-            
-            .secondary-product {
-                margin-top: 20px;
-                text-align: left;
-            }
-            
-            .toc-section ul {
-                grid-template-columns: 1fr;
-            }
-        }
-        
-        /* Add styling for subsections */
-        .doc-subsection {
-            margin: 25px 0 20px;
-            padding-left: 15px;
-            border-left: 2px solid var(--border-color);
-        }
-        
-        .doc-subsection h4 {
-            color: var(--accent-color);
-            font-size: 1.2rem;
-            margin: 15px 0 10px;
-        }
-        
-        /* Mobile adjustments - improve responsive behavior */
-        @media (max-width: 992px) {
-            .container {
-                flex-direction: column;
-            }
-            
-            .toc-sidebar {
-                position: relative;
-                width: 100%;
-                height: auto;
-                max-height: 300px;
-                overflow-y: auto;
-                border-bottom: 1px solid var(--border-color);
-                left: 0;
             }
             
             .main-content {
                 margin-left: 0;
-            }
-            
-            .secondary-product {
-                margin-top: 20px;
-                text-align: left;
-            }
-            
-            .toc-section ul {
-                grid-template-columns: 1fr;
-            }
-            
-            /* Make product title and list more readable on mobile */
-            .product-title {
-                font-size: 1.5rem;
             }
             
             .product-list {
@@ -773,85 +575,6 @@
                 color: var(--dark-bg);
             }
         }
-        
-        /* Add specific styling for documentation images */
-        .doc-image {
-            display: block;
-            max-width: 100%;
-            height: auto;
-            margin: 20px 0;
-            border: 1px solid var(--border-color);
-            border-radius: 4px;
-            background-color: var(--dark-bg-lightest);
-        }
-        
-        .image-container {
-            margin: 20px 0;
-            text-align: center;
-        }
-
-        .area {
-            background:#fff;
-            display:block;
-            height:475px;
-            opacity:0;
-            position:absolute;
-            width:320px;
-        }
-        #area2 {
-            left:320px;
-        }
-        #area1:hover, #area2:hover {
-            opacity:0.2;
-        }
-
-        /* New tooltip styles */
-        .tooltip-area {
-            position: absolute;
-            z-index: 10;
-            border: 2px solid transparent;
-            transition: border-color 0.3s;
-            text-decoration: none;
-            display: block;
-        }
-
-        /* Cursor styles based on whether area is clickable */
-        .tooltip-area[href] {
-            cursor: pointer;
-        }
-
-        .tooltip-area:not([href]) {
-            cursor: help;
-        }
-
-        .tooltip-area:hover {
-            border-color: var(--accent-color);
-        }
-
-        .tooltip-area::after {
-            content: attr(data-tooltip);
-            position: absolute;
-            bottom: 100%;
-            left: 50%;
-            transform: translateX(-50%);
-            padding: 8px 12px;
-            background-color: var(--dark-bg-lightest);
-            color: var(--text-primary);
-            border: 1px solid var(--accent-color);
-            border-radius: 4px;
-            font-size: 0.9rem;
-            white-space: nowrap;
-            opacity: 0;
-            visibility: hidden;
-            transition: opacity 0.3s, visibility 0.3s;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-            pointer-events: none;
-        }
-
-        .tooltip-area:hover::after {
-            opacity: 1;
-            visibility: visible;
-        }
     </style>
 </head>
 <body>
@@ -863,41 +586,29 @@
                     <li class="has-submenu">
                         <a href="#panner">Mach1 Panner</a>
                         <ul>
-                            <li><a href="#panner-description">Description & User Story</a>
-                                <ul>
-                                    <li><a href="#panner-spatial-format">Mach1 Spatial Format Explained</a></li>
-                                    <li><a href="#panner-encoding">Encoding Explained</a></li>
-                                </ul>
-                            </li>
-                            <li><a href="#panner-features">Plugin Features</a>
-                                <ul>
-                                    <li><a href="#panner-general-params">General Parameters</a></li>
-                                    <li><a href="#panner-stereo-params">Stereo Parameters</a></li>
-                                    <li><a href="#panner-quad-params">Quad Parameters</a></li>
-                                </ul>
-                            </li>
-                            <li><a href="#panner-notes">Notes</a>
-                            <li><a href="#panner-upcoming">Upcoming Features</a>
+                            <li><a href="#panner-description">Description & User Story</a></li>
+                            <li><a href="#panner-spatial-format">Mach1 Spatial Format Explained</a></li>
+                            <li><a href="#panner-encoding">Encoding Explained</a></li>
+                            <li><a href="#panner-features">Plugin Features</a></li>
+                            <li><a href="#panner-general-params">General Parameters</a></li>
+                            <li><a href="#panner-stereo-params">Stereo Parameters</a></li>
+                            <li><a href="#panner-quad-params">Quad Parameters</a></li>
+                            <li><a href="#panner-notes">Notes</a></li>
+                            <li><a href="#panner-upcoming">Upcoming Features</a></li>
                         </ul>
                     </li>
                     <li class="has-submenu">
                         <a href="#monitor">Mach1 Monitor</a>
                         <ul>
-                            <li><a href="#description">Description & User Story</a>
-                                <ul>
-                                    <li><a href="#spatial-format">Mach1 Spatial Format Explained</a></li>
-                                    <li><a href="#decoding">Decoding Explained</a></li>
-                                </ul>
-                            </li>
+                            <li><a href="#description">Description & User Story</a></li>
+                            <li><a href="#spatial-format">Mach1 Spatial Format Explained</a></li>
+                            <li><a href="#decoding">Decoding Explained</a></li>
                             <li><a href="#headlocked">Headlocked/Static Stereo</a></li>
-                            <li><a href="#plugin-features">Plugin Features</a>
-                                <ul>
-                                    <li><a href="#general-parameters">General Parameters</a></li>
-                                    <li><a href="#settings">Settings</a></li>
-                                    <li><a href="#monitor-modes">Monitor Modes</a></li>
-                                    <li><a href="#timecode-offset">Timecode Offset</a></li>
-                                </ul>
-                            </li>
+                            <li><a href="#plugin-features">Plugin Features</a></li>
+                            <li><a href="#general-parameters">General Parameters</a></li>
+                            <li><a href="#settings">Settings</a></li>
+                            <li><a href="#monitor-modes">Monitor Modes</a></li>
+                            <li><a href="#timecode-offset">Timecode Offset</a></li>
                             <li><a href="#upcoming-features">Upcoming Features</a></li>
                         </ul>
                     </li>
@@ -906,69 +617,48 @@
                         <ul>
                             <li><a href="#player-overview">Overview</a></li>
                             <li><a href="#player-features">Features</a></li>
-                            <li><a href="#player-playback">Playback</a>
-                                <ul>
-                                    <li><a href="#player-getting-started">Getting Started</a></li>
-                                    <li><a href="#player-playback">Playback Options</a></li>
-                                </ul>
-                            </li>
+                            <li><a href="#player-playback">Playback</a></li>
+                            <li><a href="#player-getting-started">Getting Started</a></li>
+                            <li><a href="#player-playback-options">Playback Options</a></li>
                         </ul>
                     </li>
                     <li class="has-submenu">
                         <a href="#transcoder">Mach1 Transcoder</a>
                         <ul>
-                            <li><a href="#transcoder-description">Description & User Story</a>
-                                <ul>
-                                    <li><a href="#transcoder-spatial-format">Mach1 Spatial Format</a></li>
-                                    <li><a href="#transcoder-explained">Transcoder Explained</a></li>
-                                    <li><a href="#transcoder-conversion">Format Conversion</a></li>
-                                    <li><a href="#transcoder-headlocked">Headlocked/Static Stereo</a></li>
-                                </ul>
-                            </li>
-                            <li><a href="#transcoder-features">Transcoding Features</a>
-                                <ul>
-                                    <li><a href="#transcoder-input">Input Options</a></li>
-                                    <li><a href="#transcoder-output">Output Types</a></li>
-                                    <li><a href="#transcoder-additional">Additional Features</a></li>
-                                </ul>
-                            </li>
+                            <li><a href="#transcoder-description">Description & User Story</a></li>
+                            <li><a href="#transcoder-spatial-format">Mach1 Spatial Format</a></li>
+                            <li><a href="#transcoder-explained">Transcoder Explained</a></li>
+                            <li><a href="#transcoder-conversion">Format Conversion</a></li>
+                            <li><a href="#transcoder-headlocked">Headlocked/Static Stereo</a></li>
+                            <li><a href="#transcoder-features">Transcoding Features</a></li>
+                            <li><a href="#transcoder-input">Input Options</a></li>
+                            <li><a href="#transcoder-output">Output Types</a></li>
+                            <li><a href="#transcoder-additional">Additional Features</a></li>
                             <li><a href="#transcoder-upcoming">Upcoming Features</a></li>
                         </ul>
                     </li>
                     <li class="has-submenu">
                         <a href="#guide">User Guide</a>
                         <ul>
-                            <li><a href="#guide-multichannel">Mach1 Spatial Multichannel Layouts</a>
-                                <ul>
-                                    <li><a href="#guide-format-description">Format Description & User Story</a></li>
-                                    <li><a href="#guide-spatial">Mach1 Spatial</a></li>
-                                    <li><a href="#guide-deliverable">Multichannel Deliverable</a></li>
-                                </ul>
-                            </li>
-                            <li><a href="#guide-tools">Mach1 Spatial System Tools</a>
-                                <ul>
-                                    <li><a href="#guide-general-params">General Parameters</a></li>
-                                    <li><a href="#guide-panner">Mach1 Panner (M1-Panner)</a></li>
-                                    <li><a href="#guide-monitor">Mach1 Monitor (M1-Monitor)</a></li>
-                                    <li><a href="#guide-transcoder">Mach1 Transcoder (M1-Transcoder)</a></li>
-                                    <li><a href="#guide-player">Mach1 Player (M1-Player)</a></li>
-                                </ul>
-                            </li>
-                            <li><a href="#guide-deployment">Game Engine Deployment</a>
-                                <ul>
-                                    <li><a href="#guide-unreal">Unreal Engine</a></li>
-                                    <li><a href="#guide-unity">Unity</a></li>
-                                    <li><a href="#guide-wwise">Wwise</a></li>
-                                </ul>
-                            </li>
+                            <li><a href="#guide-multichannel">Mach1 Spatial Multichannel Layouts</a></li>
+                            <li><a href="#guide-format-description">Format Description & User Story</a></li>
+                            <li><a href="#guide-spatial">Mach1 Spatial</a></li>
+                            <li><a href="#guide-deliverable">Multichannel Deliverable</a></li>
+                            <li><a href="#guide-tools">Mach1 Spatial System Tools</a></li>
+                            <li><a href="#guide-general-params">General Parameters</a></li>
+                            <li><a href="#guide-panner">Mach1 Panner (M1-Panner)</a></li>
+                            <li><a href="#guide-monitor">Mach1 Monitor (M1-Monitor)</a></li>
+                            <li><a href="#guide-transcoder">Mach1 Transcoder (M1-Transcoder)</a></li>
+                            <li><a href="#guide-player">Mach1 Player (M1-Player)</a></li>
+                            <li><a href="#guide-deployment">Game Engine Deployment</a></li>
+                            <li><a href="#guide-unreal">Unreal Engine</a></li>
+                            <li><a href="#guide-unity">Unity</a></li>
+                            <li><a href="#guide-wwise">Wwise</a></li>
                             <li><a href="#guide-sdk">M1 Spatial SDK Integration</a></li>
-                            <li><a href="#guide-hacker">Mach1 Spatial System Hacker Help</a>
-                                <ul>
-                                    <li><a href="#guide-udp">UDP/OSC Ports</a></li>
-                                    <li><a href="#guide-orientation">Orientation OSC Data</a></li>
-                                    <li><a href="#guide-other-ports">Other UDP/OSC Ports</a></li>
-                                </ul>
-                            </li>
+                            <li><a href="#guide-hacker">Mach1 Spatial System Hacker Help</a></li>
+                            <li><a href="#guide-udp">UDP/OSC Ports</a></li>
+                            <li><a href="#guide-orientation">Orientation OSC Data</a></li>
+                            <li><a href="#guide-other-ports">Other UDP/OSC Ports</a></li>
                         </ul>
                     </li>
                 </ul>
@@ -977,17 +667,6 @@
         
         <!-- Main content area -->
         <div class="main-content">
-            <!-- Product sections -->
-            <div class="product-section">
-                <h1 class="product-title">Mach1 Spatial System<span class="tm">™</span></h1>
-                <ul class="product-list">
-                    <li><a href="#panner">Mach1 Panner</a></li>
-                    <li><a href="#monitor">Mach1 Monitor</a></li>
-                    <li><a href="#player">Mach1 Player</a></li>
-                    <li><a href="#transcoder">Mach1 Transcoder</a></li>
-                    <li><a href="#guide">User Guide</a></li>
-                </ul>
-            </div>
             
             <!-- Documentation content area -->
             <div class="doc-content">
@@ -1197,9 +876,11 @@
                     <!-- Upcoming Features Section -->
                     <div id="panner-upcoming" class="doc-section">
                         <h3>Upcoming Features</h3>
-                        <div class="doc-edit-area">
-                            <p>Add upcoming features documentation here.</p>
-                        </div>
+                        <ul>
+                            <li>Improved rotation automation consistency</li>
+                            <li>Enhanced divergence control</li>
+                            <li>Additional multichannel input options</li>
+                        </ul>
                         
                         <a href="#" class="btn btn-primary">Request Feature</a>
                         <a href="#" class="btn">Report Issue</a>
@@ -1323,9 +1004,11 @@
                     <!-- Upcoming Features Section -->
                     <div id="upcoming-features" class="doc-section">
                         <h3>Upcoming Features</h3>
-                        <div class="doc-edit-area">
-                            <p>Add upcoming features documentation here.</p>
-                        </div>
+                        <ul>
+                            <li>Additional device support for orientation data</li>
+                            <li>Enhanced decoding modes</li>
+                            <li>Integration with more DAWs</li>
+                        </ul>
                         
                         <a href="#" class="btn btn-primary">Request Feature</a>
                         <a href="#" class="btn">Report Issue</a>
@@ -1339,30 +1022,32 @@
                     
                     <div id="player-overview" class="doc-section">
                         <h3>Overview</h3>
-                        <div class="doc-edit-area">
-                            <p>Add Mach1 Player overview documentation here.</p>
-                        </div>
+                        <p>Mach1 Player provides a dedicated playback environment for spatial audio content, allowing real-time head tracking and orientation control for accurate spatial audio monitoring.</p>
                     </div>
                     
                     <div id="player-features" class="doc-section">
                         <h3>Features</h3>
-                        <div class="doc-edit-area">
-                            <p>Add Mach1 Player features documentation here.</p>
-                        </div>
+                        <ul>
+                            <li>Synchronized playback with your DAW timeline</li>
+                            <li>Head tracking simulation via mouse control</li>
+                            <li>Support for external head tracking devices</li>
+                            <li>360° video playback for visual reference</li>
+                        </ul>
                     </div>
                     
                     <div id="player-getting-started" class="doc-section">
                         <h3>Getting Started</h3>
-                        <div class="doc-edit-area">
-                            <p>Add Mach1 Player getting started guide here.</p>
-                        </div>
+                        <p>Launch Mach1 Player and use the drag-and-drop interface to load your 360° video content. The player will automatically connect to Mach1 Monitor to provide orientation data and synchronize with your DAW timeline.</p>
                     </div>
                     
                     <div id="player-playback" class="doc-section">
                         <h3>Playback Options</h3>
-                        <div class="doc-edit-area">
-                            <p>Add Mach1 Player playback options documentation here.</p>
-                        </div>
+                        <ul>
+                            <li>Toggle between flat and spherical 360° mode with the 'Z' key</li>
+                            <li>Enable reference angle overlay with the 'O' key</li>
+                            <li>Switch between stereoscopic and monoscopic videos with the 'D' key</li>
+                            <li>View player statistics by holding the 'H' key</li>
+                        </ul>
                     </div>
                 </div>
                 
@@ -1527,6 +1212,7 @@
                         <ul>
                             <li>Utilize the M1-Player as a standalone review player for transcoded mixes and videos.</li>
                             <li>Support the FB360 metadata spec for encoding video metadata to support ingestible FB360 videos for Meta supported apps.</li>
+                            <li>Additional output format support for emerging spatial audio standards.</li>
                         </ul>
                         
                         <a href="#" class="btn btn-primary">Request Feature</a>
@@ -1747,88 +1433,39 @@
         document.addEventListener('DOMContentLoaded', function() {
             // Setup TOC accordion
             const setupTOCAccordion = function() {
-                // Get all TOC sidebars
                 const sidebar = document.querySelector('#sidebar');
-                
-                // Find all links with submenu
                 const menuItems = sidebar.querySelectorAll('li');
                 
                 menuItems.forEach(item => {
-                    const link = item.querySelector(':scope > a');
                     const subMenu = item.querySelector(':scope > ul');
-                    
-                    if (subMenu && link) {
+                    if (subMenu) {
                         item.classList.add('has-submenu');
                         item.classList.add('collapsed'); // Start collapsed
-                        
-                        // We're removing the click handler here as it's handled in the main TOC link handler
                     }
-                });
-                
-                // Ensure all sections start collapsed on page load
-                document.querySelectorAll('#sidebar .has-submenu').forEach(item => {
-                    item.classList.add('collapsed');
-                });
-                
-                // Remove active class from main navigation on page load
-                document.querySelectorAll('.product-list a').forEach(link => {
-                    link.classList.remove('active');
-                });
-                
-                // Make sure no content section is active by default
-                document.querySelectorAll('.product-content').forEach(content => {
-                    content.classList.remove('active');
                 });
             };
             
             // Call setup function
             setupTOCAccordion();
             
-            // Add smooth scrolling for tooltip areas
-            const tooltipAreas = document.querySelectorAll('.tooltip-area');
-            tooltipAreas.forEach(area => {
-                area.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    const targetId = this.getAttribute('href');
-                    const targetElement = document.querySelector(targetId);
-                    
-                    if (targetElement) {
-                        // Calculate offset with padding
-                        const offset = targetElement.getBoundingClientRect().top + window.pageYOffset - 60;
-                        
-                        // Smooth scroll to target
-                        window.scrollTo({
-                            top: offset,
-                            behavior: 'smooth'
-                        });
-                        
-                        // Update URL without jumping
-                        history.pushState(null, null, targetId);
-                        
-                        // Highlight the corresponding TOC link
-                        const tocLink = document.querySelector(`.toc-sidebar a[href="${targetId}"]`);
-                        if (tocLink) {
-                            document.querySelectorAll('.toc-sidebar a').forEach(l => l.classList.remove('active'));
-                            tocLink.classList.add('active');
-                            
-                            // Expand parent if in collapsed menu
-                            const parentLi = tocLink.closest('li.has-submenu');
-                            if (parentLi) {
-                                parentLi.classList.remove('collapsed');
-                            }
-                        }
-                    }
-                });
-            });
-
             // Get all navigation links
-            const navLinks = document.querySelectorAll('.product-list a, .secondary-product a');
+            const navLinks = document.querySelectorAll('.product-list a');
             
             // Get all content sections
             const contentSections = document.querySelectorAll('.product-content');
             
-            // Update the sidebar reference
-            const sidebar = document.querySelector('#sidebar');
+            // Get all TOC links
+            const tocLinks = document.querySelectorAll('.toc-sidebar a');
+            
+            // Function to save current state to localStorage
+            function saveCurrentState(contentId, targetId) {
+                const state = {
+                    contentId: contentId,
+                    targetId: targetId,
+                    scrollPosition: window.pageYOffset
+                };
+                localStorage.setItem('mach1DocState', JSON.stringify(state));
+            }
             
             // Add click event listeners for product navigation
             navLinks.forEach(link => {
@@ -1843,6 +1480,9 @@
                     
                     // Get the content ID from the href attribute
                     const contentId = this.getAttribute('href').substring(1);
+                    
+                    // Save state
+                    saveCurrentState(contentId, null);
                     
                     // Hide all content sections
                     contentSections.forEach(section => {
@@ -1875,12 +1515,7 @@
                 });
             });
             
-            // Variable to track what link was last clicked
-            let userClickedLink = null;
-            let clickTimestamp = 0;
-            
-            // Improved smooth scrolling for TOC sidebar links
-            const tocLinks = document.querySelectorAll('.toc-sidebar a');
+            // Add click handlers for TOC links
             tocLinks.forEach(link => {
                 link.addEventListener('click', function(e) {
                     e.preventDefault();
@@ -1889,15 +1524,10 @@
                     const targetElement = document.querySelector(targetId);
                     
                     // Check if this is a parent menu item with submenu
-                    const isSubmenuParent = link.parentElement.classList.contains('has-submenu');
+                    const parentLi = link.parentElement;
+                    const isSubmenuParent = parentLi.classList.contains('has-submenu');
                     
                     if (isSubmenuParent) {
-                        // Find the direct parent li of the clicked link
-                        const parentLi = link.parentElement;
-                        
-                        // Get the href of the clicked link
-                        const linkHref = link.getAttribute('href');
-                        
                         // Check if this is a top-level menu item (direct child of the main ul)
                         const isTopLevel = parentLi.parentNode.parentNode.classList.contains('toc-sidebar-inner');
                         
@@ -1909,73 +1539,353 @@
                             });
                             
                             // Then expand only the clicked one
-                            parentLi.classList.remove('collapsed');
+                            parentLi.classList.toggle('collapsed');
                         } else {
-                            // For non top-level items, just toggle as before
+                            // For non top-level items with submenu, just toggle
                             parentLi.classList.toggle('collapsed');
                         }
                         
-                        // For any parent with submenu, prevent navigation if it has child elements
-                        const hasChildSubmenu = parentLi.querySelector('ul') !== null;
-                        if (hasChildSubmenu) {
-                            return; // Don't navigate, just toggle
+                        // If it has a submenu, don't navigate 
+                        if (parentLi.querySelector('ul')) {
+                            return;
                         }
                     }
                     
                     // Only navigate if there's a target element
                     if (targetElement) {
-                        // Store which link was clicked and when
+                        // Record user click for smooth scrolling
                         userClickedLink = this;
                         clickTimestamp = Date.now();
                         
-                        // Make the corresponding product section active
-                        const productId = getProductIdFromLink(link);
-                        if (productId) {
-                            const targetProduct = document.getElementById(productId + '-content');
-                            if (targetProduct) {
-                                // Update main content section
-                                document.querySelectorAll('.product-content').forEach(content => {
-                                    content.classList.remove('active');
-                                });
-                                targetProduct.classList.add('active');
-                                
-                                // Update main navigation
-                                navLinks.forEach(navLink => {
-                                    navLink.classList.remove('active');
-                                    if (navLink.getAttribute('href') === '#' + productId) {
-                                        navLink.classList.add('active');
+                        // Update active states
+                        tocLinks.forEach(l => l.classList.remove('active'));
+                        this.classList.add('active');
+                        
+                        // Expand parent sections
+                        let parent = this.closest('li.has-submenu');
+                        while (parent) {
+                            parent.classList.remove('collapsed');
+                            parent = parent.parentElement.closest('li.has-submenu');
+                        }
+                        
+                        // Find which product this belongs to and switch if needed
+                        let topParent = this.closest('.toc-sidebar > .toc-sidebar-inner > ul > li');
+                        let needsContentSwitch = false;
+                        let contentId = null;
+                        
+                        if (topParent) {
+                            const topLink = topParent.querySelector(':scope > a');
+                            if (topLink) {
+                                const href = topLink.getAttribute('href');
+                                if (href && href.startsWith('#')) {
+                                    contentId = href.substring(1);
+                                    const targetContent = document.getElementById(contentId + '-content');
+                                    
+                                    // Check if we need to switch content sections
+                                    const currentActive = document.querySelector('.product-content.active');
+                                    if (currentActive !== targetContent) {
+                                        needsContentSwitch = true;
+                                        
+                                        // Show the corresponding product content
+                                        contentSections.forEach(section => {
+                                            section.classList.remove('active');
+                                        });
+                                        
+                                        if (targetContent) {
+                                            targetContent.classList.add('active');
+                                        }
+                                        
+                                        // Update main navigation
+                                        navLinks.forEach(navLink => {
+                                            navLink.classList.remove('active');
+                                            if (navLink.getAttribute('href') === href) {
+                                                navLink.classList.add('active');
+                                            }
+                                        });
                                     }
-                                });
+                                }
                             }
                         }
                         
-                        // Calculate the scroll offset with some padding
-                        const offset = targetElement.getBoundingClientRect().top + window.pageYOffset - 60;
+                        // Save the current state to localStorage
+                        saveCurrentState(contentId, targetId);
                         
-                        // Scroll to the target element with smooth behavior
+                        // If we switched content sections, we need a slight delay before scrolling
+                        if (needsContentSwitch) {
+                            setTimeout(() => {
+                                // Calculate offset with minimal padding
+                                const headerHeight = 60; // Estimated header height
+                                const offset = targetElement.offsetTop - headerHeight;
+                                
+                                // Smooth scroll to target
+                                window.scrollTo({
+                                    top: offset,
+                                    behavior: 'smooth'
+                                });
+                                
+                                // Update URL without jumping
+                                history.pushState(null, null, targetId);
+                            }, 10);
+                        } else {
+                            // If we didn't switch content, just scroll immediately
+                            // Calculate offset with minimal padding
+                            const headerHeight = 60; // Estimated header height
+                            const offset = targetElement.offsetTop - headerHeight;
+                            
+                            // Smooth scroll to target
+                            window.scrollTo({
+                                top: offset,
+                                behavior: 'smooth'
+                            });
+                            
+                            // Update URL without jumping
+                            history.pushState(null, null, targetId);
+                        }
+                    }
+                });
+            });
+
+            // Add smooth scrolling for tooltip areas
+            const tooltipAreas = document.querySelectorAll('.tooltip-area[href]');
+            tooltipAreas.forEach(area => {
+                area.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const targetId = this.getAttribute('href');
+                    const targetElement = document.querySelector(targetId);
+                    
+                    if (targetElement) {
+                        // Find parent section ID for saving state
+                        let contentId = null;
+                        const parentSection = targetElement.closest('.product-content');
+                        if (parentSection && parentSection.id) {
+                            contentId = parentSection.id.replace('-content', '');
+                        }
+                        
+                        // Save state
+                        saveCurrentState(contentId, targetId);
+                        
+                        // Calculate offset with minimal padding
+                        const headerHeight = 60; // Estimated header height
+                        const offset = targetElement.offsetTop - headerHeight;
+                        
+                        // Smooth scroll to target
                         window.scrollTo({
                             top: offset,
                             behavior: 'smooth'
                         });
                         
-                        // Add active class to the clicked link
-                        tocLinks.forEach(l => l.classList.remove('active'));
-                        this.classList.add('active');
-                        
-                        // Update URL hash for better navigation history
+                        // Update URL without jumping
                         history.pushState(null, null, targetId);
                         
-                        // Expand all parent accordions
-                        let parent = link.closest('li.has-submenu');
-                        while (parent) {
-                            parent.classList.remove('collapsed');
-                            parent = parent.parentElement.closest('li.has-submenu');
+                        // Find and activate the corresponding TOC link
+                        const tocLink = document.querySelector(`.toc-sidebar a[href="${targetId}"]`);
+                        if (tocLink) {
+                            tocLinks.forEach(l => l.classList.remove('active'));
+                            tocLink.classList.add('active');
+                            
+                            // Expand parent if in collapsed menu
+                            let parent = tocLink.closest('li.has-submenu');
+                            while (parent) {
+                                parent.classList.remove('collapsed');
+                                parent = parent.parentElement.closest('li.has-submenu');
+                            }
                         }
                     }
                 });
             });
             
-            // More accurate detection of elements in viewport
+            // Handle initial page load and restore state if available
+            function initializePage() {
+                let savedState = localStorage.getItem('mach1DocState');
+                let hasHash = window.location.hash;
+                
+                // If there's a hash in the URL, prioritize that over saved state
+                if (hasHash) {
+                    const targetId = window.location.hash;
+                    const targetElement = document.querySelector(targetId);
+                    
+                    if (targetElement) {
+                        setTimeout(() => {
+                            // Find parent content
+                            let contentId = null;
+                            const parentSection = targetElement.closest('.product-content');
+                            if (parentSection && parentSection.id) {
+                                contentId = parentSection.id.replace('-content', '');
+                                
+                                // Show the corresponding product content
+                                contentSections.forEach(section => {
+                                    section.classList.remove('active');
+                                });
+                                
+                                if (parentSection) {
+                                    parentSection.classList.add('active');
+                                }
+                                
+                                // Update main navigation
+                                navLinks.forEach(navLink => {
+                                    navLink.classList.remove('active');
+                                    if (navLink.getAttribute('href') === '#' + contentId) {
+                                        navLink.classList.add('active');
+                                    }
+                                });
+                            }
+                            
+                            // Calculate offset with minimal padding
+                            const headerHeight = 60; // Estimated header height
+                            const offset = targetElement.offsetTop - headerHeight;
+                            
+                            window.scrollTo({
+                                top: offset,
+                                behavior: 'smooth'
+                            });
+                            
+                            // Find and activate the correct TOC link
+                            const tocLink = document.querySelector(`.toc-sidebar a[href="${targetId}"]`);
+                            if (tocLink) {
+                                tocLinks.forEach(l => l.classList.remove('active'));
+                                tocLink.classList.add('active');
+                                
+                                // Expand parent accordions
+                                let parent = tocLink.closest('li.has-submenu');
+                                while (parent) {
+                                    parent.classList.remove('collapsed');
+                                    parent = parent.parentElement.closest('li.has-submenu');
+                                }
+                            }
+                        }, 300);
+                    }
+                }
+                // If no hash but we have saved state, restore it
+                else if (savedState) {
+                    try {
+                        savedState = JSON.parse(savedState);
+                        
+                        if (savedState.contentId) {
+                            // Show the corresponding content section
+                            contentSections.forEach(section => {
+                                section.classList.remove('active');
+                            });
+                            
+                            const contentSection = document.getElementById(savedState.contentId + '-content');
+                            if (contentSection) {
+                                contentSection.classList.add('active');
+                                
+                                // Update main navigation
+                                navLinks.forEach(navLink => {
+                                    navLink.classList.remove('active');
+                                    if (navLink.getAttribute('href') === '#' + savedState.contentId) {
+                                        navLink.classList.add('active');
+                                    }
+                                });
+                                
+                                // Expand the corresponding TOC section
+                                const sectionLink = document.querySelector(`#sidebar .has-submenu > a[href="#${savedState.contentId}"]`);
+                                if (sectionLink) {
+                                    // Collapse all TOC sections first
+                                    document.querySelectorAll('#sidebar .has-submenu').forEach(item => {
+                                        item.classList.add('collapsed');
+                                    });
+                                    
+                                    // Expand the selected section
+                                    const parentLi = sectionLink.closest('.has-submenu');
+                                    if (parentLi) {
+                                        parentLi.classList.remove('collapsed');
+                                    }
+                                }
+                                
+                                // If we have a specific target ID, scroll to it
+                                if (savedState.targetId) {
+                                    const targetElement = document.querySelector(savedState.targetId);
+                                    if (targetElement) {
+                                        setTimeout(() => {
+                                            const headerHeight = 60;
+                                            const offset = targetElement.offsetTop - headerHeight;
+                                            
+                                            window.scrollTo({
+                                                top: offset,
+                                                behavior: 'auto'
+                                            });
+                                            
+                                            // Find and activate the correct TOC link
+                                            const tocLink = document.querySelector(`.toc-sidebar a[href="${savedState.targetId}"]`);
+                                            if (tocLink) {
+                                                tocLinks.forEach(l => l.classList.remove('active'));
+                                                tocLink.classList.add('active');
+                                                
+                                                // Expand parent accordions
+                                                let parent = tocLink.closest('li.has-submenu');
+                                                while (parent) {
+                                                    parent.classList.remove('collapsed');
+                                                    parent = parent.parentElement.closest('li.has-submenu');
+                                                }
+                                            }
+                                        }, 100);
+                                    } else {
+                                        // If no specific target element, restore scroll position
+                                        window.scrollTo(0, savedState.scrollPosition || 0);
+                                    }
+                                } else {
+                                    // If no specific target element, restore scroll position
+                                    window.scrollTo(0, savedState.scrollPosition || 0);
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Error restoring saved state:', e);
+                        // Fall back to default page
+                        showDefaultPage();
+                    }
+                }
+                // If no hash and no saved state, show default page
+                else {
+                    showDefaultPage();
+                }
+            }
+            
+            // Function to show the default page (Mach1 Panner)
+            function showDefaultPage() {
+                // Show Panner content
+                contentSections.forEach(section => {
+                    section.classList.remove('active');
+                });
+                
+                const pannerContent = document.getElementById('panner-content');
+                if (pannerContent) {
+                    pannerContent.classList.add('active');
+                }
+                
+                // Activate panner link in main navigation
+                navLinks.forEach(navLink => {
+                    navLink.classList.remove('active');
+                    if (navLink.getAttribute('href') === '#panner') {
+                        navLink.classList.add('active');
+                    }
+                });
+                
+                // Expand the panner section in TOC
+                const pannerLink = document.querySelector('#sidebar .has-submenu > a[href="#panner"]');
+                if (pannerLink) {
+                    // Collapse all TOC sections first
+                    document.querySelectorAll('#sidebar .has-submenu').forEach(item => {
+                        item.classList.add('collapsed');
+                    });
+                    
+                    // Expand the panner section
+                    const parentLi = pannerLink.closest('.has-submenu');
+                    if (parentLi) {
+                        parentLi.classList.remove('collapsed');
+                    }
+                }
+            }
+            
+            // Initialize page
+            initializePage();
+            
+            // Variable to track what link was last clicked
+            let userClickedLink = null;
+            let clickTimestamp = 0;
+            
+            // Helper function to determine if an element is in viewport
             function isElementInViewport(el) {
                 const rect = el.getBoundingClientRect();
                 const windowHeight = window.innerHeight || document.documentElement.clientHeight;
@@ -1988,19 +1898,16 @@
                 // Check if element is entering from top of viewport
                 const isEnteringTop = rect.top >= headerOffset && rect.top <= windowHeight * 0.5;
                 
-                // Check if element takes significant portion of the viewport
-                const isSignificantPortion = visibleHeight > 100 && elementVisibleRatio > 0.3;
-                
                 // Check if element's top is close to the top of the viewport
-                const isNearTop = rect.top >= -150 && rect.top <= windowHeight * 0.3;
+                const isNearTop = rect.top >= -100 && rect.top <= windowHeight * 0.3;
                 
-                return isEnteringTop || isSignificantPortion || isNearTop;
+                return isEnteringTop || elementVisibleRatio > 0.3 || isNearTop;
             }
             
-            // Enhanced section highlighting based on scroll position
-            const highlightCurrentSection = function() {
-                // Skip if a user just clicked a link (within last 3 seconds)
-                if (userClickedLink && (Date.now() - clickTimestamp) < 3000) {
+            // Function to highlight current section based on scroll position
+            function highlightCurrentSection() {
+                // Skip if a user just clicked a link (within last 1 second)
+                if (userClickedLink && (Date.now() - clickTimestamp) < 1000) {
                     return;
                 }
                 
@@ -2008,180 +1915,100 @@
                 const activeProduct = document.querySelector('.product-content.active');
                 if (!activeProduct) return;
                 
-                // Get all main sections and subsections with IDs
-                const mainSections = activeProduct.querySelectorAll('.doc-section');
-                const subSections = activeProduct.querySelectorAll('.doc-subsection[id], h4[id]');
+                // Get all sections with IDs
+                const sections = activeProduct.querySelectorAll('.doc-section[id], .doc-subsection[id], h4[id]');
                 
-                // Check which elements are currently visible
-                let visibleElements = [];
-                
-                // First check subsections (they have priority if visible)
-                subSections.forEach(section => {
+                // Find visible sections
+                let visibleSections = [];
+                sections.forEach(section => {
                     if (isElementInViewport(section)) {
-                        visibleElements.push({
+                        visibleSections.push({
                             id: section.id,
-                            element: section,
-                            top: section.getBoundingClientRect().top,
-                            isSubsection: true
+                            top: section.getBoundingClientRect().top
                         });
                     }
                 });
                 
-                // If no subsections visible, check main sections
-                if (visibleElements.length === 0) {
-                    mainSections.forEach(section => {
-                        if (isElementInViewport(section)) {
-                            visibleElements.push({
-                                id: section.id,
-                                element: section,
-                                top: section.getBoundingClientRect().top,
-                                isSubsection: false
-                            });
-                        }
-                    });
-                }
-                
                 // Sort by position (top to bottom)
-                visibleElements.sort((a, b) => a.top - b.top);
+                visibleSections.sort((a, b) => a.top - b.top);
                 
-                // Find the topmost visible element
-                let currentElementId = null;
-                if (visibleElements.length > 0) {
-                    // Prefer elements at the top of the viewport
-                    for (let i = 0; i < visibleElements.length; i++) {
-                        if (visibleElements[i].top >= -100) { // Just below the top of viewport
-                            currentElementId = visibleElements[i].id;
+                // Find the topmost visible section
+                if (visibleSections.length > 0) {
+                    // Prefer sections at the top of the viewport
+                    let currentSectionId = null;
+                    
+                    for (let i = 0; i < visibleSections.length; i++) {
+                        if (visibleSections[i].top >= -100) { // Just below the top of viewport
+                            currentSectionId = visibleSections[i].id;
                             break;
                         }
                     }
                     
-                    // If no preferred element found, use the first visible one
-                    if (!currentElementId && visibleElements.length > 0) {
-                        currentElementId = visibleElements[0].id;
+                    // If no preferred section found, use the first visible one
+                    if (!currentSectionId && visibleSections.length > 0) {
+                        currentSectionId = visibleSections[0].id;
                     }
-                }
-                
-                if (currentElementId) {
-                    // Remove active class from all TOC links
-                    tocLinks.forEach(link => {
-                        link.classList.remove('active');
-                    });
                     
-                    // Add active class to the TOC link for the current element
-                    const activeTocLink = document.querySelector(`#sidebar a[href="#${currentElementId}"]`);
-                    if (activeTocLink) {
-                        activeTocLink.classList.add('active');
-                        
-                        // Expand accordion for the active link
-                        expandActiveAccordion();
-                    }
-                }
-            };
-            
-            // Throttle the scroll event to improve performance
-            let scrollTimer;
-            window.addEventListener('scroll', function() {
-                clearTimeout(scrollTimer);
-                scrollTimer = setTimeout(highlightCurrentSection, 50); // Reduced from 100ms to 50ms for faster response
-            });
-            
-            // Also trigger highlight on window resize as this can change what's in viewport
-            window.addEventListener('resize', function() {
-                clearTimeout(scrollTimer);
-                scrollTimer = setTimeout(highlightCurrentSection, 100);
-            });
-            
-            // Function to expand parent accordions of an active link
-            const expandActiveAccordion = function() {
-                const activeLink = document.querySelector('#sidebar a.active');
-                if (!activeLink) return;
-                
-                // Find all parent accordions and expand them
-                let parent = activeLink.closest('li.has-submenu');
-                while (parent) {
-                    parent.classList.remove('collapsed');
-                    parent = parent.parentElement.closest('li.has-submenu');
-                }
-                
-                // Determine which main section this belongs to
-                const productId = getProductIdFromLink(activeLink);
-                if (productId) {
-                    // Make that product content active if it's not already
-                    const activeProduct = document.querySelector('.product-content.active');
-                    const targetProduct = document.getElementById(productId + '-content');
-                    
-                    if (activeProduct !== targetProduct && targetProduct) {
-                        document.querySelectorAll('.product-content').forEach(content => {
-                            content.classList.remove('active');
-                        });
-                        targetProduct.classList.add('active');
-                        
-                        // Also update the main navigation
-                        navLinks.forEach(link => {
-                            link.classList.remove('active');
-                            if (link.getAttribute('href') === '#' + productId) {
-                                link.classList.add('active');
-                            }
-                        });
-                    }
-                }
-            };
-            
-            // Helper function to get product ID from a TOC link
-            function getProductIdFromLink(link) {
-                // Look at parent .has-submenu elements to find the top-level one
-                let topParent = link.closest('li.has-submenu');
-                
-                while (topParent && topParent.parentElement && 
-                       topParent.parentElement.closest('li.has-submenu')) {
-                    topParent = topParent.parentElement.closest('li.has-submenu');
-                }
-                
-                if (topParent) {
-                    const topLink = topParent.querySelector(':scope > a');
-                    if (topLink) {
-                        const href = topLink.getAttribute('href');
-                        if (href && href.startsWith('#')) {
-                            return href.substring(1);
+                    if (currentSectionId) {
+                        // Find parent content for saving state
+                        let contentId = null;
+                        const activeContent = document.querySelector('.product-content.active');
+                        if (activeContent && activeContent.id) {
+                            contentId = activeContent.id.replace('-content', '');
                         }
-                    }
-                }
-                
-                return null;
-            }
-            
-            // Initial highlighting on page load
-            highlightCurrentSection();
-            
-            // Expand accordion sections for the active link
-            expandActiveAccordion();
-            
-            // Handle hash navigation on page load
-            if (window.location.hash) {
-                const targetId = window.location.hash;
-                const targetElement = document.querySelector(targetId);
-                
-                if (targetElement) {
-                    // Wait a short time to ensure page layout is complete
-                    setTimeout(() => {
-                        const offset = targetElement.getBoundingClientRect().top + window.pageYOffset - 60;
-                        window.scrollTo({
-                            top: offset,
-                            behavior: 'smooth'
-                        });
                         
-                        // Find and highlight the correct TOC link
-                        const tocLink = document.querySelector(`.toc-sidebar a[href="${targetId}"]`);
-                        if (tocLink) {
+                        // Save current section to localStorage while scrolling
+                        saveCurrentState(contentId, '#' + currentSectionId);
+                        
+                        // Find the TOC link for the current section
+                        const activeTocLink = document.querySelector(`#sidebar a[href="#${currentSectionId}"]`);
+                        if (activeTocLink) {
+                            // Update active states
                             tocLinks.forEach(l => l.classList.remove('active'));
-                            tocLink.classList.add('active');
+                            activeTocLink.classList.add('active');
                             
-                            // Expand parent accordions
-                            expandActiveAccordion();
+                            // Expand parent sections
+                            let parent = activeTocLink.closest('li.has-submenu');
+                            while (parent) {
+                                parent.classList.remove('collapsed');
+                                parent = parent.parentElement.closest('li.has-submenu');
+                            }
                         }
-                    }, 300);
+                    }
                 }
             }
+            
+            // Track when user clicks a link for smoother scrolling experience
+            tocLinks.forEach(link => {
+                link.addEventListener('click', function() {
+                    userClickedLink = this;
+                    clickTimestamp = Date.now();
+                });
+            });
+            
+            // Throttle scroll events for better performance
+            let scrollTimeout;
+            window.addEventListener('scroll', function() {
+                clearTimeout(scrollTimeout);
+                scrollTimeout = setTimeout(highlightCurrentSection, 100);
+            });
+            
+            // Call highlighting on initial load
+            setTimeout(highlightCurrentSection, 500);
+            
+            // Save state before unloading the page
+            window.addEventListener('beforeunload', function() {
+                // Get current content section
+                const activeContent = document.querySelector('.product-content.active');
+                if (activeContent && activeContent.id) {
+                    const contentId = activeContent.id.replace('-content', '');
+                    // Get current active section
+                    const activeLink = document.querySelector('.toc-sidebar a.active');
+                    const targetId = activeLink ? activeLink.getAttribute('href') : null;
+                    // Save current state
+                    saveCurrentState(contentId, targetId);
+                }
+            });
         });
     </script>
 </body>
