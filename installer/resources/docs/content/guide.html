@@ -1,0 +1,201 @@
+<h2>User Guide</h2>
+
+<div id="guide-multichannel" class="doc-section">
+    <h3>Mach1 Spatial Multichannel Layouts</h3>
+    
+    <div id="guide-format-description" class="doc-subsection">
+        <h4>Format Description & User Story</h4>
+        <p>These layouts have been developed to preserve stereophony and allow audio professionals to mix in a spatial format that continues all mixing knowledge known for traditional stereo & surround audio mixing. Several notable features of these formats include that there is no active processing during playback for users. This allows studio environments to monitor the mix without needing to compensate for any additional possible active filters, room modeling or reverb processes added to the mix without the audio engineer able to have too much control—this is not the case with Mach1 Spatial. This also means that on the integration side of the Mach1 Spatial APIs are extremely lightweight for developers to integrate as seen fit (based on a few rough guidelines) streamlining the mixing and delivering pipeline. Lastly this means that the audio engineer is responsible for what 'spatial audio' means in their mix and has full creative control to try to make something realistic or define new rules of 'spatial audio' or even provide both in the same mix.</p>
+        
+        <p>This approach is a virtual algorithmic version of Vector Base Panning (VVBP). Contrary to object orientated audio or ambisonics designed to simulate soundfield reconstruction—VVBP is designed to correctly distribute audio and take full advantage of the creation of phantom sound sources around the listener, the problem is until now this approach is only successful with an array of loudspeakers recreating physical sound. The Mach1 Spatial virtual Vector Base Panning (VVBP) allows user to pan directly to their spatial mix and not require the user to recreate an approximation of the spatial audio field during playback, all correctly down-mixed to stereo for ideal playback scenarios.</p>
+    </div>
+
+    <div id="guide-spatial" class="doc-subsection">
+        <h4>Mach1 Spatial</h4>
+        <p>The M1 Spatial format is designed to allow stereoscopic mixes to incorporate 3 degrees of freedom for target users. The mix correctly allows for yaw, pitch and roll movements toward the down-mixed stereo algorithm.</p>
+    </div>
+
+    <div id="guide-deliverable" class="doc-subsection">
+        <h4>Multichannel Deliverable</h4>
+        <p>A single multichannel file of 4, 8, 12 or 14 channels are run through the Mach1Decode API during playback to create the exact stereo image via traditional Vector Based Panning math. Prepare your multichannel mix and an additional optional head-locked stereo mix for distribution or layback to a target video via the M1-Transcoder application.</p>
+    </div>
+</div>
+
+<div id="guide-tools" class="doc-section">
+    <h3>Mach1 Spatial System Tools</h3>
+    
+    <div id="guide-general-params" class="doc-subsection">
+        <h4>General Parameters</h4>
+        <p>The Mach1 Spatial System allow automatic communication between all plugins and standalone applications. This is done via a background service "M1-System-Helper" which sets up temporary and lightweight network between all the plugins and apps during runtime. The following ports are used behind the scenes on launch of plugins and standalone applications:</p>
+        
+        <div class="parameter">
+            <div class="parameter-title">System Ports</div>
+            <div class="parameter-description">
+                Port: 9001-9004 : 9100 : 10000-11000 : 12345<br>
+                Ports are searched and configured on launch for these ranges on the localhost of the user's computer.
+            </div>
+        </div>
+    </div>
+
+    <div id="guide-panner" class="doc-subsection">
+        <h4>Mach1 Panner (M1-Panner)</h4>
+        <p>The M1-Panner is designed off of the UI of many common surround panners and is based off of a system of divergence instead of actual 3D space representation. The M1-Panner's main UI window is a top down view of the mixing environment. The concentric circles around the center give the user references to different divergence amounts. It is safe to assume that the middle circle represents the estimated divergence of the common ambisonic encoding, while pushing beyond the second concentric circle allows the user to pan sounds to isolated positions in the mix (allowing infinite creative abilities still contained in a single spatial audio mix). It is still recommended to automate your volume outside of the M1-Panner plugin to simulate distance and attenuation. The M1-Panner has a UI slider for altitude or vertical panning of that track as well.</p>
+        
+        <p>The M1-Panner changes when it is placed on a Mono, Stereo or Multichannel track (Stereo and multichannel modes still in development). When in a multichannel mode the M1-Panner operates with the same automation as the Mono mode however it introduces new functions to rotate and spread the stereo emitters further or closer to center.</p>
+        
+        <p>Click on the Overlay button to activate 2D to 3D panning window that snaps to Pro Tools native video player and translates your 2D mouse movements into 3D orientation movements. There is also the gain slider that is set to +6db default to compensate for pan law in this format.</p>
+    </div>
+
+    <div id="guide-monitor" class="doc-subsection">
+        <h4>Mach1 Monitor (M1-Monitor)</h4>
+        <p>The M1-Monitor adds a monitoring stage using our decoding math shared in the SDK so the user or audio engineer is able to monitor and hear their spatial audio mix during postproduction and mixing process. The M1-Monitor contains sliders for Yaw, Pitch and Roll for mouse referencing user orientation during the mix process.</p>
+        
+        <p>The M1-Monitor automatically connects with the M1-Player to receive input orientation from the M1-Player's mouse controlled orientation. Both the M1-Monitor and the M1-Player simultaneously receive orientation from any 3rd party IMU or head tracking solution supported by the background service "M1-OrientationManager". The M1-Monitor also sends transport location automatically to the M1-Player.</p>
+    </div>
+
+    <div id="guide-transcoder" class="doc-subsection">
+        <h4>Mach1 Transcoder (M1-Transcoder)</h4>
+        <p>This standalone application is used to safely apply/encode the user's audio mix to their video content inside of the video container. The Transcoder renders the final video needed for delivery on available platforms/apps as well as downmix the spatial audio as closely as possible to ambisonics for other deliverables.</p>
+    </div>
+
+    <div id="guide-player" class="doc-subsection">
+        <h4>Mach1 Player (M1-Player)</h4>
+        <p>The M1-Player allows users to simulate orientation angles in additionally beyond the Monitor. Once launched the M1-Player links to the Monitor and controls the Monitor's orientation without Keyboard Focus. Simply drag a video into the M1-Player after launch to have it load a 360 video.</p>
+        
+        <div class="parameter">
+            <div class="parameter-title">Hotkey Options</div>
+            <div class="parameter-description">
+                <ul>
+                    <li>'Z' – Switches between flatmode and spherical 360 mode</li>
+                    <li>'O' – Turns on reference angle overlay image onto the video</li>
+                    <li>'D' – Switches between Stereoscopic and Monoscopic videos</li>
+                    <li>'H' – Hold this key to view M1-Player statistics</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="guide-deployment" class="doc-section">
+    <h3>Game Engine Deployment</h3>
+    <p>The following section is to detail on current spatial audio implementation. It goes over installation into standard projects, general use and deployment and the current features available for implementation.</p>
+    
+    <div class="note">
+        <strong>More Information:</strong> Can be found on the <a href="https://www.youtube.com/c/Mach1Spatial" target="_blank">Mach1 Spatial Youtube Channel</a>
+    </div>
+
+    <div id="guide-unreal" class="doc-subsection">
+        <h4>Unreal Engine</h4>
+        <h5>Mach1 Spatial Unreal Engine Plugin</h5>
+        <p>Mach1 Spatial Plugin installs classes that can be used in Unreal Engine's Editor for deploying different forms of Mach1 Spatial Audio Formats. The classes call the Mach1Decode library for each target platform/device with the following features:</p>
+        
+        <div class="parameter">
+            <div class="parameter-title">Features</div>
+            <div class="parameter-description">
+                <ul>
+                    <li><strong>SourcePoint (Default Rotator):</strong> Allows the deployed audio/mix to rotate to a specific point in relation to the user's position/orientation. This gives positional abilities to the audio without changing anything in the deployed audio/mix.</li>
+                    <li><strong>Custom Attenuation Curves:</strong> When active the user is able to place an attenuation curve to the Actor that is relative to the users position for simulating any possible distance falloff for the deployed audio/mix desired. Use in groups to create crossfade scenarios with complete control.</li>
+                    <li><strong>SourcePoint Closest Point (Rotator Plane):</strong> When active this assigns the SourcePoint feature to a plane/wall and calculates the users closest point to that plane/wall to be used as the SourcePoint location per update/tick.</li>
+                    <li><strong>Check Yaw/Pitch:</strong> Allows the user to ignore certain orientation inputs to that deployed audio/mix.</li>
+                    <li><strong>Fade Settings:</strong> These actors have incorporated fade settings making it a clean addition to add Fade In or Fade Out settings when needed.</li>
+                    <li><strong>Custom Node Activation & Node Settings:</strong> These classes/actors can be control with Blueprint Nodes however your project may need.</li>
+                    <li><strong>Zone Interruption (Mute Inside/Outside):</strong> If the camera enters inside one of the SpatialSound's objects reference Spatial it will turn output volume to 0 for that object.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div id="guide-unity" class="doc-subsection">
+        <h4>Unity</h4>
+        <h5>Mach1 Spatial Unity Package</h5>
+        <p>Leverages Unity scripts to call functions from Mach1Decode library per target platform with the following features:</p>
+        
+        <div class="parameter">
+            <div class="parameter-title">Features</div>
+            <div class="parameter-description">
+                <ul>
+                    <li><strong>SourcePoint (Default Rotator):</strong> Allows the deployed audio/mix to rotate to a specific point in relation to the user's position/orientation.</li>
+                    <li><strong>Custom Attenuation Curves:</strong> When active the user is able to place an attenuation curve to the object that is relative to the users position.</li>
+                    <li><strong>SourcePoint Closest Point (Rotator Plane):</strong> Assigns the SourcePoint feature to a plane/wall and calculates the users closest point.</li>
+                    <li><strong>Check Yaw/Pitch/Roll:</strong> Allows the user to ignore certain orientation inputs to that deployed audio/mix.</li>
+                    <li><strong>Zone Interruption (Mute Inside/Outside):</strong> Controls output volume based on camera position relative to SpatialSound objects.</li>
+                    <li><strong>Custom Loading:</strong> Control when to asynchronously load Mach1 audio/mixes or whether to just load on start.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div id="guide-wwise" class="doc-subsection">
+        <h4>Wwise</h4>
+        <p>Currently in development.</p>
+    </div>
+</div>
+
+<div id="guide-sdk" class="doc-section">
+    <h3>M1 Spatial SDK Integration</h3>
+    <p>Please contact info@mach1.tech if you are interested in importing the Mach1Decode API or Mach1Transcode API to your app to allow support for playing back Mach1 Spatial mixes as well as transcode and convert all spatial/surround audio formats from/to each other.</p>
+    
+    <div class="note">
+        More information about the APIs can be found in our <a href="https://dev.mach1.tech" target="_blank">Developer Documentation</a>
+    </div>
+</div>
+
+<div id="guide-hacker" class="doc-section">
+    <h3>Mach1 Spatial System Hacker Help</h3>
+    <p>As multichannel and spatial audio mixing becomes more needed, we want to enable content creators to be able to control our plugins with any device they create or any new device to market to suit their workflow and pipeline needs.</p>
+    
+    <div id="guide-udp" class="doc-subsection">
+        <h4>UDP/OSC Ports</h4>
+        <p>Control M1-Monitor or M1-Player by sending orientation data via OSCMessages or just raw UDP formatted as:</p>
+        <div class="parameter">
+            <div class="parameter-title">Format</div>
+            <div class="parameter-description">String (address), Float (yaw), Float (pitch), Float (roll)</div>
+        </div>
+        
+        <div class="note">
+            Remember to not open the device/app that would normally use this port or you will have a port conflict and see no data transmission.
+        </div>
+        
+        <div class="parameter">
+            <div class="parameter-title">Port Assignments</div>
+            <div class="parameter-description">
+                <ul>
+                    <li>9899: BoseAR Devices sending orientation data to M1-Monitor</li>
+                    <li>9901: M1-MNTRCTRL iOS App sending orientation data to M1-Player</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div id="guide-orientation" class="doc-subsection">
+        <h4>Orientation OSC Data</h4>
+        <p>For custom orientation transmission we expect the following Euler YPR angles with the address /orientation</p>
+        
+        <div class="parameter">
+            <div class="parameter-title">Angle Ranges</div>
+            <div class="parameter-description">
+                <ul>
+                    <li>float [0] = Yaw | 0.0 -> 360.0 | left->right ++</li>
+                    <li>float [1] = Pitch | -90.0 -> 90.0 | down->up ++</li>
+                    <li>float [2] = Roll | -90.0 -> 90.0 | left-ear-down->right-ear-down ++</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div id="guide-other-ports" class="doc-subsection">
+        <h4>Other UDP/OSC Ports</h4>
+        <div class="parameter">
+            <div class="parameter-title">Port Ranges</div>
+            <div class="parameter-description">
+                <ul>
+                    <li>10001->10200: M1-Panner instances connecting to m1-system-helper</li>
+                    <li>10201->10300: M1-Monitor instances connecting to m1-system-helper</li>
+                    <li>10301->10300: M1-Player instances connecting to m1-system-helper</li>
+                </ul>
+            </div>
+        </div>
+        
+        <p>Ports are searched and configured on launch for these ranges on localhost of the user's computer and establish working on connections using unused ports within range.</p>
+    </div>
+</div> 

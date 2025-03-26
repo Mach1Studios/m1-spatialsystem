@@ -1,0 +1,124 @@
+<h2>Mach1 Monitor</h2>
+<p>The Mach1 Monitor is a powerful tool designed for monitoring spatial audio content. It provides an intuitive interface for monitoring and validating spatial audio mixes created with the Mach1 Spatial System.</p>
+
+<div style="display: flex; align-items: flex-start; gap: 20px; margin: 20px 0;">
+    <div style="position: relative; flex: 0 0 600px;">
+        <img src="./monitor-images/m1-monitor.jpg" alt="Mach1 Monitor Interface" style="width: 100%; height: auto;">
+        <a href="#general-parameters" class="tooltip-area" 
+             style="position: absolute; left: 5%; top: 2%; width: 90%; height: 45%;" 
+             data-tooltip="Yaw dial, Pitch and Roll controls for orientation.">
+        </a>
+        <a href="#settings" class="tooltip-area" 
+             style="position: absolute; left: 1%; top: 51%; width: 98%; height: 30%;" 
+             data-tooltip="Settings dropdown to change timecode offset, monitor modes and devices.">
+        </a>
+        <div class="tooltip-area" 
+             style="position: absolute; left: 47%; top: 93%; width: 27%; height: 6%;" 
+             data-tooltip="Decode selection Mach1-Spatial 8 or 4">
+        </div>
+    </div>
+    <div style="
+        flex: 0 0 200px;
+        background-color: var(--dark-bg-lightest);
+        border: 1px solid var(--accent-color);
+        border-radius: 4px;
+        padding: 15px;
+        font-size: 0.9rem;
+        align-self: center;
+    ">
+        <div style="display: flex; align-items: center; margin-bottom: 10px; color: var(--accent-color);">
+            <i class="fas fa-lightbulb" style="margin-right: 8px;"></i>
+            <strong>Interactive Guide</strong>
+        </div>
+        <p style="margin: 0; line-height: 1.5;">
+            Hover over different parts of the interface to learn more.
+            <br><br>
+            Areas with a pointing hand cursor (<span style="font-size: 1.1em;">👆</span>) can be clicked to navigate to their documentation.
+        </p>
+    </div>
+</div>
+
+<!-- Description Section -->
+<div id="description" class="doc-section">
+    <h3>Description & User Story</h3>
+    <h4 id="spatial-format">Mach1 Spatial Format Explained</h4>
+    <p>Mach1 Spatial is a VVBP (Virtual Vector Based Panning) or SPS spatial audio format that encourages users to have complete freedom with their post production mixing process by not forcing the user to use any sonic signal altering processing. The user is free to apply their own DSP/ASP to their audio during the mixing process to avoid proprietary DSP algorithms for spatial audio seen in other formats or tools. With this in mind the user is completely in control of their creative mix process and can make any decision they want whether it results in realistic spatial fields or more creative spatial sound fields.</p>
+    
+    <h4 id="decoding">Decoding Explained</h4>
+    <p>The Mach1 Monitor allows users to preview and monitor the mix as though you were head tracking in your target device/app/project. The audio outputting from the channel containing Mach1 Monitor is not intended for exporting (unless using the <strong>StereoSafe mode</strong>) and is only intended for aiding in the process of mixing and mastering your spatial audio mix. This process takes the multichannel of Mach1 Spatial and down mixes them with our Mach1 Spatial VVBP algorithm to output the correct stereo image based on your simulated orientation angles (Yaw, Pitch, Roll).</p>
+    
+    <div class="image-container">
+        <img src="./monitor-images/Monitor.png" alt="Mach1 Monitor Interface">
+        <p class="image-caption">Mach1 Monitor Interface</p>
+    </div>
+</div>
+
+<!-- Headlocked Section -->
+<div id="headlocked" class="doc-section">
+    <h3>Headlocked/Static Stereo</h3>
+    <p>Stereo audio that is intended to be headlocked or static (example: music mix) should not be processed by the Mach1 Monitor and instead should be in a buss/track that sums with the output of Mach1 Monitor for the correct mixing reference.</p>
+    
+    <div class="note">
+        <strong>Note:</strong> This is an important consideration when working with mixed spatial and traditional stereo content in your project.
+    </div>
+</div>
+
+<!-- Plugin Features Section -->
+<div id="plugin-features" class="doc-section">
+    <h3>Plugin Features</h3>
+    <p>The following explains all the current possible encoding modes of the Mach1 Monitor in your common DAW/Editor.</p>
+    
+    <h4 id="general-parameters">General Parameters</h4>
+    
+    <div class="parameter">
+        <div class="parameter-title">Yaw</div>
+        <div class="parameter-range">Range: 0 → 360 (clockwise)</div>
+        <div class="parameter-description">Allows users to simulate head-tracking on the yaw axis (rotating head horizontally)</div>
+    </div>
+    
+    <div class="parameter">
+        <div class="parameter-title">Pitch</div>
+        <div class="parameter-range">Range: -90 → 90 (bottom to top)</div>
+        <div class="parameter-description">Allows users to simulate head-tracking on the pitch axis (nodding head up/down)</div>
+    </div>
+    
+    <div class="parameter">
+        <div class="parameter-title">Roll</div>
+        <div class="parameter-range">Range: -90 → 90 (top of head to left → top of head to right)</div>
+        <div class="parameter-description">Allows users to simulate head-tracking on the roll axis (tilting head toward a shoulder)</div>
+    </div>
+    
+    <div id="settings" class="doc-subsection">
+        <h4>Settings</h4>
+        <p>When activated allows access to more advanced features during the Mach1 Spatial mixing process, de-activate to shrink UI window size when not needed</p>
+    </div>
+    
+    <div id="monitor-modes" class="doc-subsection">
+        <h4>Monitor Modes</h4>
+        <p>Allows different decoding modes, these modes will be described on the next page</p>
+        
+        <ul>
+            <li><strong>Mach1 Spatial Mode:</strong> The default mode for full Mach1Spatial mixing support and full Yaw/Pitch/Roll controls of the M1-Monitor.</li>
+            <li><strong>StereoSafe Mode:</strong> When this mode is enabled all Panner's process audio with Mono output so that the user can quickly export a stereo version that is spatially safe in all directions for 360 audio/video players that do not support spatial audio yet. The Diverge values during the mix are instead used to correct the gain ratio between all spatial components so that the mix is roughly retained to avoid full re-mix scenarios.</li>
+            <li><strong>Front/Back FoldDown:</strong> When enabled this mode sums channels Front/Back/Top/Bottom left channels together and Front/Back/Top/Bottom right channels together to allow the user to quickly reference any front to rear differences during the mix.</li>
+        </ul>
+    </div>
+    
+    <div id="timecode-offset" class="doc-subsection">
+        <h4>Timecode Offset</h4>
+        <p>Allows the user to add offset to the Mach1 Player (M1-Player) to correctly align the video on our video player to match the video's sequence start time on your DAW</p>
+    </div>
+</div>
+
+<!-- Upcoming Features Section -->
+<div id="upcoming-features" class="doc-section">
+    <h3>Upcoming Features</h3>
+    <ul>
+        <li>Additional device support for orientation data</li>
+        <li>Enhanced decoding modes</li>
+        <li>Integration with more DAWs</li>
+    </ul>
+    
+    <a href="#" class="btn btn-primary">Request Feature</a>
+    <a href="#" class="btn">Report Issue</a>
+</div> 
