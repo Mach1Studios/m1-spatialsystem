@@ -538,7 +538,7 @@ body {
 }
 
 /* Mobile adjustments */
-@media (max-width: 992px) {
+@media (max-width: 768px) {
     .container {
         flex-direction: column;
     }
@@ -554,6 +554,7 @@ body {
     
     .main-content {
         margin-left: 0;
+        padding: 20px;
     }
     
     .product-list {
@@ -579,4 +580,74 @@ body {
         background-color: var(--accent-color);
         color: var(--dark-bg);
     }
+    
+    /* Improve mobile image display */
+    .image-container img {
+        max-width: 100%;
+        height: auto;
+    }
+    
+    /* Make parameters more readable on small screens */
+    .parameter {
+        padding: 10px;
+    }
+    
+    /* Adjust format list grid for mobile */
+    .format-list {
+        grid-template-columns: 1fr;
+    }
+    
+    /* Adjust flexible containers for mobile */
+    [style*="display: flex"] {
+        flex-direction: column;
+    }
+    
+    [style*="flex: 0 0"] {
+        flex: 1 0 auto !important;
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+}
+
+/* Subheadings for sections */
+.subheading {
+    color: var(--accent-color);
+    font-weight: 600;
+    font-size: 1.05rem;
+    margin: 20px 0 10px 0;
+    padding-bottom: 5px;
+    border-bottom: 1px solid rgba(255, 193, 7, 0.3);
+    display: flex;
+    align-items: center;
+}
+
+.subheading::before {
+    content: '\f054';
+    font-family: 'Font Awesome 5 Free';
+    font-weight: 900;
+    font-size: 0.8rem;
+    margin-right: 8px;
+    color: var(--accent-color);
+}
+
+/* Format list styling */
+.format-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 8px 20px;
+    margin: 15px 0;
+    list-style-position: inside;
+}
+
+.format-list li {
+    padding: 5px 0;
+    border-bottom: 1px dotted var(--border-color);
+}
+
+.format-list li::before {
+    content: '\f1c7';
+    font-family: 'Font Awesome 5 Free';
+    font-weight: 400;
+    margin-right: 8px;
+    color: var(--mach1-yellow-light);
 } 
