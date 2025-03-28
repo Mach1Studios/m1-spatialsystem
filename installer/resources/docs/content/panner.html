@@ -1,62 +1,161 @@
 <h2>Mach1 Panner</h2>
-<p>The Mach1 Panner is a spatial audio authoring tool that allows you to position audio sources in a three-dimensional space.</p>
 
-<div style="display: flex; align-items: flex-start; gap: 20px; margin: 20px 0;">
-    <div style="position: relative; flex: 0 0 600px;">
-        <img src="./panner-images/m1-panner.jpg" alt="Mach1 Panner Interface" style="width: 100%; height: auto;">
-        <a href="#panner-general-params" class="tooltip-area" 
-             style="position: absolute; left: 2%; top: 63%; width: 70%; height: 15%;" 
-             data-tooltip="Control panel: X, Y, Z, Diverge, and Rotation parameters">
-        </a>
-        <div class="tooltip-area" 
-             style="position: absolute; left: 75%; top: 7%; width: 23%; height: 54%;" 
-             data-tooltip="Gain Monitors: Visual feedback for input levels">
+<div id="panner-interface" class="doc-section">
+    <h3>Interface</h3>
+    <div style="display: flex; align-items: flex-start; gap: 20px; margin: 20px 0;">
+        <div style="position: relative; flex: 0 0 600px;">
+            <img src="./panner-images/m1-panner.jpg" alt="Mach1 Panner Interface" style="width: 100%; height: auto;">
+            <!-- Main panning area -->
+            <a href="#panner-parameters" class="tooltip-area" 
+                style="position: absolute; left: 2%; top: 2%; width: 59%; height: 55%;" 
+                data-tooltip="Main panning area with position indicator">
+            </a>
+            
+            <!-- Level meters -->
+            <a href="#panner-parameters" class="tooltip-area" 
+                style="position: absolute; left: 75%; top: 7%; width: 23%; height: 52%;" 
+                data-tooltip="Level meters for monitoring output channels">
+            </a>
+            
+            <!-- X/Y controls -->
+            <a href="#panner-general-params" class="tooltip-area" 
+                style="position: absolute; left: 2%; top: 60%; width: 23%; height: 18%;" 
+                data-tooltip="X/Y position controls">
+            </a>
+            
+            <!-- Azimuth control -->
+            <a href="#panner-general-params" class="tooltip-area" 
+                style="position: absolute; left: 25.5%; top: 60%; width: 12%; height: 18%;" 
+                data-tooltip="Azimuth (rotation) control">
+            </a>
+            
+            <!-- Diverge control -->
+            <a href="#panner-general-params" class="tooltip-area" 
+                style="position: absolute; left: 38%; top: 60%; width: 12%; height: 18%;" 
+                data-tooltip="Diverge control">
+            </a>
+            
+            <!-- Gain control -->
+            <a href="#panner-general-params" class="tooltip-area" 
+                style="position: absolute; left: 50%; top: 60%; width: 12%; height: 18%;" 
+                data-tooltip="Gain control">
+            </a>
+            
+            <!-- Gain indicator -->
+            <a href="#panner-general-params" class="tooltip-area" 
+                style="position: absolute; left: 58%; top: 67%; width: 4%; height: 6%;" 
+                data-tooltip="Gain level indicator">
+            </a>
+            
+            <!-- Z/Altitude control -->
+            <a href="#panner-general-params" class="tooltip-area" 
+                style="position: absolute; left: 63%; top: 2%; width: 11%; height: 75%;" 
+                data-tooltip="Z axis (altitude) control">
+            </a>
+            
+            <!-- Overlay checkbox -->
+            <a href="#panner-parameters" class="tooltip-area" 
+                style="position: absolute; left: 75%; top: 61%; width: 21%; height: 4%;" 
+                data-tooltip="Overlay mode: Enable 3D panning overlay">
+            </a>
+            
+            <!-- Isotropic checkbox -->
+            <a href="#panner-parameters" class="tooltip-area" 
+                style="position: absolute; left: 75%; top: 64.5%; width: 21%; height: 4%;" 
+                data-tooltip="Isotropic mode: Equal energy distribution">
+            </a>
+            
+            <!-- Equal Power checkbox -->
+            <a href="#panner-parameters" class="tooltip-area" 
+                style="position: absolute; left: 75%; top: 68.5%; width: 21%; height: 4%;" 
+                data-tooltip="Equal Pwower mode: Maintain consistent power">
+            </a>
+            
+            <!-- Auto Gain checkbox -->
+            <a href="#panner-parameters" class="tooltip-area" 
+                style="position: absolute; left: 75%; top: 72%; width: 21%; height: 4%;" 
+                data-tooltip="Auto Gain: Automatically adjust gain">
+            </a>
+            
+            <!-- Auto orbit -->
+            <a href="#panner-parameters" class="tooltip-area" 
+                style="position: absolute; left: 75%; top: 78%; width: 21%; height: 4%;" 
+                data-tooltip="Auto orbit function">
+            </a>
+            
+            <!-- Stereo controls - S Rotate -->
+            <a href="#panner-stereo-params" class="tooltip-area" 
+                style="position: absolute; left: 26.5%; top: 78%; width: 10%; height: 15%;" 
+                data-tooltip="Stereo rotation control">
+            </a>
+            
+            <!-- Stereo controls - S Spread -->
+            <a href="#panner-stereo-params" class="tooltip-area" 
+                style="position: absolute; left: 39%; top: 78%; width: 10%; height: 15%;" 
+                data-tooltip="Stereo spread control">
+            </a>
+            
+            <!-- Stereo pan -->
+            <a href="#panner-stereo-params" class="tooltip-area" 
+                style="position: absolute; left: 51%; top: 78%; width: 10%; height: 15%;" 
+                data-tooltip="Stereo pan control">
+            </a>
+            
+            <!-- Input selection -->
+            <a href="#panner-parameters" class="tooltip-area" 
+                style="position: absolute; left: 32%; top: 95%; width: 19%; height: 4%;" 
+                data-tooltip="Input channel configuration">
+            </a>
+            
+            <!-- Output selection -->
+            <a href="#panner-parameters" class="tooltip-area" 
+                style="position: absolute; left: 50%; top: 95%; width: 20%; height: 4%;" 
+                data-tooltip="Output channel configuration">
+            </a>
+            
+            <!-- Lock button -->
+            <a href="#panner-parameters" class="tooltip-area" 
+                style="position: absolute; left: 71%; top: 95%; width: 10%; height: 4%;" 
+                data-tooltip="Lock current settings">
+            </a>
         </div>
-        <div class="tooltip-area" 
-             style="position: absolute; left: 31%; top: 95%; width: 40%; height: 4%;" 
-             data-tooltip="Change input and output modes.">
+        <div style="
+            flex: 0 0 200px;
+            background-color: var(--dark-bg-lightest);
+            border: 1px solid var(--accent-color);
+            border-radius: 4px;
+            padding: 15px;
+            font-size: 0.9rem;
+            align-self: center;
+        ">
+            <div style="display: flex; align-items: center; margin-bottom: 10px; color: var(--accent-color);">
+                <i class="fas fa-lightbulb" style="margin-right: 8px;"></i>
+                <strong>Interactive Guide</strong>
+            </div>
+            <p style="margin: 0; line-height: 1.5;">
+                Hover over different parts of the interface to learn more.
+                <br><br>
+                Areas with a pointing hand cursor (<span style="font-size: 1.1em;">👆</span>) can be clicked to navigate to their documentation.
+            </p>
         </div>
-    </div>
-    <div style="
-        flex: 0 0 200px;
-        background-color: var(--dark-bg-lightest);
-        border: 1px solid var(--accent-color);
-        border-radius: 4px;
-        padding: 15px;
-        font-size: 0.9rem;
-        align-self: center;
-    ">
-        <div style="display: flex; align-items: center; margin-bottom: 10px; color: var(--accent-color);">
-            <i class="fas fa-lightbulb" style="margin-right: 8px;"></i>
-            <strong>Interactive Guide</strong>
-        </div>
-        <p style="margin: 0; line-height: 1.5;">
-            Hover over different parts of the interface to learn more.
-            <br><br>
-            Areas with a pointing hand cursor (<span style="font-size: 1.1em;">👆</span>) can be clicked to navigate to their documentation.
-        </p>
     </div>
 </div>
+
 <!-- Description Section -->
 <div id="panner-description" class="doc-section">
-    <h3>Description & User Story</h3>
+    <h3>Description</h3>
     
-    <h4 id="panner-spatial-format">Mach1 Spatial Format Explained</h4>
-    <p>Mach1 Spatial is a VVBP (Virtual Vector Based Panning) or SPS spatial audio format that encourages users to have complete freedom with their post production mixing process by not forcing the user to use any sonic signal altering processing. The user is free to apply their own DSP/ASP to their audio during the mixing process to avoid proprietary DSP algorithms for spatial audio seen in other formats or tools. With this in mind the user is completely in control of their creative mix process and can make any decision they want whether it results in realistic spatial fields or more creative spatial sound fields.</p>
-    
-    <h4 id="panner-encoding">Encoding Explained</h4>
     <p>The Mach1 Panner allows users to encode input audio tracks/channels in their preferred DAW (Digital Audio Workstation) to the Mach1 Spatial format. The process is a simple signal distribution process with no other DSP related effects, allowing complete 1:1 encoding into our Vector Based Panning format—Mach1 Spatial.</p>
 </div>
 
-<!-- Plugin Features Section -->
-<div id="panner-features" class="doc-section">
-    <h3>Plugin Features</h3>
-    <p>The following explains all the current possible encoding modes of the Mach1 Panner in your common DAW/Editor.</p>
+<!-- Plugin Parameters Section -->
+<div id="panner-parameters" class="doc-section">
+    <h3>Plugin Parameters</h3>
     
     <h4 id="panner-general-params">General Parameters</h4>
     
     <div class="parameter">
-        <div class="parameter-title">Rotation</div>
+        <div class="parameter-title">Azimuth</div>
         <div class="parameter-range">Range: 0 → 180 → -180 → 0 (clockwise)</div>
         <div class="parameter-description">Rotates the input sound source(s) around central listener location. Where 0 is front facing and 180/-180 is rear facing.</div>
     </div>
@@ -118,55 +217,11 @@
         <div class="parameter-title">Stereo Balance [S PAN]</div>
         <div class="parameter-description">Input balance/pan between Left & Right input channels.</div>
     </div>
-    
-    <h4 id="panner-quad-params">Quad Parameters</h4>
-    <p>M1-Panner mode for Quad input channels/tracks of audio (L, R, Ls, Rs)</p>
-    
-    <div class="image-container">
-        <img src="./panner-images/PannerQuadParams.png" alt="Mach1 Panner Quad Mode Interface" style="max-width: 500px; width: 100%;">
-    </div>
-    
-    <h4 id="a-format-params">Quad - AFormat Ambisonics</h4>
-    <div class="parameter">
-        <div class="parameter-description">M1-Panner mode for stereo input channels/tracks of audio (FLU, FRD, BLU, BRD)</div>
-    </div>
-    
-    <h4 id="b-format-params">Quad - BFormat Ambisonics</h4>
-    <div class="parameter">
-        <div class="parameter-description">M1-Panner mode for stereo input channels/tracks of audio (W, X, Y, Z ACNSN3D)</div>
-    </div>
-    
-    <h4 id="quad-general-params">Quad General Parameters</h4>
-    
-    <div class="parameter">
-        <div class="parameter-title">Quad Mode Dropdown</div>
-        <div class="parameter-description">Allows the user to change/select their 4 channel Quad mode for their audio track.</div>
-    </div>
-    
-    <h4 id="ba-format-params">BFormat & AFormat Parameters</h4>
-    
-    <div class="parameter">
-        <div class="parameter-title">AFormat</div>
-        <div class="parameter-description">Intended for A-Format ambisonic microphone arrangements setup in the:<br>
-        1: front-left-up [FLU]<br>
-        2: front-right-down [FRD]<br>
-        3: back-left-down [BLD]<br>
-        4: back-right-up [BRU]</div>
-    </div>
-    
-    <div class="parameter">
-        <div class="parameter-title">BFormat</div>
-        <div class="parameter-description">Intended for ACNSN3D AmbiX B-Format 4 channel audio tracks, to encode them by reversing each pole's channel into 2 channels with one phase inverted and oriented inversely to maximize the pre-AmbiX encoded audio.</div>
-    </div>
 </div>
 
 <!-- Notes Section -->
 <div id="panner-notes" class="doc-section">
     <h3>Notes</h3>
-    
-    <div class="note">
-        <strong>Divergence Consistency:</strong> Rotation automation in the M1-Panner is currently using a radiance focused UI system due to the ease of use for users. This sacrifices the ability to have a perfectly consistent divergence ratio of signal front/back as you rotate your source. In an upcoming update we will add a processing mode that users can select to focus on Divergence Consistency.
-    </div>
     
     <div class="note">
         <strong>Pro Tools HD Automation:</strong> It is observed that Pro Tools HD by default always interpolates automation to smooth all values to only two floating points (example: 20.04 instead of 20.03997); because of this continuous performance knobs/sliders, specifically the Rotation parameter are prone to a GUI bug if you record Automation for this parameter in full rotations and play it back from the Host (Pro Tools HD). This issue can occur when recording automation that travels past 180 crossing, this is due to the value attempting to reset to -180 (or 180 if counter-clockwise).
@@ -196,18 +251,5 @@
             <p class="image-caption">Good Example</p>
         </div>
     </div>
-    
-</div>
 
-<!-- Upcoming Features Section -->
-<div id="panner-upcoming" class="doc-section">
-    <h3>Upcoming Features</h3>
-    <ul>
-        <li>Improved rotation automation consistency</li>
-        <li>Enhanced divergence control</li>
-        <li>Additional multichannel input options</li>
-    </ul>
-    
-    <a href="#" class="btn btn-primary">Request Feature</a>
-    <a href="#" class="btn">Report Issue</a>
-</div> 
+</div>

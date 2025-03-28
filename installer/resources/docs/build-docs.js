@@ -1,7 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const docsDir = '.';
+// Use __dirname to get the absolute path of the directory where the script is located
+const docsDir = __dirname;
 const contentDir = path.join(docsDir, 'content');
 
 console.log('Reading index.html template...');
@@ -37,6 +38,38 @@ outputHTML = replaceContentInDiv(outputHTML, 'monitor-content', monitorContent);
 outputHTML = replaceContentInDiv(outputHTML, 'player-content', playerContent);
 outputHTML = replaceContentInDiv(outputHTML, 'transcoder-content', transcoderContent);
 outputHTML = replaceContentInDiv(outputHTML, 'guide-content', guideContent);
+
+// Ensure the js directory exists
+const jsDir = path.join(docsDir, 'js');
+if (!fs.existsSync(jsDir)) {
+    fs.mkdirSync(jsDir, { recursive: true });
+}
+
+// Create search.js file if it doesn't exist
+const searchJsPath = path.join(jsDir, 'search.js');
+if (!fs.existsSync(searchJsPath)) {
+    console.log('Creating search.js...');
+    fs.writeFileSync(searchJsPath, `/**
+ * Search functionality for Mach1 Documentation
+ */
+
+// Search implementation will be here
+// This file is a placeholder that will be replaced with the actual implementation
+`);
+}
+
+// Create print.js file if it doesn't exist
+const printJsPath = path.join(jsDir, 'print.js');
+if (!fs.existsSync(printJsPath)) {
+    console.log('Creating print.js...');
+    fs.writeFileSync(printJsPath, `/**
+ * Print/PDF Export functionality for Mach1 Documentation
+ */
+
+// Print implementation will be here
+// This file is a placeholder that will be replaced with the actual implementation
+`);
+}
 
 const outputPath = path.join(docsDir, 'index.html');
 fs.writeFileSync(outputPath, outputHTML);
