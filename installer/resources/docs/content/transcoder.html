@@ -1,165 +1,166 @@
 <h2>Mach1 Transcoder</h2>
-<p>The Mach1 Transcoder enables conversion between different spatial audio formats and the Mach1 Spatial System.</p>
-
-<div style="display: flex; align-items: flex-start; gap: 20px; margin: 20px 0;">
-    <div style="position: relative; flex: 0 0 600px;">
-        <img src="./transcoder-images/m1-transcoder.jpg" alt="Mach1 Transcoder Interface" style="width: 100%; height: auto;">
-        <a href="#transcoder-input" class="tooltip-area" 
-             style="position: absolute; left: 2%; top: 10%; width: 97%; height: 45%;" 
-             data-tooltip="Input options: Drop or load Mach1 Spatial, Static Stereo, JSON, or Video files">
-        </a>
-        <a href="#transcoder-output" class="tooltip-area" 
-             style="position: absolute; left: 2%; top: 61%; width: 97%; height: 23%;" 
-             data-tooltip="Output options: Select spatial format and output file type">
-        </a>
-    </div>
-    <div style="
-        flex: 0 0 200px;
-        background-color: var(--dark-bg-lightest);
-        border: 1px solid var(--accent-color);
-        border-radius: 4px;
-        padding: 15px;
-        font-size: 0.9rem;
-        align-self: center;
-    ">
-        <div style="display: flex; align-items: center; margin-bottom: 10px; color: var(--accent-color);">
-            <i class="fas fa-lightbulb" style="margin-right: 8px;"></i>
-            <strong>Interactive Guide</strong>
+<div id="transcoder-interface" class="doc-section">
+    <h3>Interface</h3>
+    <div style="display: flex; align-items: flex-start; gap: 20px; margin: 20px 0;">
+        <div style="position: relative; flex: 0 0 600px;">
+            <img src="./transcoder-images/m1-transcoder.jpg" alt="Mach1 Transcoder Interface" style="width: 100%; height: auto;">
+            <a href="#transcoder-input" class="tooltip-area" 
+                style="position: absolute; left: 2%; top: 10%; width: 97%; height: 45%;" 
+                data-tooltip="Input options: Drop or load Mach1 Spatial, Static Stereo, JSON, or Video files">
+            </a>
+            <a href="#transcoder-output" class="tooltip-area" 
+                style="position: absolute; left: 2%; top: 61%; width: 97%; height: 23%;" 
+                data-tooltip="Output options: Select spatial format and output file type">
+            </a>
         </div>
-        <p style="margin: 0; line-height: 1.5;">
-            Hover over different parts of the interface to learn more.
-            <br><br>
-            Areas with a pointing hand cursor (<span style="font-size: 1.1em;">👆</span>) can be clicked to navigate to their documentation.
-        </p>
+        <div style="
+            flex: 0 0 200px;
+            background-color: var(--dark-bg-lightest);
+            border: 1px solid var(--accent-color);
+            border-radius: 4px;
+            padding: 15px;
+            font-size: 0.9rem;
+            align-self: center;
+        ">
+            <div style="display: flex; align-items: center; margin-bottom: 10px; color: var(--accent-color);">
+                <i class="fas fa-lightbulb" style="margin-right: 8px;"></i>
+                <strong>Interactive Guide</strong>
+            </div>
+            <p style="margin: 0; line-height: 1.5;">
+                Hover over different parts of the interface to learn more.
+                <br><br>
+                Areas with a pointing hand cursor (<span style="font-size: 1.1em;">👆</span>) can be clicked to navigate to their documentation.
+            </p>
+        </div>
     </div>
-</div>
 
-<!-- Description Section -->
-<div id="transcoder-description" class="doc-section">
-    <h3>Description & User Story</h3>
-    
-    <h4 id="transcoder-spatial-format">Mach1 Spatial Format Explained</h4>
-    <p>Mach1 Spatial is a VVBP (Virtual Vector Based Panning) or SPS spatial audio format that encourages users to have complete freedom with their post production mixing process by not forcing the user to use any sonic signal altering processing. The user is free to apply their own DSP/ASP to their audio during the mixing process to avoid proprietary DSP algorithms for spatial audio seen in other formats or tools. With this in mind the user is completely in control of their creative mix process and can make any decision they want whether it results in realistic spatial fields or more creative spatial sound fields.</p>
-    
-    <h4 id="transcoder-explained">Transcoder Explained</h4>
-    <p>Mach1 Spatial as a virtual vector based format has the advantage of not using any signal processing effects for pre-rendering or playing back spatial audio. Due to this major advantage; the user is able to leverage Mach1 Spatial format as a master spatial audio format and use the Transcoder to down mix to all other spatial or surround formats without introducing any mix altering effects, guaranteeing the most 1:1 transcoding possible.</p>
-    
-    <h4 id="transcoder-conversion">Format Conversion (m1-transcode)</h4>
-    <p>The format conversion math uses basic coefficient changes to channels of audio with only the process effecting: re-ordering channels to the correct output, correctly distributing audio data to the correct output channels. There are no other effects applied to the master mix.</p>
-    <p>For more information: <a href="https://dev.mach1.tech/#mach1transcode-api" target="_blank">https://dev.mach1.tech/#mach1transcode-api</a></p>
-    
-    <h4 id="transcoder-headlocked">Headlocked/Static Stereo</h4>
-    <p>Use the Input Static Stereo Mix field to correctly mux master headlocked stereo audio, ideal for adding music or some VO elements (as well as experimental elements) to your spatial mix. These channels will remain intact until the decoding stages, at which point the target app will sum these channels to the output decoded stereo from the spatial mix (if your target app supports this).</p>
-</div>
-
-<!-- Transcoding Features Section -->
-<div id="transcoder-features" class="doc-section">
-    <h3>Transcoding Features</h3>
-    
-    <div id="transcoder-input" class="doc-subsection">
-        <h4>Input Options</h4>
+    <!-- Description Section -->
+    <div id="transcoder-description" class="doc-section">
+        <h3>Description & User Story</h3>
         
-        <div class="subheading">Audio Input Files</div>
+        <h4 id="transcoder-spatial-format">Mach1 Spatial Format Explained</h4>
+        <p>Mach1 Spatial is a VVBP (Virtual Vector Based Panning) or SPS spatial audio format that encourages users to have complete freedom with their post production mixing process by not forcing the user to use any sonic signal altering processing. The user is free to apply their own DSP/ASP to their audio during the mixing process to avoid proprietary DSP algorithms for spatial audio seen in other formats or tools. With this in mind the user is completely in control of their creative mix process and can make any decision they want whether it results in realistic spatial fields or more creative spatial sound fields.</p>
+        
+        <h4 id="transcoder-explained">Transcoder Explained</h4>
+        <p>Mach1 Spatial as a virtual vector based format has the advantage of not using any signal processing effects for pre-rendering or playing back spatial audio. Due to this major advantage; the user is able to leverage Mach1 Spatial format as a master spatial audio format and use the Transcoder to down mix to all other spatial or surround formats without introducing any mix altering effects, guaranteeing the most 1:1 transcoding possible.</p>
+        
+        <h4 id="transcoder-conversion">Format Conversion (m1-transcode)</h4>
+        <p>The format conversion math uses basic coefficient changes to channels of audio with only the process effecting: re-ordering channels to the correct output, correctly distributing audio data to the correct output channels. There are no other effects applied to the master mix.</p>
+        <p>For more information: <a href="https://dev.mach1.tech/#mach1transcode-api" target="_blank">https://dev.mach1.tech/#mach1transcode-api</a></p>
+        
+        <h4 id="transcoder-headlocked">Headlocked/Static Stereo</h4>
+        <p>Use the Input Static Stereo Mix field to correctly mux master headlocked stereo audio, ideal for adding music or some VO elements (as well as experimental elements) to your spatial mix. These channels will remain intact until the decoding stages, at which point the target app will sum these channels to the output decoded stereo from the spatial mix (if your target app supports this).</p>
+    </div>
+
+    <!-- Transcoding Features Section -->
+    <div id="transcoder-features" class="doc-section">
+        <h3>Transcoding Features</h3>
+        
+        <div id="transcoder-input" class="doc-subsection">
+            <h4>Input Options</h4>
+            
+            <div class="subheading">Audio Input Files</div>
+            <div class="parameter">
+                <div class="parameter-title">Mach1 Spatial Input</div>
+                <div class="parameter-description">Single multichannel file of 8 channels exported/rendered from preferred DAW, supports aif or wav files. (automatically detects Pro Tools HD multichannel .wav file and reorder the channels correctly during transcoding process from the 7.1 channel order)</div>
+            </div>
+            
+            <div class="parameter">
+                <div class="parameter-title">Mach1 Horizon Pairs Inputs</div>
+                <div class="parameter-description">
+                    Drag in the 4 exported stereo files. Add the following to the end of the file names to safely encode:<br>
+                    <strong>_000</strong> (front)<br>
+                    <strong>_090</strong> (right)<br>
+                    <strong>_180</strong> (back)<br>
+                    <strong>_270</strong> (left)<br>
+                    The M1-Transcoder app will only display the available/relevant transcoding options for the Mach1 Horizon Pairs input type.
+                </div>
+            </div>
+            
+            <div class="subheading">Video Input Files</div>
+            <p>Supports mp4 & mov video files, all conversions/encoding/transcodings use pass through video so that nothing is re-encoded or effecting the video streams of files.</p>
+        </div>
+        
+        <div id="transcoder-output" class="doc-subsection">
+            <h4>Output Types</h4>
+            
+            <div class="subheading">Supported Format & File Types</div>
+            <ul class="format-list">
+                <li>Mach1 Spatial (Audio & Video)</li>
+                <li>Mach1 Horizon (Audio & Video)</li>
+                <li>Mach1 Horizon Pairs (Single Stream) (Audio & Video)</li>
+                <li>Mach1 Horizon Pairs / Quad-Binaural (Multiple Streams) (Audio & Video)</li>
+                <li>First Order Ambisonic ACNSN3D [Youtube] (Audio & Video) [Applies metadata for direct upload to Youtube depending on selected File Type]</li>
+                <li>First Order Ambisonic FuMa (Audio & Video)</li>
+                <li>Second Order Ambisonic ACNSN3D (Audio Only)</li>
+                <li>Second Order Ambisonic FuMa (Audio Only)</li>
+                <li>Third Order Ambisonic ACNSN3D (Audio Only)</li>
+                <li>Third Order Ambisonic FuMa (Audio Only)</li>
+                <li>5.0 Surround (L,C,R,Ls,Rs) (Audio & Video)</li>
+                <li>5.1 Surround (L,C,R,Ls,Rs,LFE) (Audio & Video)</li>
+                <li>5.1 Surround SMPTE (L,R,C,LFE,Ls,Rs) (Audio & Video)</li>
+                <li>5.1 Surround DTS (L,R,Ls,Rs,C,LFE) (Audio & Video)</li>
+                <li>5.0.2 Surround (L,C,R,Ls,Rs,Lts,Rts) (Audio Only)</li>
+                <li>5.1.2 Surround (L,C,R,Ls,Rs,LFE,Lts,Rts) (Audio Only)</li>
+                <li>5.0.4 Surround (L,C,R,Ls,Rs,FLts,FRts,BLts,BRts) (Audio Only)</li>
+                <li>5.1.4 Surround (L,C,R,Ls,Rs,LFE,FLts,FRts,BLts,BRts) (Audio Only)</li>
+                <li>7.0 Surround (L,C,R,Lss,Rss,Lsr,Rsr) (Audio & Video)</li>
+                <li>7.1 Surround (L,C,R,Lss,Rss,Lsr,Rsr,LFE) (Audio & Video)</li>
+                <li>7.1 Surround SDDS (L,Lc,C,Rc,R,Ls,Rs,LFE) (Audio & Video)</li>
+                <li>7.1.2 Surround (L,C,R,Lss,Rss,Lsr,Rsr,LFE,Lts,Rts) (Audio Only)</li>
+                <li>7.1.4 Surround (L,C,R,Lss,Rss,Lsr,Rsr,LFE,FLts,FRts,BLts,BRts) (Audio Only)</li>
+                <li>FB360/TBE (8ch) (Audio Only)</li>
+            </ul>
+            
+            <p>This list is maintained here: <a href="https://dev.mach1.tech/#formats-supported" target="_blank">https://dev.mach1.tech/#formats-supported</a></p>
+            
+            <div class="subheading">Output Configuration</div>
+            <p>The output options are dependent on what is possible per selected format as the list above shows.</p>
+        </div>
+    </div>
+    <!-- Additional Features Section -->
+    <div id="transcoder-additional" class="doc-section">
+        <h3>Additional Features</h3>
+        
         <div class="parameter">
-            <div class="parameter-title">Mach1 Spatial Input</div>
-            <div class="parameter-description">Single multichannel file of 8 channels exported/rendered from preferred DAW, supports aif or wav files. (automatically detects Pro Tools HD multichannel .wav file and reorder the channels correctly during transcoding process from the 7.1 channel order)</div>
+            <div class="parameter-title">Transcode</div>
+            <div class="parameter-description">Runs the transcoding process for the users input files to become the target output encoded audio/video (applies metadata for YouTube output if selected).</div>
         </div>
         
         <div class="parameter">
-            <div class="parameter-title">Mach1 Horizon Pairs Inputs</div>
-            <div class="parameter-description">
-                Drag in the 4 exported stereo files. Add the following to the end of the file names to safely encode:<br>
-                <strong>_000</strong> (front)<br>
-                <strong>_090</strong> (right)<br>
-                <strong>_180</strong> (back)<br>
-                <strong>_270</strong> (left)<br>
-                The M1-Transcoder app will only display the available/relevant transcoding options for the Mach1 Horizon Pairs input type.
+            <div class="parameter-title">Auto File Loading</div>
+            <div class="parameter-description">Drag and drop the input audio file(s) in the top half of app window and the intended video input in the bottom half of the app window to load the input files into the correct files easily.</div>
+        </div>
+
+        <div style="display: flex; gap: 70px; justify-content: center; margin: 20px 0;">
+            <div class="image-container" style="margin: 0;">
+                <img src="./transcoder-images/TranscoderAudioLoad.png" alt="Transcoder Audio Loading Interface" style="max-width: 500px; width: 120%;">
+                <p class="image-caption">Audio File Loading</p>
+            </div>
+            <div class="image-container" style="margin: 0;">
+                <img src="./transcoder-images/TranscoderVideoLoad.png" alt="Transcoder Video Loading Interface" style="max-width: 500px; width: 120%;">
+                <p class="image-caption">Video File Loading</p>
             </div>
         </div>
         
-        <div class="subheading">Video Input Files</div>
-        <p>Supports mp4 & mov video files, all conversions/encoding/transcodings use pass through video so that nothing is re-encoded or effecting the video streams of files.</p>
-    </div>
-    
-    <div id="transcoder-output" class="doc-subsection">
-        <h4>Output Types</h4>
+        <p>These features are available after a successful run of the M1-Transcoder.</p>
         
-        <div class="subheading">Supported Format & File Types</div>
-        <ul class="format-list">
-            <li>Mach1 Spatial (Audio & Video)</li>
-            <li>Mach1 Horizon (Audio & Video)</li>
-            <li>Mach1 Horizon Pairs (Single Stream) (Audio & Video)</li>
-            <li>Mach1 Horizon Pairs / Quad-Binaural (Multiple Streams) (Audio & Video)</li>
-            <li>First Order Ambisonic ACNSN3D [Youtube] (Audio & Video) [Applies metadata for direct upload to Youtube depending on selected File Type]</li>
-            <li>First Order Ambisonic FuMa (Audio & Video)</li>
-            <li>Second Order Ambisonic ACNSN3D (Audio Only)</li>
-            <li>Second Order Ambisonic FuMa (Audio Only)</li>
-            <li>Third Order Ambisonic ACNSN3D (Audio Only)</li>
-            <li>Third Order Ambisonic FuMa (Audio Only)</li>
-            <li>5.0 Surround (L,C,R,Ls,Rs) (Audio & Video)</li>
-            <li>5.1 Surround (L,C,R,Ls,Rs,LFE) (Audio & Video)</li>
-            <li>5.1 Surround SMPTE (L,R,C,LFE,Ls,Rs) (Audio & Video)</li>
-            <li>5.1 Surround DTS (L,R,Ls,Rs,C,LFE) (Audio & Video)</li>
-            <li>5.0.2 Surround (L,C,R,Ls,Rs,Lts,Rts) (Audio Only)</li>
-            <li>5.1.2 Surround (L,C,R,Ls,Rs,LFE,Lts,Rts) (Audio Only)</li>
-            <li>5.0.4 Surround (L,C,R,Ls,Rs,FLts,FRts,BLts,BRts) (Audio Only)</li>
-            <li>5.1.4 Surround (L,C,R,Ls,Rs,LFE,FLts,FRts,BLts,BRts) (Audio Only)</li>
-            <li>7.0 Surround (L,C,R,Lss,Rss,Lsr,Rsr) (Audio & Video)</li>
-            <li>7.1 Surround (L,C,R,Lss,Rss,Lsr,Rsr,LFE) (Audio & Video)</li>
-            <li>7.1 Surround SDDS (L,Lc,C,Rc,R,Ls,Rs,LFE) (Audio & Video)</li>
-            <li>7.1.2 Surround (L,C,R,Lss,Rss,Lsr,Rsr,LFE,Lts,Rts) (Audio Only)</li>
-            <li>7.1.4 Surround (L,C,R,Lss,Rss,Lsr,Rsr,LFE,FLts,FRts,BLts,BRts) (Audio Only)</li>
-            <li>FB360/TBE (8ch) (Audio Only)</li>
+        <div class="parameter">
+            <div class="parameter-title">Reveal In Finder</div>
+            <div class="parameter-description">Shows user the location of the output transcoded audio/video file in Finder.</div>
+        </div>
+    </div>
+
+    <!-- Upcoming Features Section -->
+    <div id="transcoder-upcoming" class="doc-section">
+        <h3>Upcoming Features</h3>
+        <ul>
+            <li>Utilize the M1-Player as a standalone review player for transcoded mixes and videos.</li>
+            <li>Support the FB360 metadata spec for encoding video metadata to support ingestible FB360 videos for Meta supported apps.</li>
+            <li>Additional output format support for emerging spatial audio standards.</li>
         </ul>
         
-        <p>This list is maintained here: <a href="https://dev.mach1.tech/#formats-supported" target="_blank">https://dev.mach1.tech/#formats-supported</a></p>
-        
-        <div class="subheading">Output Configuration</div>
-        <p>The output options are dependent on what is possible per selected format as the list above shows.</p>
-    </div>
+        <a href="#" class="btn btn-primary">Request Feature</a>
+        <a href="#" class="btn">Report Issue</a>
+    </div> 
 </div>
-<!-- Additional Features Section -->
-<div id="transcoder-additional" class="doc-section">
-    <h3>Additional Features</h3>
-    
-    <div class="parameter">
-        <div class="parameter-title">Transcode</div>
-        <div class="parameter-description">Runs the transcoding process for the users input files to become the target output encoded audio/video (applies metadata for YouTube output if selected).</div>
-    </div>
-    
-    <div class="parameter">
-        <div class="parameter-title">Auto File Loading</div>
-        <div class="parameter-description">Drag and drop the input audio file(s) in the top half of app window and the intended video input in the bottom half of the app window to load the input files into the correct files easily.</div>
-    </div>
-
-    <div style="display: flex; gap: 70px; justify-content: center; margin: 20px 0;">
-        <div class="image-container" style="margin: 0;">
-            <img src="./transcoder-images/TranscoderAudioLoad.png" alt="Transcoder Audio Loading Interface" style="max-width: 500px; width: 120%;">
-            <p class="image-caption">Audio File Loading</p>
-        </div>
-        <div class="image-container" style="margin: 0;">
-            <img src="./transcoder-images/TranscoderVideoLoad.png" alt="Transcoder Video Loading Interface" style="max-width: 500px; width: 120%;">
-            <p class="image-caption">Video File Loading</p>
-        </div>
-    </div>
-    
-    <p>These features are available after a successful run of the M1-Transcoder.</p>
-    
-    <div class="parameter">
-        <div class="parameter-title">Reveal In Finder</div>
-        <div class="parameter-description">Shows user the location of the output transcoded audio/video file in Finder.</div>
-    </div>
-</div>
-
-<!-- Upcoming Features Section -->
-<div id="transcoder-upcoming" class="doc-section">
-    <h3>Upcoming Features</h3>
-    <ul>
-        <li>Utilize the M1-Player as a standalone review player for transcoded mixes and videos.</li>
-        <li>Support the FB360 metadata spec for encoding video metadata to support ingestible FB360 videos for Meta supported apps.</li>
-        <li>Additional output format support for emerging spatial audio standards.</li>
-    </ul>
-    
-    <a href="#" class="btn btn-primary">Request Feature</a>
-    <a href="#" class="btn">Report Issue</a>
-</div> 
