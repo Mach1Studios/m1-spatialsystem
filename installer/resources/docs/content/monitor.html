@@ -41,10 +41,10 @@
             </a>
             
             <!-- Decode format selector -->
-            <div class="tooltip-area" 
+            <a href="#decode-selection" class="tooltip-area" 
                 style="position: absolute; left: 47%; top: 93%; width: 27%; height: 6%;" 
                 data-tooltip="Decode selection Mach1-Spatial 8 or 4">
-            </div>
+            </a>
         </div>
         <div style="
             flex: 0 0 200px;
@@ -110,21 +110,65 @@
             <div class="parameter-range">Range: -90 → 90 (top of head to left → top of head to right)</div>
             <div class="parameter-description">Allows users to simulate head-tracking on the roll axis (tilting head toward a shoulder)</div>
         </div>
-        
-        <div id="settings" class="doc-subsection">
-            <h4>Settings</h4>
-            <p>When activated allows access to more advanced features during the Mach1 Spatial mixing process, de-activate to shrink UI window size when not needed</p>
-        </div>
+    </div>
+    
+    <!-- Settings Section -->
+    <div id="settings" class="doc-section">
+        <h4 id="settings-header">Settings</h4>
         
         <div id="monitor-modes" class="doc-subsection">
             <h4>Monitor Modes</h4>
-            <p>Allows different decoding modes, these modes will be described on the next page</p>
+            <p>Allows different decoding modes for testing your spatial mix:</p>
             
-            <ul>
-                <li><strong>Mach1 Spatial Mode:</strong> The default mode for full Mach1Spatial mixing support and full Yaw/Pitch/Roll controls of the M1-Monitor.</li>
-                <li><strong>StereoSafe Mode:</strong> When this mode is enabled all Panner's process audio with Mono output so that the user can quickly export a stereo version that is spatially safe in all directions for 360 audio/video players that do not support spatial audio yet. The Diverge values during the mix are instead used to correct the gain ratio between all spatial components so that the mix is roughly retained to avoid full re-mix scenarios.</li>
-                <li><strong>Front/Back FoldDown:</strong> When enabled this mode sums channels Front/Back/Top/Bottom left channels together and Front/Back/Top/Bottom right channels together to allow the user to quickly reference any front to rear differences during the mix.</li>
-            </ul>
+            <div id="spatial-mode" class="parameter">
+                <div class="parameter-title">Mach1 Spatial Mode</div>
+                <div class="parameter-description">The default mode for full Mach1Spatial mixing support and full Yaw/Pitch/Roll controls of the M1-Monitor.</div>
+            </div>
+            
+            <div id="stereo-safe-mode" class="parameter">
+                <div class="parameter-title">StereoSafe Mode</div>
+                <div class="parameter-description">When this mode is enabled all Panner's process audio with Mono output so that the user can quickly export a stereo version that is spatially safe in all directions for 360 audio/video players that do not support spatial audio yet. The Diverge values during the mix are instead used to correct the gain ratio between all spatial components so that the mix is roughly retained to avoid full re-mix scenarios.</div>
+            </div>
+            
+            <div id="folddown-mode" class="parameter">
+                <div class="parameter-title">Front/Back FoldDown</div>
+                <div class="parameter-description">When enabled this mode sums channels Front/Back/Top/Bottom left channels together and Front/Back/Top/Bottom right channels together to allow the user to quickly reference any front to rear differences during the mix.</div>
+            </div>
+        </div>
+        
+        <div id="connected-devices" class="doc-subsection">
+            <h4>Connected Devices</h4>
+            <p>Allows switching between different orientation data sources for testing how your spatial mix will sound on various devices:</p>
+            
+            <div id="default-device" class="parameter">
+                <div class="parameter-title">Default</div>
+                <div class="parameter-description">Uses the built-in orientation controls (Yaw, Pitch, Roll dials).</div>
+            </div>
+
+            <div id="vr-device" class="parameter">
+                <div class="parameter-title">VR Headset</div>
+                <div class="parameter-description">When connected, uses orientation data from VR headsets for more immersive testing.</div>
+            </div>
+            
+            <div id="osc-device" class="parameter">
+                <div class="parameter-title">OSC Input</div>
+                <div class="parameter-description">Accepts orientation data from external applications or devices via OSC protocol.</div>
+            </div>
+        </div>
+        
+        <div id="decode-selection" class="doc-subsection">
+            <h4>Decode Selection</h4>
+            <p>Allows switching between different Mach1 Spatial format configurations:</p>
+            
+            <div id="spatial-8ch" class="parameter">
+                <div class="parameter-title">Mach1 Spatial (8ch)</div>
+                <div class="parameter-description">The standard 8-channel configuration with full 3D spatial audio support.</div>
+            </div>
+            
+            <div id="horizon-4ch" class="parameter">
+                <div class="parameter-title">Mach1 Horizon (4ch)</div>
+                <div class="parameter-description">A 4-channel horizontal-only configuration.</div>
+            </div>
         </div>
         
         <div id="timecode-offset" class="doc-subsection">

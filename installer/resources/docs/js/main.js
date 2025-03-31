@@ -444,84 +444,143 @@ function showDefaultPage() {
 }
 
 function setupScrollHighlighting() {
-    window.addEventListener('scroll', highlightCurrentSection);
-}
-
-function isElementInViewport(el) {
-    const rect = el.getBoundingClientRect();
-    const headerHeight = 100;
+    let scrollTimeout;
+    let isScrolling = false;
+    let lastUserClickTime = 0;
     
-    return (
-        rect.top >= headerHeight &&
-        rect.top <= (window.innerHeight || document.documentElement.clientHeight) / 3
-    );
+    window.addEventListener('scroll', function() {
+        isScrolling = true;
+        clearTimeout(scrollTimeout);
+        
+        // Check if a user just clicked a link - prevent auto highlighting for 1 second
+        const userClickedRecently = Date.now() - lastUserClickTime < 1000;
+        
+        scrollTimeout = setTimeout(() => {
+            isScrolling = false;
+            
+            // Get the most recent user click time
+            const tocLink = document.querySelector('.toc-sidebar a.active');
+            if (tocLink) {
+                const userClickTime = parseInt(tocLink.dataset.lastClicked || '0');
+                if (userClickTime > 0) {
+                    lastUserClickTime = userClickTime;
+                }
+            }
+            
+            // Skip auto highlighting if user clicked recently
+            if (!userClickedRecently) {
+                highlightCurrentSection();
+            }
+        }, 100);
+    });
+    
+    // Monitor user clicks on TOC links
+    document.querySelectorAll('.toc-sidebar a').forEach(link => {
+        link.addEventListener('click', function() {
+            const now = Date.now();
+            this.dataset.lastClicked = now.toString();
+            lastUserClickTime = now;
+        });
+    });
 }
 
 function highlightCurrentSection() {
+    // Skip highlighting if user clicked a link within the last 1 second
+    if (Date.now() - (parseInt(document.querySelector('.toc-sidebar a.active')?.dataset.lastClicked || '0')) < 1000) {
+        return;
+    }
+
     const contentSection = document.querySelector('.product-content.active');
     if (!contentSection) return;
     
-    const sections = Array.from(contentSection.querySelectorAll('.doc-section, .doc-subsection'));
+    // Get all TOC links for the current content section
+    const currentContentId = contentSection.id.replace('-content', '');
+    const topLevelItem = document.querySelector(`.toc-sidebar a[href="#${currentContentId}"]`);
     
-    let currentSection = null;
+    if (!topLevelItem) return;
     
-    for (let i = 0; i < sections.length; i++) {
-        if (isElementInViewport(sections[i])) {
-            currentSection = sections[i];
-            break;
-        }
+    const tocParent = topLevelItem.closest('li.has-submenu');
+    const allSectionLinks = Array.from(tocParent.querySelectorAll('a')).filter(link => link.getAttribute('href')?.startsWith('#'));
+    
+    if (allSectionLinks.length === 0) return;
+    
+    // Map of all section IDs mentioned in the TOC
+    const tocSectionIds = allSectionLinks.map(link => link.getAttribute('href').substring(1));
+    
+    // Find which section is currently visible
+    const scrollPosition = window.scrollY;
+    const headerHeight = 100;
+    
+    // Check if we're at the very top of the page
+    if (scrollPosition < 50) {
+        // If at top, just highlight the main section
+        updateActiveSection(currentContentId);
+        return;
     }
     
-    if (!currentSection && sections.length > 0) {
-        const scrollPos = window.scrollY || document.documentElement.scrollTop;
-        
-        if (scrollPos < 50) {
-            currentSection = sections[0];
-        } else {
-            let closestSection = null;
-            let closestDistance = Infinity;
-            
-            sections.forEach(section => {
-                const rect = section.getBoundingClientRect();
-                const distance = Math.abs(rect.top);
-                
-                if (distance < closestDistance) {
-                    closestDistance = distance;
-                    closestSection = section;
-                }
+    // Get all visible sections in the current content section that are also in the TOC
+    const sections = Array.from(contentSection.querySelectorAll('[id]')).filter(
+        section => tocSectionIds.includes(section.id)
+    );
+    
+    if (sections.length === 0) {
+        // If no sections match TOC links, fall back to the main section
+        updateActiveSection(currentContentId);
+        return;
+    }
+    
+    // Find sections above the current scroll position
+    let visibleSections = [];
+    for (const section of sections) {
+        const sectionTop = section.getBoundingClientRect().top + window.scrollY;
+        if (sectionTop < scrollPosition + headerHeight + 150) {
+            visibleSections.push({
+                id: section.id,
+                top: sectionTop
             });
-            
-            currentSection = closestSection;
         }
     }
     
-    if (currentSection) {
-        const sectionId = currentSection.id;
-        if (sectionId) {
-            const linkSelector = `.toc-sidebar a[href="#${sectionId}"]`;
-            const activeLink = document.querySelector(linkSelector);
-            
-            if (activeLink) {
-                document.querySelectorAll('.toc-sidebar a').forEach(link => {
-                    link.classList.remove('active');
-                });
-                
-                activeLink.classList.add('active');
-                
-                let parent = activeLink.closest('li.has-submenu');
-                while (parent) {
-                    parent.classList.remove('collapsed');
-                    parent = parent.parentElement.closest('li.has-submenu');
-                }
-                
-                history.replaceState(null, null, `#${sectionId}`);
-                
-                const parentContent = currentSection.closest('.product-content');
-                if (parentContent && parentContent.id) {
-                    const contentId = parentContent.id.replace('-content', '');
-                    saveCurrentState(contentId, `#${sectionId}`);
-                }
-            }
+    // If no sections are visible, use the main section
+    if (visibleSections.length === 0) {
+        updateActiveSection(currentContentId);
+        return;
+    }
+    
+    // Sort by position (top to bottom) and get the last one (closest to current viewport)
+    visibleSections.sort((a, b) => a.top - b.top);
+    const currentSection = visibleSections[visibleSections.length - 1];
+    
+    // Update the active section in the TOC
+    updateActiveSection(currentSection.id);
+}
+
+function updateActiveSection(sectionId) {
+    const linkSelector = `.toc-sidebar a[href="#${sectionId}"]`;
+    const activeLink = document.querySelector(linkSelector);
+    
+    if (activeLink) {
+        document.querySelectorAll('.toc-sidebar a').forEach(link => {
+            link.classList.remove('active');
+        });
+        
+        activeLink.classList.add('active');
+        
+        let parent = activeLink.closest('li.has-submenu');
+        while (parent) {
+            parent.classList.remove('collapsed');
+            parent = parent.parentElement.closest('li.has-submenu');
+        }
+        
+        // Only update history if we're not in a click timeout
+        if (Date.now() - (parseInt(activeLink.dataset.lastClicked || '0')) > 1000) {
+            history.replaceState(null, null, `#${sectionId}`);
+        }
+        
+        const parentContent = document.querySelector(`.product-content.active`);
+        if (parentContent && parentContent.id) {
+            const contentId = parentContent.id.replace('-content', '');
+            saveCurrentState(contentId, `#${sectionId}`);
         }
     }
 }
