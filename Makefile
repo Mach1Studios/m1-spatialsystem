@@ -61,6 +61,8 @@ ifeq ($(detected_OS),Darwin)
 	rm -f /Library/Application\ Support/Mach1/settings.json
 	rm -f /Library/LaunchAgents/com.mach1.spatial.orientationmanager.plist
 	rm -f /Library/LaunchAgents/com.mach1.spatial.helper.plist
+	killall m1-system-helper || true
+	killall m1-orientationmanager || true
 endif
 
 clean:
