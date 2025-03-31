@@ -1,5 +1,22 @@
 /* Base styles */
 :root {
+    /* Mach1 Color Palette */
+    --hl-yellow: #F2FF5F;
+    --hl-blue: #14DFBA;
+    --hl-green: #38F708;
+    --gray-zero: #181818;
+    --gray-one: #282828;
+    --gray-one-faded: #4E4E4E4E;
+    --gray-two: #363636;
+    --gray-three: #404040;
+    --gray-four: #707070;
+    --gray-five: #E4E4E4;
+    --gray-six: #18181888;
+    --gray-seven: #E5E5E5;
+    --off-white: #FBFBFB;
+    --new-white: #FAFAFA;
+    --v2-yellow: #F3C635;
+
     --mach1-yellow: #FFC61E;
     --mach1-yellow-dark: #e6b100;
     --mach1-yellow-light: #ffd24d;
@@ -10,7 +27,7 @@
     --text-secondary: #b0b0b0;
     --text-muted: #888888;
     --border-color: #333333;
-    --accent-color: var(--mach1-yellow);
+    --accent-color: var(--gray-five);
     --transition-speed: 0.3s;
     --sidebar-width: 270px;
     --toc-width: 250px;
@@ -482,7 +499,7 @@ body {
 }
 
 .btn-primary:hover {
-    background-color: var(--mach1-yellow-dark);
+    background-color: var(--gray-one-faded);
 }
 
 /* Image and tooltip styling */
@@ -649,7 +666,7 @@ body {
     font-family: 'Font Awesome 5 Free';
     font-weight: 400;
     margin-right: 8px;
-    color: var(--mach1-yellow-light);
+    color: var(--gray-three);
 } 
 
 /* Search functionality */
@@ -822,7 +839,7 @@ body {
 }
 
 #print-button:hover {
-    background-color: var(--mach1-yellow-dark);
+    background-color: var(--gray-one-faded);
     transform: scale(1.1);
 }
 
