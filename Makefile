@@ -132,6 +132,9 @@ ifeq ($(detected_OS),Darwin)
 	rm -rf ~/Library/Audio/Plug-Ins/Components/M1-Panner.component
 endif
 
+docs:
+	cd installer/resources/docs && node build-docs.js && open index.html
+
 # configure for debug and setup dev envs with common IDEs
 dev: clean-dev dev-monitor dev-panner dev-player dev-orientationmanager dev-system-helper dev-transcoder
 

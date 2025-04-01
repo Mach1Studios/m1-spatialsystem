@@ -8,7 +8,7 @@
             <!-- Main panning area -->
             <a href="#panner-general-params" class="tooltip-area" 
                 style="position: absolute; left: 2%; top: 2%; width: 59%; height: 55%;" 
-                data-tooltip="Main panning area with position indicator">
+                data-tooltip="Main panning area with interactive reticle and additional channel reticles">
             </a>
             
             <!-- Level meters -->
@@ -20,7 +20,7 @@
             <!-- X/Y controls -->
             <a href="#x-parameter" class="tooltip-area" 
                 style="position: absolute; left: 2%; top: 60%; width: 23%; height: 18%;" 
-                data-tooltip="X/Y position controls">
+                data-tooltip="X/Y position controls, these parameters cannot be automated">
             </a>
             
             <!-- Azimuth control -->
@@ -32,7 +32,7 @@
             <!-- Diverge control -->
             <a href="#diverge-parameter" class="tooltip-area" 
                 style="position: absolute; left: 38%; top: 60%; width: 12%; height: 18%;" 
-                data-tooltip="Diverge control">
+                data-tooltip="Diverge control, how much the signal spreads to the output channels by azimuth">
             </a>
             
             <!-- Gain control -->
@@ -44,79 +44,79 @@
             <!-- Gain indicator -->
             <a href="#gain-parameter" class="tooltip-area" 
                 style="position: absolute; left: 58%; top: 67%; width: 4%; height: 6%;" 
-                data-tooltip="Gain level indicator">
+                data-tooltip="Auto Gain incicator, only active when Auto Gain is enabled">
             </a>
             
             <!-- Z/Altitude control -->
             <a href="#z-parameter" class="tooltip-area" 
                 style="position: absolute; left: 63%; top: 2%; width: 11%; height: 75%;" 
-                data-tooltip="Z axis (altitude) control">
+                data-tooltip="Elevation (Z) control, both the knob and the slider are linked">
             </a>
             
             <!-- Overlay checkbox -->
             <a href="#overlay-parameter" class="tooltip-area" 
                 style="position: absolute; left: 75%; top: 61%; width: 21%; height: 4%;" 
-                data-tooltip="Overlay mode: Enable 3D panning overlay">
+                data-tooltip="Enables a transparent overlay of the reticle for equirectangular 360 panning to picture">
             </a>
             
             <!-- Isotropic checkbox -->
             <a href="#isotropic-parameter" class="tooltip-area" 
                 style="position: absolute; left: 75%; top: 64.5%; width: 21%; height: 4%;" 
-                data-tooltip="Isotropic mode: Equal energy distribution">
+                data-tooltip="When enabled the signal will distribute equally on the vertically plane, otherwise the signal will crossfade between the top and bottom channels">
             </a>
             
             <!-- Equal Power checkbox -->
             <a href="#equal-power-parameter" class="tooltip-area" 
                 style="position: absolute; left: 75%; top: 68.5%; width: 21%; height: 4%;" 
-                data-tooltip="Equal Power mode: Maintain consistent power">
+                data-tooltip="Can only be enabled when Isotropic is also enabled, this will apply a gain compensation to the signal linked to the Diverge parameter">
             </a>
             
             <!-- Auto Gain checkbox -->
             <a href="#auto-gain-parameter" class="tooltip-area" 
                 style="position: absolute; left: 75%; top: 72%; width: 21%; height: 4%;" 
-                data-tooltip="Auto Gain: Automatically adjust gain">
+                data-tooltip="Automatically adjust gain based on the number of output channels to maintain a consistent level with the input">
             </a>
             
             <!-- Auto orbit -->
             <a href="#stereo-auto-orbit-parameter" class="tooltip-area" 
                 style="position: absolute; left: 75%; top: 78%; width: 21%; height: 4%;" 
-                data-tooltip="Auto orbit function">
+                data-tooltip="Automatically adjusts the Stereo Orbit Angle to point toward the center of the M1-Panner grid">
             </a>
             
             <!-- Stereo controls - S Rotate -->
             <a href="#stereo-rotate-parameter" class="tooltip-area" 
                 style="position: absolute; left: 26.5%; top: 78%; width: 10%; height: 15%;" 
-                data-tooltip="Stereo rotation control">
+                data-tooltip="Rotates the Left & Right reticles around the center reticle axis for more creative control during mixing">
             </a>
             
             <!-- Stereo controls - S Spread -->
             <a href="#stereo-spread-parameter" class="tooltip-area" 
                 style="position: absolute; left: 39%; top: 78%; width: 10%; height: 15%;" 
-                data-tooltip="Stereo spread control">
+                data-tooltip="Adds/reduces the distance between the Left & Right reticles">
             </a>
             
             <!-- Stereo pan -->
             <a href="#stereo-balance-parameter" class="tooltip-area" 
                 style="position: absolute; left: 51%; top: 78%; width: 10%; height: 15%;" 
-                data-tooltip="Stereo pan control">
+                data-tooltip="Controls the input balance between the Left & Right reticles">
             </a>
             
             <!-- Input selection -->
             <a href="#input-parameter" class="tooltip-area" 
                 style="position: absolute; left: 32%; top: 95%; width: 19%; height: 4%;" 
-                data-tooltip="Input channel configuration">
+                data-tooltip="Select which input channel configuration to encode from">
             </a>
             
             <!-- Output selection -->
             <a href="#output-parameter" class="tooltip-area" 
                 style="position: absolute; left: 50%; top: 95%; width: 20%; height: 4%;" 
-                data-tooltip="Output channel configuration">
+                data-tooltip="Select which output channel configuration to encode to">
             </a>
             
             <!-- Lock button -->
             <a href="#lock-parameter" class="tooltip-area" 
                 style="position: absolute; left: 71%; top: 95%; width: 10%; height: 4%;" 
-                data-tooltip="Lock current settings">
+                data-tooltip="Lock the current output setting to prevent changes from M1-Monitor">
             </a>
         </div>
         <div style="
@@ -163,7 +163,7 @@
     <div id="diverge-parameter" class="parameter">
         <div class="parameter-title">Diverge</div>
         <div class="parameter-range">Range: 100 → 0 → -100</div>
-        <div class="parameter-description">Moves the input sound source(s) to and from center to allow control of divergence of signal, or otherwise allowing control of distribution of how the signal spreads around listener. Where 100 is front forward on current Rotation angle, 0 is center panning or mono divergence and -100 is the inverse of current Rotation angle.</div>
+        <div class="parameter-description">distributes the spread of the input sound source(s) to and from center to allow control of divergence of signal, or otherwise allowing control of distribution of how the signal spreads around listener. Where 100 is front forward on current Rotation angle, 0 is center panning or mono divergence and -100 is the inverse of current Rotation angle.</div>
     </div>
     
     <div id="x-parameter" class="parameter">
@@ -186,13 +186,13 @@
     
     <div id="gain-parameter" class="parameter">
         <div class="parameter-title">Gain</div>
-        <div class="parameter-range">Range: 0 → 100</div>
+        <div class="parameter-range">Range: -96dB → +24dB</div>
         <div class="parameter-description">Controls input gain for input sound source(s) before encoding.</div>
     </div>
     
     <div id="levels-parameter" class="parameter">
         <div class="parameter-title">Level Meters</div>
-        <div class="parameter-description">Visual indicators showing the output levels of each channel in the selected Mach1 Spatial format.</div>
+        <div class="parameter-description">Visual indicators showing the output levels of each channel in the selected output Mach1 Spatial configuration.</div>
     </div>
 
     <div id="overlay-parameter" class="parameter">
@@ -202,34 +202,34 @@
 
     <div id="isotropic-parameter" class="parameter">
         <div class="parameter-title">Isotropic</div>
-        <div class="parameter-description">Enables isotropic energy distribution, maintaining equal energy across all output channels regardless of position.</div>
+        <div class="parameter-description">When enabled the signal uses a more realistic signal distribution model that distributes the signal equally on the vertically plane. When disabled the signal will crossfade between the top and bottom channels in a "Periphonic" panner mode.</div>
     </div>
 
     <div id="equal-power-parameter" class="parameter">
         <div class="parameter-title">Equal Power</div>
-        <div class="parameter-description">Maintains consistent power levels across the sound field, ensuring smooth transitions between output channels.</div>
+        <div class="parameter-description">Maintains consistent power levels no matter what the Diverge parameter is set to. Can only be enabled when Isotropic is also enabled.</div>
     </div>
 
     <div id="auto-gain-parameter" class="parameter">
         <div class="parameter-title">Auto Gain</div>
-        <div class="parameter-description">Automatically adjusts gain levels to ensure consistent output volume regardless of position or spread settings.</div>
+        <div class="parameter-description">Automatically adjust the gain of the input signal based on the number of output channels to maintain a consistent level with the input.</div>
     </div>
 
     <h4 id="panner-input-output">Input and Output Options</h4>
 
     <div id="input-parameter" class="parameter">
         <div class="parameter-title">Input Selection</div>
-        <div class="parameter-description">Configure the input channel configuration. The plugin can handle mono or stereo input sources.</div>
+        <div class="parameter-description">Configure the input channel configuration to encode from. The plugin can handle many variations of input channel configurations as long as the plugin is instantiated with the correct number of channels. It is advised to put M1-Panner and M1-Monitor on busses that can supply more channels than needed to allow flexibility while mixing.</div>
     </div>
 
     <div id="output-parameter" class="parameter">
         <div class="parameter-title">Output Selection</div>
-        <div class="parameter-description">Select the output channel configuration for the Mach1 Spatial format. Options include Mach1 Horizon (4ch), Mach1 Spatial (8ch), and others.</div>
+        <div class="parameter-description">Select the output channel configuration to encode to. Options include Mach1 Spatial (4ch), Mach1 Spatial (8ch) and Mach1 Spatial (14ch).</div>
     </div>
 
     <div id="lock-parameter" class="parameter">
         <div class="parameter-title">Lock</div>
-        <div class="parameter-description">Locks the current settings to prevent accidental changes during mixing or automation recording.</div>
+        <div class="parameter-description">Locks the current output setting to prevent changes from M1-Monitor. If you change the (input) Decode configuration; the M1-Monitor will automatically change the output setting on all instances of M1-Panner unless the Lock parameter is enabled.</div>
     </div>
 
     <h4 id="panner-stereo-params">Stereo Parameters</h4>
