@@ -23,6 +23,10 @@ public:
     PluginManager& getPluginManager() { return *pluginManager; }
     ServiceManager& getServiceManager() { return *serviceManager; }
     
+    void updateClientSeenTime(juce::int64 time) {
+        timeWhenHelperLastSeenAClient = time;
+    }
+    
 private:
     M1SystemHelperService();
     ~M1SystemHelperService() override;
@@ -38,7 +42,6 @@ private:
     std::unique_ptr<OSCHandler> oscHandler;
     
     juce::int64 timeWhenHelperLastSeenAClient = 0;
-    bool clientRequestsServer = false;
     
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(M1SystemHelperService)
 };

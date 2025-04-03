@@ -15,7 +15,6 @@ ServiceManager::~ServiceManager() {
 void ServiceManager::startOrientationManager() {
     // Check if port is available
     juce::DatagramSocket socket(false);
-    socket.setEnablePortReuse(false);
     
     if (!socket.bindToPort(serverPort)) {
         DBG("Port " + juce::String(serverPort) + " is in use, assuming service is running");
@@ -73,13 +72,24 @@ void ServiceManager::killOrientationManager() {
 
 void ServiceManager::restartOrientationManagerIfNeeded() {
     auto currentTime = juce::Time::currentTimeMillis();
-    if (clientRequestsServer && (currentTime - timeWhenWeLastStartedAManager) > 10000) {
+    
+    // Only restart if enough time has passed since last restart
+    if (clientRequestsServer && (currentTime - timeWhenWeLastStartedAManager) > SERVICE_RESTART_DELAY_MS) {
+        DBG("[ServiceManager] Restarting orientation manager due to client request");
+        
+        // Kill existing process
         killOrientationManager();
+        
+        // Wait for process to terminate
         juce::Thread::sleep(2000);
+        
+        // Start new process
         startOrientationManager();
-        juce::Thread::sleep(8000);
+        
+        // Reset flag and update time
         clientRequestsServer = false;
         timeWhenWeLastStartedAManager = currentTime;
+        DBG("[ServiceManager] Orientation manager restarted successfully");
     }
 }
 

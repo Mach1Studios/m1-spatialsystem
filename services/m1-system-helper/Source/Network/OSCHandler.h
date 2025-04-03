@@ -11,7 +11,7 @@ class OSCHandler : public juce::OSCReceiver::Listener<juce::OSCReceiver::Realtim
                   public juce::Timer  // Add Timer
 {
 public:
-    OSCHandler(ClientManager* clientManager, PluginManager* pluginManager, ServiceManager* processManager);
+    OSCHandler(ClientManager* clientManager, PluginManager* pluginManager, ServiceManager* serviceManager);
     ~OSCHandler() override;
 
     bool startListening(int port);
@@ -44,7 +44,7 @@ private:
 
     ClientManager* clientManager;
     PluginManager* pluginManager;
-    ServiceManager* processManager;
+    ServiceManager* serviceManager;
     
     juce::OSCReceiver receiver;
     using MessageHandler = std::function<void(const juce::OSCMessage&)>;
@@ -58,7 +58,6 @@ private:
     int lastSystemChannelCount = 0;
     int playerLastUpdate = 0;
 
-    juce::int64 pingTime = 0;
     juce::int64 timeWhenHelperLastSeenAClient = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(OSCHandler)

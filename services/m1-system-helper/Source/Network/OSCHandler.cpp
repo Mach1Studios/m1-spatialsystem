@@ -3,10 +3,10 @@
 
 namespace Mach1 {
 
-OSCHandler::OSCHandler(ClientManager* clientManager, PluginManager* pluginManager, ServiceManager* processManager)
+OSCHandler::OSCHandler(ClientManager* clientManager, PluginManager* pluginManager, ServiceManager* serviceManager)
     : clientManager(clientManager)
     , pluginManager(pluginManager)
-    , processManager(processManager)
+    , serviceManager(serviceManager)
 {
     setupMessageHandlers();
     startTimer(20);
@@ -61,9 +61,6 @@ void OSCHandler::setupMessageHandlers() {
 }
 
 void OSCHandler::oscMessageReceived(const juce::OSCMessage& message) {
-    // Update ping time for every message received
-    pingTime = juce::Time::currentTimeMillis();
-    
     auto address = message.getAddressPattern().toString();
     
     // Handle other messages
@@ -270,11 +267,19 @@ void OSCHandler::handlePannerSettings(const juce::OSCMessage& message) {
 }
 
 void OSCHandler::handleClientRequestsServer(const juce::OSCMessage& message) {
-    processManager->setClientRequestsServer(true);
+    // Set flag in process manager
+    serviceManager->setClientRequestsServer(true);
+    
+    // Also update the last seen time
+    timeWhenHelperLastSeenAClient = juce::Time::currentTimeMillis();
+    
+    // Log this event
+    DBG("[OSCHandler] Client requested server, triggering orientation manager start");
 }
 
 void OSCHandler::handleOMClientPulse(const juce::OSCMessage& message) {
-    timeWhenHelperLastSeenAClient = pingTime;
+    // Update the last seen time
+    timeWhenHelperLastSeenAClient = juce::Time::currentTimeMillis();
 }
 
 void OSCHandler::handlePluginPulse(const juce::OSCMessage& message) {
