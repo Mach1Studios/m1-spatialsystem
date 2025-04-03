@@ -156,6 +156,7 @@ try {
     // Create content placeholders template file if it doesn't exist
     contentPlaceholdersTemplate = `<div id="panner-content" class="product-content"></div>
 <div id="monitor-content" class="product-content"></div>
+<div id="orientation-content" class="product-content"></div>
 <div id="player-content" class="product-content"></div>
 <div id="transcoder-content" class="product-content"></div>
 <div id="guide-content" class="product-content"></div>`;
@@ -176,6 +177,7 @@ function readContentFile(filename) {
 
 const pannerContent = readContentFile('panner.html');
 const monitorContent = readContentFile('monitor.html');
+const orientationContent = readContentFile('orientation.html');
 const playerContent = readContentFile('player.html');
 const transcoderContent = readContentFile('transcoder.html');
 const guideContent = readContentFile('guide.html');
@@ -196,6 +198,7 @@ function replaceContentInDiv(html, divId, newContent) {
 
 outputHTML = replaceContentInDiv(outputHTML, 'panner-content', pannerContent);
 outputHTML = replaceContentInDiv(outputHTML, 'monitor-content', monitorContent);
+outputHTML = replaceContentInDiv(outputHTML, 'orientation-content', orientationContent);
 outputHTML = replaceContentInDiv(outputHTML, 'player-content', playerContent);
 outputHTML = replaceContentInDiv(outputHTML, 'transcoder-content', transcoderContent);
 outputHTML = replaceContentInDiv(outputHTML, 'guide-content', guideContent);
