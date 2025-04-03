@@ -208,8 +208,27 @@ function setupTOCLinks(tocLinks, contentSections, navLinks) {
 }
 
 function setupTooltipAreas() {
-    const tooltipAreas = document.querySelectorAll('.tooltip-area[href]');
-    tooltipAreas.forEach(area => {
+    // Create tooltip element if it doesn't exist
+    let tooltip = document.getElementById('custom-tooltip');
+    if (!tooltip) {
+        tooltip = document.createElement('div');
+        tooltip.id = 'custom-tooltip';
+        tooltip.style.position = 'absolute';
+        tooltip.style.backgroundColor = 'rgba(0,0,0,0.8)';
+        tooltip.style.color = 'white';
+        tooltip.style.padding = '5px 10px';
+        tooltip.style.borderRadius = '4px';
+        tooltip.style.fontSize = '14px';
+        tooltip.style.zIndex = '1000';
+        tooltip.style.pointerEvents = 'none';
+        tooltip.style.opacity = '0';
+        tooltip.style.transition = 'opacity 0.3s';
+        document.body.appendChild(tooltip);
+    }
+    
+    // Handle tooltip areas with href attributes
+    const tooltipAreasWithHref = document.querySelectorAll('.tooltip-area[href]');
+    tooltipAreasWithHref.forEach(area => {
         area.addEventListener('click', function(e) {
             e.preventDefault();
             const targetId = this.getAttribute('href');
@@ -259,8 +278,6 @@ function setupTooltipAreas() {
                             top: offset,
                             behavior: 'smooth'
                         });
-                        
-                        history.pushState(null, null, targetId);
                     }, 10);
                 } else {
                     const headerHeight = 60;
@@ -270,12 +287,40 @@ function setupTooltipAreas() {
                         top: offset,
                         behavior: 'smooth'
                     });
-                    
-                    history.pushState(null, null, targetId);
                 }
             }
         });
     });
+    
+    // Handle tooltip display for all tooltip areas
+    const tooltipAreas = document.querySelectorAll('.tooltip-area[data-tooltip]');
+    tooltipAreas.forEach(area => {
+        // Show tooltip on hover
+        area.addEventListener('mouseenter', function(e) {
+            const tooltipText = this.getAttribute('data-tooltip');
+            tooltip.textContent = tooltipText;
+            tooltip.style.opacity = '1';
+            
+            // Position the tooltip near the mouse
+            updateTooltipPosition(e);
+        });
+        
+        // Hide tooltip when mouse leaves
+        area.addEventListener('mouseleave', function() {
+            tooltip.style.opacity = '0';
+        });
+        
+        // Update tooltip position as mouse moves
+        area.addEventListener('mousemove', updateTooltipPosition);
+    });
+    
+    function updateTooltipPosition(e) {
+        const mouseX = e.clientX;
+        const mouseY = e.clientY;
+        
+        tooltip.style.left = (mouseX + 15) + 'px';
+        tooltip.style.top = (mouseY + 15) + 'px';
+    }
 }
 
 function initializePage() {
