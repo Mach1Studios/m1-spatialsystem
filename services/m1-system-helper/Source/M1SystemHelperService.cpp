@@ -66,13 +66,28 @@ void M1SystemHelperService::timerCallback() {
     
     // Check for inactive clients
     if ((currentTime - timeWhenHelperLastSeenAClient) > CLIENT_TIMEOUT_MS) {
-        serviceManager->killOrientationManager();
-        timeWhenHelperLastSeenAClient = currentTime;
+        if (serviceManager->isOrientationManagerRunning()) {
+            auto result = serviceManager->killOrientationManager();
+            if (!result.wasOk()) {
+                DBG("[M1SystemHelperService] Failed to kill orientation manager: " + result.getErrorMessage());
+            }
+            timeWhenHelperLastSeenAClient = currentTime;
+        }
     }
     
     // Handle client server requests
     if (serviceManager->getClientRequestsServer()) {
-        serviceManager->restartOrientationManagerIfNeeded();
+        // Try to start the orientation manager
+        auto result = serviceManager->startOrientationManager();
+        if (!result.wasOk()) {
+            DBG("[M1SystemHelperService] Failed to start orientation manager: " + result.getErrorMessage());
+            
+            // If starting fails, try restarting
+            result = serviceManager->restartOrientationManagerIfNeeded();
+            if (!result.wasOk()) {
+                DBG("[M1SystemHelperService] Failed to restart orientation manager: " + result.getErrorMessage());
+            }
+        }
         serviceManager->setClientRequestsServer(false);
     }
 }

@@ -18,9 +18,9 @@ public:
     explicit ServiceManager(int serverPort);
     ~ServiceManager();
 
-    void startOrientationManager();
-    void killOrientationManager();
-    void restartOrientationManagerIfNeeded();
+    Result startOrientationManager();
+    Result killOrientationManager();
+    Result restartOrientationManagerIfNeeded();
     bool isOrientationManagerRunning() const;
     
     void setClientRequestsServer(bool value) { clientRequestsServer = value; }
