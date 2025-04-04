@@ -6,17 +6,13 @@ M1SystemHelperService::M1SystemHelperService() {
     eventSystem = std::make_shared<EventSystem>();
     configManager = std::make_unique<ConfigManager>();
     
-    // Try to load config file
     juce::File configFile;
-    if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::MacOSX) != 0)
-    {
+    if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::MacOSX) != 0) {
         configFile = juce::File::getSpecialLocation(juce::File::commonApplicationDataDirectory)
                             .getChildFile("Application Support")
                             .getChildFile("Mach1")
                             .getChildFile("settings.json");
-    }
-    else
-    {
+    } else {
         configFile = juce::File::getSpecialLocation(juce::File::commonApplicationDataDirectory)
                             .getChildFile("Mach1")
                             .getChildFile("settings.json");
@@ -63,7 +59,6 @@ M1SystemHelperService& M1SystemHelperService::getInstance() {
 
 void M1SystemHelperService::initialise() {
     startTimer(1000); // Check status every second
-    serviceManager->startOrientationManager();
 }
 
 void M1SystemHelperService::timerCallback() {
@@ -71,14 +66,29 @@ void M1SystemHelperService::timerCallback() {
     
     // Check for inactive clients
     if ((currentTime - timeWhenHelperLastSeenAClient) > CLIENT_TIMEOUT_MS) {
-        serviceManager->killOrientationManager();
-        timeWhenHelperLastSeenAClient = currentTime;
+        if (serviceManager->isOrientationManagerRunning()) {
+            auto result = serviceManager->killOrientationManager();
+            if (!result.wasOk()) {
+                DBG("[M1SystemHelperService] Failed to kill orientation manager: " + result.getErrorMessage());
+            }
+            timeWhenHelperLastSeenAClient = currentTime;
+        }
     }
     
-    // Check if we need to restart the orientation manager
+    // Handle client server requests
     if (serviceManager->getClientRequestsServer()) {
-        serviceManager->setClientRequestsServer(true);
-        serviceManager->restartOrientationManagerIfNeeded();
+        // Try to start the orientation manager
+        auto result = serviceManager->startOrientationManager();
+        if (!result.wasOk()) {
+            DBG("[M1SystemHelperService] Failed to start orientation manager: " + result.getErrorMessage());
+            
+            // If starting fails, try restarting
+            result = serviceManager->restartOrientationManagerIfNeeded();
+            if (!result.wasOk()) {
+                DBG("[M1SystemHelperService] Failed to restart orientation manager: " + result.getErrorMessage());
+            }
+        }
+        serviceManager->setClientRequestsServer(false);
     }
 }
 

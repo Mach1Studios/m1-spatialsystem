@@ -18,14 +18,14 @@ public:
     explicit ServiceManager(int serverPort);
     ~ServiceManager();
 
-    void startOrientationManager();
-    void killOrientationManager();
-    void restartOrientationManagerIfNeeded();
+    Result startOrientationManager();
+    Result killOrientationManager();
+    Result restartOrientationManagerIfNeeded();
     bool isOrientationManagerRunning() const;
-
+    
     void setClientRequestsServer(bool value) { clientRequestsServer = value; }
     bool getClientRequestsServer() { return clientRequestsServer; }
-
+    
 private:
     void killProcessByName(const std::string& name);
     juce::Result handleServiceOperation(ServiceOperation operation, int result);
