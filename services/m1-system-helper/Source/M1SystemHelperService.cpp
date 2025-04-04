@@ -6,10 +6,17 @@ M1SystemHelperService::M1SystemHelperService() {
     eventSystem = std::make_shared<EventSystem>();
     configManager = std::make_unique<ConfigManager>();
     
-    // Try to load config file
-    auto configFile = juce::File::getSpecialLocation(juce::File::commonApplicationDataDirectory)
-                        .getChildFile("Mach1")
-                        .getChildFile("config.json");
+    juce::File configFile;
+    if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::MacOSX) != 0) {
+        configFile = juce::File::getSpecialLocation(juce::File::commonApplicationDataDirectory)
+                            .getChildFile("Application Support")
+                            .getChildFile("Mach1")
+                            .getChildFile("settings.json");
+    } else {
+        configFile = juce::File::getSpecialLocation(juce::File::commonApplicationDataDirectory)
+                            .getChildFile("Mach1")
+                            .getChildFile("settings.json");
+    }
     
     if (configFile.exists()) {
         auto result = configManager->loadConfig(configFile);
@@ -52,7 +59,6 @@ M1SystemHelperService& M1SystemHelperService::getInstance() {
 
 void M1SystemHelperService::initialise() {
     startTimer(1000); // Check status every second
-    serviceManager->startOrientationManager();
 }
 
 void M1SystemHelperService::timerCallback() {
@@ -65,9 +71,9 @@ void M1SystemHelperService::timerCallback() {
     }
     
     // Handle client server requests
-    if (clientRequestsServer) {
+    if (serviceManager->getClientRequestsServer()) {
         serviceManager->restartOrientationManagerIfNeeded();
-        clientRequestsServer = false;
+        serviceManager->setClientRequestsServer(false);
     }
 }
 

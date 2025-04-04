@@ -73,13 +73,16 @@ void ServiceManager::killOrientationManager() {
 
 void ServiceManager::restartOrientationManagerIfNeeded() {
     auto currentTime = juce::Time::currentTimeMillis();
-    if (clientRequestsServer && (currentTime - timeWhenWeLastStartedAManager) > 10000) {
-        killOrientationManager();
-        juce::Thread::sleep(2000);
-        startOrientationManager();
-        juce::Thread::sleep(8000);
+    if (clientRequestsServer && (currentTime - timeWhenWeLastStartedAManager) > SERVICE_RESTART_DELAY_MS) {
+        DBG("[ServiceManager] Restarting orientation manager due to client request");
+        killOrientationManager(); // kill existing
+        juce::Thread::sleep(2000); // wait to terminate
+        startOrientationManager(); // start new service process
+        juce::Thread::sleep(6000);
         clientRequestsServer = false;
+        currentTime = juce::Time::currentTimeMillis();
         timeWhenWeLastStartedAManager = currentTime;
+        DBG("[ServiceManager] Orientation manager restarted successfully");
     }
 }
 

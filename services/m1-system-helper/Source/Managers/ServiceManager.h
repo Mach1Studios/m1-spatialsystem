@@ -24,7 +24,8 @@ public:
     bool isOrientationManagerRunning() const;
     
     void setClientRequestsServer(bool value) { clientRequestsServer = value; }
-
+    bool getClientRequestsServer() { return clientRequestsServer; }
+    
 private:
     void killProcessByName(const std::string& name);
     juce::Result handleServiceOperation(ServiceOperation operation, int result);

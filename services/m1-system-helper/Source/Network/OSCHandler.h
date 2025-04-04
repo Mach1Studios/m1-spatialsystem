@@ -44,7 +44,7 @@ private:
 
     ClientManager* clientManager;
     PluginManager* pluginManager;
-    ServiceManager* processManager;
+    ServiceManager* serviceManager;
     
     juce::OSCReceiver receiver;
     using MessageHandler = std::function<void(const juce::OSCMessage&)>;

@@ -3,10 +3,10 @@
 
 namespace Mach1 {
 
-OSCHandler::OSCHandler(ClientManager* clientManager, PluginManager* pluginManager, ServiceManager* processManager)
+OSCHandler::OSCHandler(ClientManager* clientManager, PluginManager* pluginManager, ServiceManager* serviceManager)
     : clientManager(clientManager)
     , pluginManager(pluginManager)
-    , processManager(processManager)
+    , serviceManager(serviceManager)
 {
     setupMessageHandlers();
     startTimer(20);
@@ -270,7 +270,7 @@ void OSCHandler::handlePannerSettings(const juce::OSCMessage& message) {
 }
 
 void OSCHandler::handleClientRequestsServer(const juce::OSCMessage& message) {
-    processManager->setClientRequestsServer(true);
+    serviceManager->setClientRequestsServer(true);
 }
 
 void OSCHandler::handleOMClientPulse(const juce::OSCMessage& message) {
