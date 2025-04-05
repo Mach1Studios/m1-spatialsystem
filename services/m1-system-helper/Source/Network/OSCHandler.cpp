@@ -61,9 +61,6 @@ void OSCHandler::setupMessageHandlers() {
 }
 
 void OSCHandler::oscMessageReceived(const juce::OSCMessage& message) {
-    // Update ping time for every message received
-    pingTime = juce::Time::currentTimeMillis();
-    
     auto address = message.getAddressPattern().toString();
     
     // Handle other messages
@@ -274,7 +271,7 @@ void OSCHandler::handleClientRequestsServer(const juce::OSCMessage& message) {
 }
 
 void OSCHandler::handleOMClientPulse(const juce::OSCMessage& message) {
-    timeWhenHelperLastSeenAClient = pingTime;
+    timeWhenHelperLastSeenAClient = juce::Time::currentTimeMillis();
 }
 
 void OSCHandler::handlePluginPulse(const juce::OSCMessage& message) {
