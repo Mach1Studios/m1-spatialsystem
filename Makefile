@@ -192,6 +192,13 @@ else
 	cd m1-transcoder && ./scripts/setup.sh && npm install
 endif
 
+dev-transcoder-plugin:
+ifeq ($(detected_OS),Darwin)
+	cmake m1-transcoder/juce_plugin -Bm1-transcoder/juce_plugin/build-dev -G "Xcode" -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DBUILD_STANDALONE=ON
+else
+	cmake m1-transcoder/juce_plugin -Bm1-transcoder/juce_plugin/build-dev -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_STANDALONE=ON
+endif
+
 overlay-debug:
 	cd m1-panner/Resources/overlay_debug && ./run_simulator.sh --title "Avid Video Engine"
 
