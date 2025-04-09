@@ -1,19 +1,39 @@
 <h2>Mach1 Orientation Manager</h2>
 
 <div id="orientation-client" class="doc-section">
+    <!-- Description Section -->
+    <div id="orientation-description" class="doc-section">
+        <h3>Description</h3>
+        <p>The Mach1 Orientation Manager is an external orientation device manager and utility designed for aggregating different headtracking methods. It functions as a central service that connects, manages, and routes orientation data from various devices to Mach1 applications. By supporting multiple hardware connections and data transmission protocols, it enables seamless integration of orientation tracking in spatial audio workflows.</p>
+
+        <!-- Integration Section -->
+        <div id="daw-integration">
+            <div class="parameter-title">System Integration</div>
+            <div class="parameter-description">
+                The Orientation Manager integrates with various parts of the Mach1 Spatial System:
+                <ul>
+                    <li><strong>Background Service:</strong> Runs as a system service or LaunchAgent</li>
+                    <li><strong>OSC Client:</strong> UI application for monitoring and configuration</li>
+                    <li><strong>Mach1 Monitor:</strong> For real-time spatial audio monitoring</li>
+                    <li><strong>Mach1 Player:</strong> For video monitoring with head tracking</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
     <h3>Interface</h3>
     <div style="display: flex; align-items: flex-start; gap: 20px; margin: 20px 0;">
-        <div style="position: relative; flex: 0 0 600px;">
-            <img src="./orientation-images/Screenshot 2025-04-02 at 4.15.26 PM.png" alt="Mach1 Orientation Manager Interface" style="width: 100%; height: auto;">
+        <div style="position: relative; flex: 0 0 300px;">
+            <img src="./orientation-images/orientation-client-interface.png" alt="Mach1 Orientation Client Interface" style="width: 100%; height: auto;">
             
-            <!-- Tooltip areas overlaying the image -->
+            <!-- Tooltip areas overlaying the image - positions adjusted for 50% width -->
             <div class="tooltip-area" style="position: absolute; top: 10%; left: 1%; width: 97%; height: 21%;" data-tooltip="Device Selection Menu" href="#device-selector"></div>
             
-            <div class="tooltip-area" style="position: absolute; top: 31%; left: 1%; width: 69%; height: 17%;" data-tooltip="Connection Path" href="#connection-path"></div>
+            <div class="tooltip-area" style="position: absolute; top: 31%; left: 1%; width: 69%; height: 17%;" data-tooltip="Input OSC Address" href="#orientation-osc-address"></div>
             
             <div class="tooltip-area" style="position: absolute; top: 57%; left: 1%; width: 97%; height: 24%;" data-tooltip="Orientation Data Display" href="#orientation-data"></div>
             
-            <div class="tooltip-area" style="position: absolute; top: 31%; right: 1%; width: 29%; height: 17%;" data-tooltip="Port" href="#orientation-port"></div>
+            <div class="tooltip-area" style="position: absolute; top: 31%; right: 1%; width: 29%; height: 17%;" data-tooltip="Input OSC Port" href="#orientation-osc-port"></div>
             
             <div class="tooltip-area" style="position: absolute; bottom: 3%; left: 1%; width: 49%; height: 17%;" data-tooltip="Recenter Orientation" href="#orientation-recenter"></div>
             
@@ -41,19 +61,13 @@
     </div>
 </div>
 
-<!-- Description Section -->
-<div id="orientation-description" class="doc-section">
-    <h3>Description</h3>
-    <p>The Mach1 Orientation Manager is an external orientation device manager and utility designed for aggregating different headtracking methods. It functions as a central service that connects, manages, and routes orientation data from various devices to Mach1 applications. By supporting multiple hardware connections and data transmission protocols, it enables seamless integration of orientation tracking in spatial audio workflows.</p>
-</div>
-
 <!-- Interface Elements Documentation -->
-<div id="interface-elements" class="doc-section">
-    <h3>Interface Elements</h3>
+<div id="orientation-parameters" class="doc-section">
+    <h3>Parameters</h3>
     <p>The Mach1 Orientation Manager OSC Client interface contains several key components for controlling and monitoring orientation data:</p>
     
     <div style="margin: 20px 0;">
-        <img src="./orientation-images/Screenshot 2025-04-02 at 4.13.56 PM.png" alt="Orientation Manager Before Device Selection" style="max-width: 100%; height: auto;">
+        <img src="./orientation-images/orientation-client-closed.png" alt="Orientation Manager Before Device Selection" style="max-width: 100%; height: auto;">
         <p class="caption">Initial client state before selecting any device</p>
     </div>
 
@@ -62,13 +76,6 @@
         <div class="parameter-description">
             Select from various supported orientation tracking devices
             <p>The menu will display all currently detected compatible devices. If your device isn't listed, check its connection and ensure drivers are properly installed.</p>
-        </div>
-    </div>
-    
-    <div id="connection-path" class="parameter">
-        <div class="parameter-title">Connection Path</div>
-        <div class="parameter-description">
-            Displays the connection path information between the device and the Orientation Manager, showing the specific route and protocol used for data transmission.
         </div>
     </div>
     
@@ -82,19 +89,7 @@
                 <li><strong>Roll:</strong> Lateral rotation (tilt)</li>
             </ul>
             <p>This section displays the current orientation values being received from the connected device and sent to other applications. The data is processed by the background service and made available through this client interface.</p>
-        </div>
-    </div>
-    
-    <div id="orientation-port" class="parameter">
-        <div class="parameter-title">Port</div>
-        <div class="parameter-description">
-            Configure the OSC port settings for communication:
-            <ul>
-                <li>Set the port number for OSC data transmission</li>
-                <li>This defines where the orientation data will be sent</li>
-                <li>Must match the incoming port on any receiving application</li>
-            </ul>
-            <p>The Orientation Manager uses OSC (Open Sound Control) protocol to send orientation data to other applications. This setting allows you to specify which port should receive the orientation data.</p>
+            <p>Each of these values are also buttons to invert (-) the polarity of each axis depending on how the device is mounted or being used.</p>
         </div>
     </div>
     
@@ -123,16 +118,46 @@
     </div>
 </div>
 
-<!-- Supported Devices Section -->
-<div id="supported-devices" class="doc-section">
-    <h3>Supported Devices</h3>
-    
-    <div style="margin: 20px 0;">
-        <img src="./orientation-images/Screenshot 2025-04-02 at 4.14.31 PM.png" alt="Orientation Manager Device Selection" style="max-width: 100%; height: auto;">
-        <p class="caption">Device selection options in the Orientation Manager</p>
+<div id="orientation-device-parameters" class="doc-section">
+    <h3>Device Specific Parameters</h3>
+
+    <h4>OSC</h4>
+    <div id="orientation-osc-address" class="parameter">
+        <div class="parameter-title">Input OSC Address</div>
+        <div class="parameter-description">
+            Displays the OSC address for receiving orientation data from another app or device to the Orientation Manager, and allows you to change it for more customization.
+        </div>
     </div>
 
-    <h4 id="vr-devices">Hardware & Data Transmission</h4>
+    <div id="orientation-osc-port" class="parameter">
+        <div class="parameter-title">Input OSC Port</div>
+        <div class="parameter-description">
+            Configure the OSC port settings for communication:
+            <ul>
+                <li>Set the port number for receiving OSC data</li>
+                <li>Must match the outgoing port on any sending application</li>
+            </ul>
+            <p>The Orientation Manager uses OSC (Open Sound Control) protocol to send orientation data to other applications. This setting allows you to specify which port should receive the orientation data.</p>
+        </div>
+    </div>
+
+    <h4>Superware IMU</h4>
+    <div id="superware-imu-parameters-chirality" class="parameter">
+        <div class="parameter-title">Chirality</div>
+        <div class="parameter-description">
+            Indicate whether the Supperware device's USB port is on the left or right side when mounted on the head. This is important for determining the correct orientation of the device.
+        </div>
+    </div>  
+</div>
+
+<!-- Supported Devices Section -->
+<div id="orientation-hardware" class="doc-section">
+    <h3>Hardware</h3>
+    
+    <div style="margin: 20px 0;">
+        <img src="./orientation-images/orientation-client-open.png" alt="Orientation Manager Device Selection" style="max-width: 100%; height: auto;">
+        <p class="caption">Device selection options in the Orientation Manager</p>
+    </div>
     
     <div id="vr-headsets" class="parameter">
         <div class="parameter-title">Connection Types</div>
@@ -147,8 +172,6 @@
             </ul>
         </div>
     </div>
-
-    <h4 id="mobile-devices">Compatible Devices</h4>
     
     <div id="mobile-apps" class="parameter">
         <div class="parameter-title">Supported Hardware</div>
@@ -161,24 +184,6 @@
                 <li><strong>M1 IMU:</strong> Mach1's proprietary orientation sensor</li>
                 <li><strong>WitMotion IMUs:</strong> Cost-effective motion sensors (in development)</li>
                 <li><strong>Custom OSC Input:</strong> Any device or app that sends OSC-formatted orientation data</li>
-            </ul>
-        </div>
-    </div>
-</div>
-
-<!-- Integration Section -->
-<div id="integration" class="doc-section">
-    <h3>Integration</h3>
-
-    <div id="daw-integration" class="parameter">
-        <div class="parameter-title">System Integration</div>
-        <div class="parameter-description">
-            The Orientation Manager integrates with various parts of the Mach1 ecosystem:
-            <ul>
-                <li><strong>Background Service:</strong> Runs as a system service or LaunchAgent</li>
-                <li><strong>OSC Client:</strong> UI application for monitoring and configuration</li>
-                <li><strong>Mach1 Monitor:</strong> For real-time spatial audio monitoring</li>
-                <li><strong>Mach1 Player:</strong> For video monitoring with head tracking</li>
             </ul>
         </div>
     </div>
