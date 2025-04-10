@@ -7,43 +7,43 @@
             <!-- Yaw control dial -->
             <a href="#yaw" class="tooltip-area" 
                 style="position: absolute; left: 4%; top: 2%; width: 44%; height: 45%;" 
-                data-tooltip="Yaw dial">
+                data-tooltip="Yaw dial for changing the horizontal rotation of the listener">
             </a>
             
             <!-- Pitch control dial -->
             <a href="#pitch" class="tooltip-area" 
                 style="position: absolute; left: 66%; top: 5%; width: 19%; height: 25%;" 
-                data-tooltip="Pitch dial">
+                data-tooltip="Pitch dial for changing the vertical rotation of the listener">
             </a>
             
             <!-- Roll control dial -->
             <a href="#roll" class="tooltip-area" 
                 style="position: absolute; left: 63%; top: 32%; width: 26%; height: 13%;" 
-                data-tooltip="Roll dial">
+                data-tooltip="Roll dial for changing the lateral rotation of the listener (left ear points toward the ground when the roll is -90 and right ear points toward the ground when the roll is 90)">
             </a>
             
             <!-- Settings dropdown -->
             <a href="#timecode-offset" class="tooltip-area" 
                 style="position: absolute; left: 1%; top: 67%; width: 46%; height: 12%;" 
-                data-tooltip="Configure timecode offset">
+                data-tooltip="Configure timecode offset for syncing the Mach1 Player with your DAW">
             </a>
 
             <!-- Settings dropdown -->
             <a href="#monitor-modes" class="tooltip-area" 
                 style="position: absolute; left: 1%; top: 56%; width: 46%; height: 12%;" 
-                data-tooltip="Monitor modes selector">
+                data-tooltip="Monitor modes selector for different decoding modes">
             </a>
 
             <!-- Settings dropdown -->
-            <a href="#connected-devices" class="tooltip-area" 
+            <a href="#orientation-client" class="tooltip-area" 
                 style="position: absolute; left: 55%; top: 56%; width: 42%; height: 12%;" 
-                data-tooltip="Switch between connected devices">
+                data-tooltip="Find, connect and manage a 3rd party orientation or headtracking device">
             </a>
             
             <!-- Decode format selector -->
             <a href="#decode-selection" class="tooltip-area" 
                 style="position: absolute; left: 47%; top: 93%; width: 27%; height: 6%;" 
-                data-tooltip="Decode selection Mach1-Spatial 8 or 4">
+                data-tooltip="Decode selection for decoding a Mach1 Spatial multichannel configuration input">
             </a>
         </div>
         <div style="
@@ -67,26 +67,16 @@
         </div>
     </div>
     <!-- Description Section -->
-    <div id="description" class="doc-section">
+    <div id="monitor-description" class="doc-section">
         <h3>Description</h3>
         
         <h4 id="decoding">Decoding Explained</h4>
         <p>The Mach1 Monitor allows users to preview and monitor the mix as though you were head tracking in your target device/app/project. The audio outputting from the channel containing Mach1 Monitor is not intended for exporting (unless using the <strong>StereoSafe mode</strong>) and is only intended for aiding in the process of mixing and mastering your spatial audio mix. This process takes the multichannel of Mach1 Spatial and down mixes them with our Mach1 Spatial VVBP algorithm to output the correct stereo image based on your simulated orientation angles (Yaw, Pitch, Roll).</p>
     </div>
 
-    <!-- Headlocked Section -->
-    <div id="headlocked" class="doc-section">
-        <h3>Headlocked/Static Stereo</h3>
-        <p>Stereo audio that is intended to be headlocked or static (example: music mix) should not be processed by the Mach1 Monitor and instead should be in a buss/track that sums with the output of Mach1 Monitor for the correct mixing reference.</p>
-        
-        <div class="note">
-            <strong>Note:</strong> This is an important consideration when working with mixed spatial and traditional stereo content in your project.
-        </div>
-    </div>
-
     <!-- Plugin Features Section -->
-    <div id="plugin-features" class="doc-section">
-        <h3>Plugin Features</h3>
+    <div id="monitor-plugin-parameters" class="doc-section">
+        <h3>Plugin Parameters</h3>
         <p>The following explains all the current possible encoding modes of the Mach1 Monitor in your common DAW/Editor.</p>
         
         <h4 id="general-parameters">General Parameters</h4>
@@ -109,9 +99,25 @@
             <div class="parameter-description">Allows users to simulate head-tracking on the roll axis (tilting head toward a shoulder)</div>
         </div>
     </div>
+
+    <h4>Decode Selection</h4>
+    <p>The decode selection determines how your spatial mix will be monitored and affects the available panning options in connected Mach1 Panners:</p>
+    
+    <div id="horizon-4ch" class="parameter">
+        <div class="parameter-title">Mach1 Horizon (4ch)</div>
+        <div class="parameter-description">A 4-channel horizontal-only configuration. Limits spatial movement to the horizontal plane. When selected, connected Mach1 Panners will hide Z-axis controls and optimize for horizontal-only movement.</div>
+    </div>
+    <div id="spatial-8ch" class="parameter">
+        <div class="parameter-title">Mach1 Spatial (8ch)</div>
+        <div class="parameter-description">The standard 8-channel configuration with full 3D spatial audio support. Enables complete spatial control including height information. When selected, connected Mach1 Panners will show full 3D controls including Z-axis movement.</div>
+    </div>
+    <div id="spatial-14ch" class="parameter">
+        <div class="parameter-title">Mach1 Spatial (14ch)</div>
+        <div class="parameter-description">The 14-channel configuration with full 3D spatial audio support. Enables complete spatial control including height information. When selected, connected Mach1 Panners will show full 3D controls including Z-axis movement.</div>
+    </div>
     
     <!-- Settings Section -->
-    <div id="settings" class="doc-section">
+    <div id="monitor-settings" class="doc-section">
         <h4 id="settings-header">Settings</h4>
         
         <div id="monitor-modes" class="doc-subsection">
@@ -135,45 +141,6 @@
 
             <div class="note">
                 <strong>Note:</strong> Changing monitor modes will affect how you hear your mix but does not modify the original spatial audio data unless you're recording the monitor output.
-            </div>
-        </div>
-        
-        <div id="connected-devices" class="doc-subsection">
-            <h4>Connected Devices</h4>
-            <p>The Mach1 Monitor can receive orientation data from various sources to simulate head movement and test your spatial mix:</p>
-            
-            <div id="default-device" class="parameter">
-                <div class="parameter-title">Default</div>
-                <div class="parameter-description">Uses the built-in orientation controls (Yaw, Pitch, Roll dials). This is the standard mode for basic testing and automation.</div>
-            </div>
-
-            <div id="vr-device" class="parameter">
-                <div class="parameter-title">VR Headset</div>
-                <div class="parameter-description">When connected, uses orientation data from VR headsets (like Oculus, Vive, etc.) for more immersive testing. Particularly useful when mixing for VR applications.</div>
-            </div>
-            
-            <div id="osc-device" class="parameter">
-                <div class="parameter-title">OSC Input</div>
-                <div class="parameter-description">Accepts orientation data from external applications or devices via OSC protocol. This allows integration with custom controllers, mobile apps, or other orientation tracking systems.</div>
-            </div>
-
-            <div class="note">
-                <strong>Note:</strong> For detailed information about connecting external devices and the Mach1 Orientation Manager, please refer to the <a href="#orientation">Orientation Manager</a> section.
-            </div>
-        </div>
-        
-        <div id="decode-selection" class="doc-subsection">
-            <h4>Decode Selection</h4>
-            <p>The decode selection determines how your spatial mix will be monitored and affects the available panning options in connected Mach1 Panners:</p>
-            
-            <div id="spatial-8ch" class="parameter">
-                <div class="parameter-title">Mach1 Spatial (8ch)</div>
-                <div class="parameter-description">The standard 8-channel configuration with full 3D spatial audio support. Enables complete spatial control including height information. When selected, connected Mach1 Panners will show full 3D controls including Z-axis movement.</div>
-            </div>
-            
-            <div id="horizon-4ch" class="parameter">
-                <div class="parameter-title">Mach1 Horizon (4ch)</div>
-                <div class="parameter-description">A 4-channel horizontal-only configuration. Limits spatial movement to the horizontal plane. When selected, connected Mach1 Panners will hide Z-axis controls and optimize for horizontal-only movement.</div>
             </div>
         </div>
         
