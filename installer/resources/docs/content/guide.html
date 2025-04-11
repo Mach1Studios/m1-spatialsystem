@@ -30,12 +30,11 @@
     <h4>Mach1 System Helper (m1-system-helper)</h4>
     <p>The Mach1 Spatial System allow automatic communication between all plugins and standalone applications. This is done via a background service "M1-System-Helper" which sets up temporary and lightweight network between all the plugins and apps during runtime. The following ports are used behind the scenes on launch of plugins and standalone applications:</p>
         
-    <div class="ports">
-        <div class="ports-title">System Ports</div>
-        <div class="ports-description">
-            Port: 9001-9004 : 9100 : 10000-11000 : 12345<br>
-            Ports are searched and configured on launch for these ranges on the localhost of the user's computer.
-        </div>
+    <div class="note">
+        <strong>User Defined Ports:</strong> 6345, 6346<br>
+        <i>These ports are defined via the `settings.json` file in the common User Data folder of your OS within a `Mach1` folder.</i><br><br>
+        <strong>Ports:</strong> 9001-9004 : 9100 : 10000-11000 : 12345<br>
+        <i>Ports are searched and configured on launch for these ranges on the localhost of the user's computer.</i>
     </div>
 
     <h4>Mach1 Orientation Manager (m1-orientationmanager)</h4>
@@ -116,9 +115,6 @@
             </ul>
         </div>
     </div>
-
-    <h4>Wwise</h4>
-    <p>Currently in development.</p>
 </div>
 
 <div id="guide-sdk" class="doc-section">
