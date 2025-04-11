@@ -59,7 +59,6 @@ body {
 .toc-sidebar {
     width: var(--toc-width);
     background-color: var(--dark-bg-lightest);
-    padding: 30px 0;
     position: fixed;
     top: 0;
     left: 0;
@@ -209,6 +208,41 @@ body {
 
 .toc-sidebar > .toc-sidebar-inner > ul > li.has-submenu:not(.collapsed) > a {
     background-color: rgba(255, 193, 7, 0.2);
+}
+
+.sidebar-logo {
+    text-align: center;
+    padding: 5px 0;
+    margin-bottom: 5px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sidebar-logo img {
+    max-width: 60%;
+    height: auto;
+    margin-top: 5px;
+}
+
+.sidebar-logo a {
+    display: inline-block;
+    border-left: none;
+    padding: 0;
+}
+
+.sidebar-logo a:hover, 
+.sidebar-logo a:focus, 
+.sidebar-logo a:active {
+    background-color: transparent;
+    border-left: none;
+    transform: none;
+    color: inherit;
+    font-weight: normal;
+}
+
+.toc-sidebar .sidebar-logo a:hover {
+    background-color: transparent;
+    border-left: none;
+    transform: none;
 }
 
 /* Main content area */
