@@ -8,9 +8,6 @@ A background executable that checks if the server is still active and operating 
 - `cmake ..` Create project files by adding the appropriate `-G Xcode` or `-G "Visual Studio 16 2019"` to the end of this line
 - `cmake --build .`
 
-### Build via .jucer
-- Open the `m1-system-helper.jucer` and compile as needed
-
 ## Install
 Currently this helper service executable is expected in a common data directory of each local machine, and where applicable to be managed by a service agent or LaunchAgent.
 
