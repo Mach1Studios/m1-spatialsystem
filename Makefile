@@ -283,6 +283,63 @@ ifeq ($(detected_OS),Darwin)
 	#./installer/osx/macos_utilities.sh -f m1-system-helper -z .zip -p services/m1-system-helper/build/m1-system-helper_artefacts -k 'notarize-app' --apple-id $(APPLE_USERNAME) --apple-app-pass $(ALTOOL_APPPASS) -t $(APPLE_TEAM_CODE)
 endif
 
+# Plugin validation with pluginval
+download-pluginval:
+ifeq ($(detected_OS),Darwin)
+	@if [ ! -f "./pluginval.app/Contents/MacOS/pluginval" ]; then \
+		echo "Downloading pluginval for macOS..."; \
+		curl -LO "https://github.com/Tracktion/pluginval/releases/latest/download/pluginval_macOS.zip"; \
+		unzip -o pluginval_macOS.zip; \
+		rm pluginval_macOS.zip; \
+		echo "✅ pluginval downloaded and extracted"; \
+	else \
+		echo "✅ pluginval already exists"; \
+	fi
+else ifeq ($(detected_OS),Windows)
+	@if not exist "pluginval.exe" ( \
+		echo "Downloading pluginval for Windows..." && \
+		curl -LO "https://github.com/Tracktion/pluginval/releases/latest/download/pluginval_Windows.zip" && \
+		7z x -aoa pluginval_Windows.zip && \
+		del pluginval_Windows.zip && \
+		echo "✅ pluginval downloaded and extracted" \
+	) else ( \
+		echo "✅ pluginval already exists" \
+	)
+endif
+
+test-monitor: dev-monitor download-pluginval
+	@echo "Building M1-Monitor in development mode..."
+	cmake --build m1-monitor/build-dev --config "Debug"
+	@echo "Testing M1-Monitor plugin..."
+ifeq ($(detected_OS),Darwin)
+	./pluginval.app/Contents/MacOS/pluginval --strictness-level 10 --repeat 2 --verbose --validate "m1-monitor/build-dev/M1-Monitor_artefacts/Debug/VST3/M1-Monitor.vst3"
+else ifeq ($(detected_OS),Windows)
+	./pluginval.exe --strictness-level 10 --repeat 2 --verbose --skip-gui-tests --validate "m1-monitor/build-dev/M1-Monitor_artefacts/Debug/VST3/M1-Monitor.vst3"
+endif
+	@echo "✅ M1-Monitor validation completed"
+
+test-panner: dev-panner download-pluginval
+	@echo "Building M1-Panner in development mode..."
+	cmake --build m1-panner/build-dev --config "Debug"
+	@echo "Testing M1-Panner plugin..."
+ifeq ($(detected_OS),Darwin)
+	./pluginval.app/Contents/MacOS/pluginval --strictness-level 10 --repeat 2 --verbose --validate "m1-panner/build-dev/M1-Panner_artefacts/Debug/VST3/M1-Panner.vst3"
+else ifeq ($(detected_OS),Windows)
+	./pluginval.exe --strictness-level 10 --repeat 2 --verbose --skip-gui-tests --validate "m1-panner/build-dev/M1-Panner_artefacts/Debug/VST3/M1-Panner.vst3"
+endif
+	@echo "✅ M1-Panner validation completed"
+
+test-plugins: test-monitor test-panner
+	@echo "🎉 All plugin validations completed successfully!"
+
+clean-pluginval:
+ifeq ($(detected_OS),Darwin)
+	rm -rf pluginval.app
+else ifeq ($(detected_OS),Windows)
+	del pluginval.exe
+endif
+	@echo "✅ pluginval cleaned up"
+
 installer-pkg:
 ifeq ($(detected_OS),Darwin)
 	packagesbuild -v installer/osx/Mach1\ Spatial\ System\ Installer.pkgproj
