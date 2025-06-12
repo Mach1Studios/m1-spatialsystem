@@ -30,6 +30,7 @@ setup:
 ifeq ($(detected_OS),Darwin)
 	# Assumes you have installed Homebrew package manager
 	brew install yasm cmake p7zip ninja act pre-commit launchcontrol
+	npm install -g nodemon
 	cd m1-transcoder && ./scripts/setup.sh
 	cd m1-panner && pre-commit install
 	cd m1-monitor && pre-commit install
@@ -38,6 +39,7 @@ else ifeq ($(detected_OS),Windows)
 	@echo "choco is installed and working"
 	@choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' --apply-install-arguments-to-dependencies
 	@if not exist "$(pip show pre-commit)" (pip install pre-commit)
+	npm install -g nodemon
 	cd m1-panner && pre-commit install
 	cd m1-monitor && pre-commit install
 endif
@@ -130,6 +132,15 @@ ifeq ($(detected_OS),Darwin)
 	rm -rf ~/Library/Audio/Plug-Ins/VST3/M1-Panner.vst3
 	rm -rf ~/Library/Audio/Plug-Ins/Components/M1-Monitor.component
 	rm -rf ~/Library/Audio/Plug-Ins/Components/M1-Panner.component
+endif
+
+docs:
+ifeq ($(detected_OS),Darwin)
+	cd installer/resources/docs && (node build-docs.js & nodemon --watch . -e js,md,html --ignore node_modules/ --exec 'node build-docs.js' & open index.html)
+else ifeq ($(detected_OS),Windows)
+	cd installer/resources/docs && (node build-docs.js & nodemon --watch . -e js,md,html --ignore node_modules/ --exec "node build-docs.js" & start index.html)
+else
+	cd installer/resources/docs && (node build-docs.js & nodemon --watch . -e js,md,html --ignore node_modules/ --exec 'node build-docs.js' & xdg-open index.html)
 endif
 
 # configure for debug and setup dev envs with common IDEs

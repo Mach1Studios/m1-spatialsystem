@@ -1,0 +1,175 @@
+<h2>Mach1 Monitor</h2>
+<div id="monitor-interface" class="doc-section">
+    <h3>Interface</h3>
+    <div style="display: flex; align-items: flex-start; gap: 20px; margin: 20px 0;">
+        <div style="position: relative; flex: 0 0 600px;">
+            <img src="./monitor-images/m1-monitor.jpg" alt="Mach1 Monitor Interface" style="width: 100%; height: auto;">
+            <!-- Yaw control dial -->
+            <a href="#yaw" class="tooltip-area" 
+                style="position: absolute; left: 4%; top: 2%; width: 44%; height: 45%;" 
+                data-tooltip="Yaw dial for changing the horizontal rotation of the listener">
+            </a>
+            
+            <!-- Pitch control dial -->
+            <a href="#pitch" class="tooltip-area" 
+                style="position: absolute; left: 66%; top: 5%; width: 19%; height: 25%;" 
+                data-tooltip="Pitch dial for changing the vertical rotation of the listener">
+            </a>
+            
+            <!-- Roll control dial -->
+            <a href="#roll" class="tooltip-area" 
+                style="position: absolute; left: 63%; top: 32%; width: 26%; height: 13%;" 
+                data-tooltip="Roll dial for changing the lateral rotation of the listener (left ear points toward the ground when the roll is -90 and right ear points toward the ground when the roll is 90)">
+            </a>
+            
+            <!-- Settings dropdown -->
+            <a href="#timecode-offset" class="tooltip-area" 
+                style="position: absolute; left: 1%; top: 67%; width: 46%; height: 12%;" 
+                data-tooltip="Configure timecode offset for syncing the Mach1 Player with your DAW">
+            </a>
+
+            <!-- Settings dropdown -->
+            <a href="#monitor-modes" class="tooltip-area" 
+                style="position: absolute; left: 1%; top: 56%; width: 46%; height: 12%;" 
+                data-tooltip="Monitor modes selector for different decoding modes">
+            </a>
+
+            <!-- Settings dropdown -->
+            <a href="#orientation-client" class="tooltip-area" 
+                style="position: absolute; left: 55%; top: 56%; width: 42%; height: 12%;" 
+                data-tooltip="Find, connect and manage a 3rd party orientation or headtracking device">
+            </a>
+            
+            <!-- Decode format selector -->
+            <a href="#decode-selection" class="tooltip-area" 
+                style="position: absolute; left: 47%; top: 93%; width: 27%; height: 6%;" 
+                data-tooltip="Decode selection for decoding a Mach1 Spatial multichannel configuration input">
+            </a>
+        </div>
+        <div style="
+            flex: 0 0 200px;
+            background-color: var(--dark-bg-lightest);
+            border: 1px solid var(--accent-color);
+            border-radius: 4px;
+            padding: 15px;
+            font-size: 0.9rem;
+            align-self: center;
+        ">
+            <div style="display: flex; align-items: center; margin-bottom: 10px; color: var(--accent-color);">
+                <i class="fas fa-lightbulb" style="margin-right: 8px;"></i>
+                <strong>Interactive Guide</strong>
+            </div>
+            <p style="margin: 0; line-height: 1.5;">
+                Hover over different parts of the interface to learn more.
+                <br><br>
+                Areas with a pointing hand cursor (<span style="font-size: 1.1em;">👆</span>) can be clicked to navigate to their documentation.
+            </p>
+        </div>
+    </div>
+    <!-- Description Section -->
+    <div id="monitor-description" class="doc-section">
+        <h3>Description</h3>
+        
+        <h4 id="decoding">Decoding Explained</h4>
+        <p>The Mach1 Monitor allows users to preview and monitor the mix as though you were head tracking in your target device/app/project. The audio outputting from the channel containing Mach1 Monitor is not intended for exporting (unless using the <strong>StereoSafe mode</strong>) and is only intended for aiding in the process of mixing and mastering your spatial audio mix. This process takes the multichannel of Mach1 Spatial and down mixes them with our Mach1 Spatial VVBP algorithm to output the correct stereo image based on your simulated orientation angles (Yaw, Pitch, Roll).</p>
+    </div>
+
+    <!-- Plugin Features Section -->
+    <div id="monitor-plugin-parameters" class="doc-section">
+        <h3>Plugin Parameters</h3>
+        <p>The following explains all the current possible encoding modes of the Mach1 Monitor in your common DAW/Editor.</p>
+        
+        <h4 id="general-parameters">General Parameters</h4>
+        
+        <div id="yaw" class="parameter">
+            <div class="parameter-title">Yaw</div>
+            <div class="parameter-range">Range: 0 → 360 (clockwise)</div>
+            <div class="parameter-description">Allows users to simulate head-tracking on the yaw axis (rotating head horizontally)</div>
+        </div>
+        
+        <div id="pitch" class="parameter">
+            <div class="parameter-title">Pitch</div>
+            <div class="parameter-range">Range: -90 → 90 (bottom to top)</div>
+            <div class="parameter-description">Allows users to simulate head-tracking on the pitch axis (nodding head up/down)</div>
+        </div>
+        
+        <div id="roll" class="parameter">
+            <div class="parameter-title">Roll</div>
+            <div class="parameter-range">Range: -90 → 90 (top of head to left → top of head to right)</div>
+            <div class="parameter-description">Allows users to simulate head-tracking on the roll axis (tilting head toward a shoulder)</div>
+        </div>
+    </div>
+
+    <h4>Decode Selection</h4>
+    <p>The decode selection determines how your spatial mix will be monitored and affects the available panning options in connected Mach1 Panners:</p>
+    
+    <div id="horizon-4ch" class="parameter">
+        <div class="parameter-title">Mach1 Horizon (4ch)</div>
+        <div class="parameter-description">A 4-channel horizontal-only configuration. Limits spatial movement to the horizontal plane. When selected, connected Mach1 Panners will hide Z-axis controls and optimize for horizontal-only movement.</div>
+    </div>
+    <div id="spatial-8ch" class="parameter">
+        <div class="parameter-title">Mach1 Spatial (8ch)</div>
+        <div class="parameter-description">The standard 8-channel configuration with full 3D spatial audio support. Enables complete spatial control including height information. When selected, connected Mach1 Panners will show full 3D controls including Z-axis movement.</div>
+    </div>
+    <div id="spatial-14ch" class="parameter">
+        <div class="parameter-title">Mach1 Spatial (14ch)</div>
+        <div class="parameter-description">The 14-channel configuration with full 3D spatial audio support. Enables complete spatial control including height information. When selected, connected Mach1 Panners will show full 3D controls including Z-axis movement.</div>
+    </div>
+    
+    <!-- Settings Section -->
+    <div id="monitor-settings" class="doc-section">
+        <h4 id="settings-header">Settings</h4>
+        
+        <div id="monitor-modes" class="doc-subsection">
+            <h4>Monitor Modes</h4>
+            <p>Allows different decoding modes for testing your spatial mix:</p>
+            
+            <div id="spatial-mode" class="parameter">
+                <div class="parameter-title">Mach1 Spatial Mode</div>
+                <div class="parameter-description">The default mode for full Mach1Spatial mixing support and full Yaw/Pitch/Roll controls of the M1-Monitor. This mode provides accurate spatial monitoring of your mix as it would be heard in the final playback environment.</div>
+            </div>
+            
+            <div id="stereo-safe-mode" class="parameter">
+                <div class="parameter-title">StereoSafe Mode</div>
+                <div class="parameter-description">When this mode is enabled all Panner's process audio with Mono output so that the user can quickly export a stereo version that is spatially safe in all directions for 360 audio/video players that do not support spatial audio yet. The Diverge values during the mix are instead used to correct the gain ratio between all spatial components so that the mix is roughly retained to avoid full re-mix scenarios.</div>
+            </div>
+            
+            <div id="folddown-mode" class="parameter">
+                <div class="parameter-title">Front/Back FoldDown</div>
+                <div class="parameter-description">When enabled this mode sums channels Front/Back/Top/Bottom left channels together and Front/Back/Top/Bottom right channels together to allow the user to quickly reference any front to rear differences during the mix. This is particularly useful for checking balance and consistency in your spatial mix.</div>
+            </div>
+
+            <div class="note">
+                <strong>Note:</strong> Changing monitor modes will affect how you hear your mix but does not modify the original spatial audio data unless you're recording the monitor output.
+            </div>
+        </div>
+        
+        <div id="timecode-offset" class="doc-subsection">
+            <h4>Timecode Offset</h4>
+            <p>The timecode offset feature helps synchronize the Mach1 Player with your DAW timeline:</p>
+            
+            <div id="offset-settings" class="parameter">
+                <div class="parameter-title">Offset Configuration</div>
+                <div class="parameter-description">
+                    Allows you to adjust the timing offset between your DAW and the Mach1 Player video playback. This is crucial when:
+                    <ul>
+                        <li>Your DAW session doesn't start at 00:00:00:00</li>
+                        <li>Your video file has a different start time than your DAW session</li>
+                        <li>You need to compensate for any system latency</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div id="offset-usage" class="parameter">
+                <div class="parameter-title">Using Timecode Offset</div>
+                <div class="parameter-description">
+                    <ul>
+                        <li>Enter the timecode where your video should start in your DAW</li>
+                        <li>The Mach1 Player will automatically adjust its playback to match this position</li>
+                        <li>The offset remains active until changed, ensuring consistent sync between your DAW and video</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

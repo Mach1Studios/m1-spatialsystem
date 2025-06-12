@@ -430,3 +430,4 @@ typings/
 
 !resources/**/[Dd]ebug
 !resources/**/[Rr]elease
+installer/resources/docs/index.html

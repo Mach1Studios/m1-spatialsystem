@@ -1,0 +1,292 @@
+<h2>Mach1 Panner</h2>
+
+<div id="panner-interface" class="doc-section">
+    <h3>Interface</h3>
+    <div style="display: flex; align-items: flex-start; gap: 20px; margin: 20px 0;">
+        <div style="position: relative; flex: 0 0 600px;">
+            <img src="./panner-images/m1-panner.jpg" alt="Mach1 Panner Interface" style="width: 100%; height: auto;">
+            <!-- Main panning area -->
+            <a href="#panner-general-params" class="tooltip-area" 
+                style="position: absolute; left: 2%; top: 2%; width: 59%; height: 55%;" 
+                data-tooltip="Main panning area with interactive reticle and additional channel reticles">
+            </a>
+            
+            <!-- Level meters -->
+            <a href="#levels-parameter" class="tooltip-area" 
+                style="position: absolute; left: 75%; top: 7%; width: 23%; height: 52%;" 
+                data-tooltip="Level meters for monitoring output channels">
+            </a>
+            
+            <!-- X/Y controls -->
+            <a href="#x-parameter" class="tooltip-area" 
+                style="position: absolute; left: 2%; top: 60%; width: 23%; height: 18%;" 
+                data-tooltip="X/Y position controls, these parameters cannot be automated">
+            </a>
+            
+            <!-- Azimuth control -->
+            <a href="#azimuth-parameter" class="tooltip-area" 
+                style="position: absolute; left: 25.5%; top: 60%; width: 12%; height: 18%;" 
+                data-tooltip="Azimuth (rotation) control">
+            </a>
+            
+            <!-- Diverge control -->
+            <a href="#diverge-parameter" class="tooltip-area" 
+                style="position: absolute; left: 38%; top: 60%; width: 12%; height: 18%;" 
+                data-tooltip="Diverge control, how much the signal spreads to the output channels by azimuth">
+            </a>
+            
+            <!-- Gain control -->
+            <a href="#gain-parameter" class="tooltip-area" 
+                style="position: absolute; left: 50%; top: 60%; width: 12%; height: 18%;" 
+                data-tooltip="Gain control">
+            </a>
+            
+            <!-- Gain indicator -->
+            <a href="#gain-parameter" class="tooltip-area" 
+                style="position: absolute; left: 58%; top: 67%; width: 4%; height: 6%;" 
+                data-tooltip="Auto Gain incicator, only active when Auto Gain is enabled">
+            </a>
+            
+            <!-- Z/Altitude control -->
+            <a href="#z-parameter" class="tooltip-area" 
+                style="position: absolute; left: 63%; top: 2%; width: 11%; height: 75%;" 
+                data-tooltip="Elevation (Z) control, both the knob and the slider are linked">
+            </a>
+            
+            <!-- Overlay checkbox -->
+            <a href="#overlay-parameter" class="tooltip-area" 
+                style="position: absolute; left: 75%; top: 61%; width: 21%; height: 4%;" 
+                data-tooltip="Enables a transparent overlay of the reticle for equirectangular 360 panning to picture">
+            </a>
+            
+            <!-- Isotropic checkbox -->
+            <a href="#isotropic-parameter" class="tooltip-area" 
+                style="position: absolute; left: 75%; top: 64.5%; width: 21%; height: 4%;" 
+                data-tooltip="When enabled the signal will distribute equally on the vertically plane, otherwise the signal will crossfade between the top and bottom channels">
+            </a>
+            
+            <!-- Equal Power checkbox -->
+            <a href="#equal-power-parameter" class="tooltip-area" 
+                style="position: absolute; left: 75%; top: 68.5%; width: 21%; height: 4%;" 
+                data-tooltip="Can only be enabled when Isotropic is also enabled, this will apply a gain compensation to the signal linked to the Diverge parameter">
+            </a>
+            
+            <!-- Auto Gain checkbox -->
+            <a href="#auto-gain-parameter" class="tooltip-area" 
+                style="position: absolute; left: 75%; top: 72%; width: 21%; height: 4%;" 
+                data-tooltip="Automatically adjust gain based on the number of output channels to maintain a consistent level with the input">
+            </a>
+            
+            <!-- Auto orbit -->
+            <a href="#stereo-auto-orbit-parameter" class="tooltip-area" 
+                style="position: absolute; left: 75%; top: 78%; width: 21%; height: 4%;" 
+                data-tooltip="Automatically adjusts the Stereo Orbit Angle to point toward the center of the M1-Panner grid">
+            </a>
+            
+            <!-- Stereo controls - S Rotate -->
+            <a href="#stereo-rotate-parameter" class="tooltip-area" 
+                style="position: absolute; left: 26.5%; top: 78%; width: 10%; height: 15%;" 
+                data-tooltip="Rotates the Left & Right reticles around the center reticle axis for more creative control during mixing">
+            </a>
+            
+            <!-- Stereo controls - S Spread -->
+            <a href="#stereo-spread-parameter" class="tooltip-area" 
+                style="position: absolute; left: 39%; top: 78%; width: 10%; height: 15%;" 
+                data-tooltip="Adds/reduces the distance between the Left & Right reticles">
+            </a>
+            
+            <!-- Stereo pan -->
+            <a href="#stereo-balance-parameter" class="tooltip-area" 
+                style="position: absolute; left: 51%; top: 78%; width: 10%; height: 15%;" 
+                data-tooltip="Controls the input balance between the Left & Right reticles">
+            </a>
+            
+            <!-- Input selection -->
+            <a href="#input-parameter" class="tooltip-area" 
+                style="position: absolute; left: 32%; top: 95%; width: 19%; height: 4%;" 
+                data-tooltip="Select which input channel configuration to encode from">
+            </a>
+            
+            <!-- Output selection -->
+            <a href="#output-parameter" class="tooltip-area" 
+                style="position: absolute; left: 50%; top: 95%; width: 20%; height: 4%;" 
+                data-tooltip="Select which output channel configuration to encode to">
+            </a>
+            
+            <!-- Lock button -->
+            <a href="#lock-parameter" class="tooltip-area" 
+                style="position: absolute; left: 71%; top: 95%; width: 10%; height: 4%;" 
+                data-tooltip="Lock the current output setting to prevent changes from M1-Monitor">
+            </a>
+        </div>
+        <div style="
+            flex: 0 0 200px;
+            background-color: var(--dark-bg-lightest);
+            border: 1px solid var(--accent-color);
+            border-radius: 4px;
+            padding: 15px;
+            font-size: 0.9rem;
+            align-self: center;
+        ">
+            <div style="display: flex; align-items: center; margin-bottom: 10px; color: var(--accent-color);">
+                <i class="fas fa-lightbulb" style="margin-right: 8px;"></i>
+                <strong>Interactive Guide</strong>
+            </div>
+            <p style="margin: 0; line-height: 1.5;">
+                Hover over different parts of the interface to learn more.
+                <br><br>
+                Areas with a pointing hand cursor (<span style="font-size: 1.1em;">👆</span>) can be clicked to navigate to their documentation.
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- Description Section -->
+<div id="panner-description" class="doc-section">
+    <h3>Description</h3>
+    
+    <p>The Mach1 Panner allows users to encode input audio tracks/channels in their preferred DAW (Digital Audio Workstation) to the Mach1 Spatial format. The process is a simple signal distribution process with no other DSP related effects, allowing complete 1:1 encoding into our Vector Based Panning format—Mach1 Spatial.</p>
+</div>
+
+<!-- Plugin Parameters Section -->
+<div id="panner-parameters" class="doc-section">
+    <h3>Plugin Parameters</h3>
+    
+    <h4 id="panner-general-params">General Parameters</h4>
+    
+    <div id="azimuth-parameter" class="parameter">
+        <div class="parameter-title">Azimuth</div>
+        <div class="parameter-range">Range: 0 → 180 → -180 → 0 (clockwise)</div>
+        <div class="parameter-description">Rotates the input sound source(s) around central listener location. Where 0 is front facing and 180/-180 is rear facing.</div>
+    </div>
+    
+    <div id="diverge-parameter" class="parameter">
+        <div class="parameter-title">Diverge</div>
+        <div class="parameter-range">Range: 100 → 0 → -100</div>
+        <div class="parameter-description">distributes the spread of the input sound source(s) to and from center to allow control of divergence of signal, or otherwise allowing control of distribution of how the signal spreads around listener. Where 100 is front forward on current Rotation angle, 0 is center panning or mono divergence and -100 is the inverse of current Rotation angle.</div>
+    </div>
+    
+    <div id="x-parameter" class="parameter">
+        <div class="parameter-title">X</div>
+        <div class="parameter-range">Range: -100 → 100</div>
+        <div class="parameter-description">Moves the input sound source(s) along the up/down axis in the top down view.</div>
+    </div>
+    
+    <div id="y-parameter" class="parameter">
+        <div class="parameter-title">Y</div>
+        <div class="parameter-range">Range: -100 → 100</div>
+        <div class="parameter-description">Moves the input sound source(s) along the left/right axis in the top down view.</div>
+    </div>
+    
+    <div id="z-parameter" class="parameter">
+        <div class="parameter-title">Z</div>
+        <div class="parameter-range">Range: -100 → 100</div>
+        <div class="parameter-description">Moves the input sound source(s) along the Z axis (up/down head pitch).</div>
+    </div>
+    
+    <div id="gain-parameter" class="parameter">
+        <div class="parameter-title">Gain</div>
+        <div class="parameter-range">Range: -96dB → +24dB</div>
+        <div class="parameter-description">Controls input gain for input sound source(s) before encoding.</div>
+    </div>
+    
+    <div id="levels-parameter" class="parameter">
+        <div class="parameter-title">Level Meters</div>
+        <div class="parameter-description">Visual indicators showing the output levels of each channel in the selected output Mach1 Spatial configuration.</div>
+    </div>
+
+    <div id="overlay-parameter" class="parameter">
+        <div class="parameter-title">Overlay</div>
+        <div class="parameter-description">Allows user to pan to picture by overlaying the reticle for a equirectangular 360 video.</div>
+    </div>
+
+    <div id="isotropic-parameter" class="parameter">
+        <div class="parameter-title">Isotropic</div>
+        <div class="parameter-description">When enabled the signal uses a more realistic signal distribution model that distributes the signal equally on the vertically plane. When disabled the signal will crossfade between the top and bottom channels in a "Periphonic" panner mode.</div>
+    </div>
+
+    <div id="equal-power-parameter" class="parameter">
+        <div class="parameter-title">Equal Power</div>
+        <div class="parameter-description">Maintains consistent power levels no matter what the Diverge parameter is set to. Can only be enabled when Isotropic is also enabled.</div>
+    </div>
+
+    <div id="auto-gain-parameter" class="parameter">
+        <div class="parameter-title">Auto Gain</div>
+        <div class="parameter-description">Automatically adjust the gain of the input signal based on the number of output channels to maintain a consistent level with the input.</div>
+    </div>
+
+    <h4 id="panner-input-output">Input and Output Options</h4>
+
+    <div id="input-parameter" class="parameter">
+        <div class="parameter-title">Input Selection</div>
+        <div class="parameter-description">Configure the input channel configuration to encode from. The plugin can handle many variations of input channel configurations as long as the plugin is instantiated with the correct number of channels. It is advised to put M1-Panner and M1-Monitor on busses that can supply more channels than needed to allow flexibility while mixing.</div>
+    </div>
+
+    <div id="output-parameter" class="parameter">
+        <div class="parameter-title">Output Selection</div>
+        <div class="parameter-description">Select the output channel configuration to encode to. Options include Mach1 Spatial (4ch), Mach1 Spatial (8ch) and Mach1 Spatial (14ch).</div>
+    </div>
+
+    <div id="lock-parameter" class="parameter">
+        <div class="parameter-title">Lock</div>
+        <div class="parameter-description">Locks the current output setting to prevent changes from M1-Monitor. If you change the (input) Decode configuration; the M1-Monitor will automatically change the output setting on all instances of M1-Panner unless the Lock parameter is enabled.</div>
+    </div>
+
+    <h4 id="panner-stereo-params">Stereo Parameters</h4>
+    <p>M1-Panner mode for stereo input channels/tracks of audio (L & R)</p>
+    
+    <div id="stereo-spread-parameter" class="parameter">
+        <div class="parameter-title">Stereo Spread [S SPREAD]</div>
+        <div class="parameter-description">Add/reduce the distance between Left & Right input reticles.</div>
+    </div>
+    
+    <div id="stereo-rotate-parameter" class="parameter">
+        <div class="parameter-title">Stereo Orbit Angle [S ROTATE]</div>
+        <div class="parameter-description">Rotates Left & Right reticles around center reticle axis for more creative control during mixing.</div>
+    </div>
+    
+    <div id="stereo-auto-orbit-parameter" class="parameter">
+        <div class="parameter-title">Stereo Auto Orbit [AUTO ORBIT]</div>
+        <div class="parameter-description">When active Stereo Orbit Angle will automatically adjust to point toward center of M1-Panner grid.</div>
+    </div>
+    
+    <div id="stereo-balance-parameter" class="parameter">
+        <div class="parameter-title">Stereo Balance [S PAN]</div>
+        <div class="parameter-description">Input balance/pan between Left & Right input channels.</div>
+    </div>
+</div>
+
+<!-- Notes Section -->
+<div id="panner-notes" class="doc-section">
+    <h3>Notes</h3>
+    
+    <div class="note">
+        <strong>Pro Tools HD Automation:</strong> It is observed that Pro Tools HD by default always interpolates automation to smooth all values to only two floating points (example: 20.04 instead of 20.03997); because of this continuous performance knobs/sliders, specifically the Rotation parameter are prone to a GUI bug if you record Automation for this parameter in full rotations and play it back from the Host (Pro Tools HD). This issue can occur when recording automation that travels past 180 crossing, this is due to the value attempting to reset to -180 (or 180 if counter-clockwise).
+    </div>
+
+    <div class="image-container">
+        <img src="./panner-images/PannerProTools.png" alt="Automation Examples">
+    </div>
+    
+    <p>Simply un-ramp the automation to further cleanup playback of a fully rotating source:</p>
+    
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; max-width: 800px; margin-left: auto; margin-right: auto;">
+        <div class="image-container" style="margin: 0;">
+            <img src="./panner-images/PannerZoomedOut.png" alt="Panner Zoomed Out View" style="width: 100%; height: 300px; object-fit: contain;">
+            <p class="image-caption">Zoomed Out View</p>
+        </div>
+        <div class="image-container" style="margin: 0;">
+            <img src="./panner-images/PannerZoomedInBad.png" alt="Panner Zoomed In Bad Example" style="width: 100%; height: 300px; object-fit: contain;">
+            <p class="image-caption">Bad Example</p>
+        </div>
+        <div class="image-container" style="margin: 0;">
+            <img src="./panner-images/PannerZoomedInNeutral.png" alt="Panner Zoomed In View" style="width: 100%; height: 300px; object-fit: contain;">
+            <p class="image-caption">Zoomed In View</p>
+        </div>
+        <div class="image-container" style="margin: 0;">
+            <img src="./panner-images/PannerZoomedInGood.png" alt="Panner Zoomed In Good Example" style="width: 100%; height: 300px; object-fit: contain;">
+            <p class="image-caption">Good Example</p>
+        </div>
+    </div>
+
+</div>
