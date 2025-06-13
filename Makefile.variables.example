@@ -37,3 +37,10 @@ M1_GLOBAL_GUID=
 # Private
 APPLE_USERNAME=""
 ALTOOL_APPPASS=""
+
+# Documentation deployment settings
+docs_s3_bucket_name =
+docs_s3_stage_bucket_name =
+docs_port = 8810
+docs_cloudfront_id =  # Production CloudFront distribution ID
+docs_stage_cloudfront_id =  # Staging CloudFront distribution ID

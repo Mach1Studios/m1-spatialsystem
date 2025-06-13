@@ -5,11 +5,18 @@ const path = require('path');
 const docsDir = __dirname;
 const contentDir = path.join(docsDir, 'content');
 const templatesDir = path.join(docsDir, 'templates');
+const distDir = path.join(docsDir, 'dist');
 
 // Ensure templates directory exists
 if (!fs.existsSync(templatesDir)) {
     fs.mkdirSync(templatesDir, { recursive: true });
     console.log('Created templates directory');
+}
+
+// Ensure dist directory exists
+if (!fs.existsSync(distDir)) {
+    fs.mkdirSync(distDir, { recursive: true });
+    console.log('Created dist directory');
 }
 
 // Read templates
@@ -203,40 +210,50 @@ outputHTML = replaceContentInDiv(outputHTML, 'player-content', playerContent);
 outputHTML = replaceContentInDiv(outputHTML, 'transcoder-content', transcoderContent);
 outputHTML = replaceContentInDiv(outputHTML, 'guide-content', guideContent);
 
-// Ensure the js directory exists
-const jsDir = path.join(docsDir, 'js');
-if (!fs.existsSync(jsDir)) {
-    fs.mkdirSync(jsDir, { recursive: true });
-}
+// The JS files will be copied along with other directories below
 
-// Create search.js file if it doesn't exist
-const searchJsPath = path.join(jsDir, 'search.js');
-if (!fs.existsSync(searchJsPath)) {
-    console.log('Creating search.js...');
-    fs.writeFileSync(searchJsPath, `/**
- * Search functionality for Mach1 Documentation
- */
-
-// Search implementation will be here
-// This file is a placeholder that will be replaced with the actual implementation
-`);
-}
-
-// Create print.js file if it doesn't exist
-const printJsPath = path.join(jsDir, 'print.js');
-if (!fs.existsSync(printJsPath)) {
-    console.log('Creating print.js...');
-    fs.writeFileSync(printJsPath, `/**
- * Print/PDF Export functionality for Mach1 Documentation
- */
-
-// Print implementation will be here
-// This file is a placeholder that will be replaced with the actual implementation
-`);
-}
-
-const outputPath = path.join(docsDir, 'index.html');
+const outputPath = path.join(distDir, 'index.html');
 fs.writeFileSync(outputPath, outputHTML);
+
+// Copy CSS and images directories to dist
+function copyDirectory(src, dest) {
+    if (fs.existsSync(src)) {
+        if (!fs.existsSync(dest)) {
+            fs.mkdirSync(dest, { recursive: true });
+        }
+        const files = fs.readdirSync(src);
+        files.forEach(file => {
+            const srcPath = path.join(src, file);
+            const destPath = path.join(dest, file);
+            if (fs.lstatSync(srcPath).isDirectory()) {
+                copyDirectory(srcPath, destPath);
+            } else {
+                fs.copyFileSync(srcPath, destPath);
+            }
+        });
+    }
+}
+
+// Copy required directories
+console.log('Copying CSS, JS, and images directories...');
+copyDirectory(path.join(docsDir, 'css'), path.join(distDir, 'css'));
+copyDirectory(path.join(docsDir, 'js'), path.join(distDir, 'js'));
+copyDirectory(path.join(docsDir, 'images'), path.join(distDir, 'images'));
+copyDirectory(path.join(docsDir, 'panner-images'), path.join(distDir, 'panner-images'));
+copyDirectory(path.join(docsDir, 'monitor-images'), path.join(distDir, 'monitor-images'));
+copyDirectory(path.join(docsDir, 'orientation-images'), path.join(distDir, 'orientation-images'));
+copyDirectory(path.join(docsDir, 'transcoder-images'), path.join(distDir, 'transcoder-images'));
+
+// Copy CloudFront setup files
+const cloudFrontFiles = ['cloudfront-function.js', 'CLOUDFRONT_SETUP.md'];
+cloudFrontFiles.forEach(file => {
+    const srcPath = path.join(docsDir, file);
+    if (fs.existsSync(srcPath)) {
+        fs.copyFileSync(srcPath, path.join(distDir, file));
+        console.log(`Copied ${file} for CloudFront setup`);
+    }
+});
+
 console.log(`Static HTML file generated successfully: ${outputPath}`);
 console.log(`\nTo rebuild the documentation after changes:`);
 console.log(`1. Edit content files in the content/ directory`);

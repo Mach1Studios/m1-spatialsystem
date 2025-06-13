@@ -9,6 +9,7 @@ M1notifier/dist
 *.ttf
 *.otf
 *pluginval*
+installer/resources/docs/dist
 
 # JUCE
 Builds
@@ -431,3 +432,4 @@ typings/
 !resources/**/[Dd]ebug
 !resources/**/[Rr]elease
 installer/resources/docs/index.html
+Makefile.variables

@@ -134,14 +134,68 @@ ifeq ($(detected_OS),Darwin)
 	rm -rf ~/Library/Audio/Plug-Ins/Components/M1-Panner.component
 endif
 
-docs:
-ifeq ($(detected_OS),Darwin)
-	cd installer/resources/docs && (node build-docs.js & nodemon --watch . -e js,md,html --ignore node_modules/ --exec 'node build-docs.js' & open index.html)
-else ifeq ($(detected_OS),Windows)
-	cd installer/resources/docs && (node build-docs.js & nodemon --watch . -e js,md,html --ignore node_modules/ --exec "node build-docs.js" & start index.html)
-else
-	cd installer/resources/docs && (node build-docs.js & nodemon --watch . -e js,md,html --ignore node_modules/ --exec 'node build-docs.js' & xdg-open index.html)
-endif
+# Add these helper functions at the top of the Makefile
+define kill_port
+	@lsof -ti:$(1) | xargs kill -9 2>/dev/null || true
+endef
+
+# Force target to always run
+FORCE:
+
+clean-docs-ports:
+	# Kill any processes using our docs port
+	$(call kill_port,$(docs_port))
+
+clean-docs-dist:
+	@echo "Cleaning documentation dist folder..."
+	rm -rf installer/resources/docs/dist
+
+# Documentation deployment commands
+docs-build: clean-docs-dist FORCE
+	@echo "Building documentation..."
+	cd installer/resources/docs && node build-docs.js
+
+docs-deploy: docs-build
+	@echo "Deploying documentation to spatialsystem.mach1.tech..."
+	aws s3 sync installer/resources/docs/dist/ s3://$(docs_s3_bucket_name)/ \
+		--cache-control "public, max-age=3600" \
+		--profile mach1
+	@echo "Invalidating CloudFront cache..."
+	@aws cloudfront create-invalidation \
+		--distribution-id $(docs_cloudfront_id) \
+		--paths "/*" \
+		--profile mach1 \
+		--output json \
+		--query 'Invalidation.{Status:Status,CreateTime:CreateTime,Id:Id}' || (echo "❌ CloudFront invalidation failed" && exit 1)
+	@echo "✅ Documentation deployed to spatialsystem.mach1.tech"
+
+docs-stage: docs-build
+	@echo "Deploying documentation to staging..."
+	aws s3 sync installer/resources/docs/dist/ s3://$(docs_s3_stage_bucket_name)/ \
+		--cache-control "no-cache" \
+		--profile mach1
+	@echo "Invalidating CloudFront cache..."
+	@aws cloudfront create-invalidation \
+		--distribution-id $(docs_stage_cloudfront_id) \
+		--paths "/*" \
+		--profile mach1 \
+		--output json \
+		--query 'Invalidation.{Status:Status,CreateTime:CreateTime,Id:Id}' || (echo "❌ CloudFront invalidation failed" && exit 1)
+	@echo "✅ Documentation deployed to staging.spatialsystem.mach1.tech"
+
+docs-local: clean-docs-ports docs-build
+	@echo "Starting local documentation server..."
+	cd installer/resources/docs/dist && python3 -m http.server $(docs_port)
+	@echo "📚 Documentation available at http://localhost:$(docs_port)"
+
+docs-verify:
+	@echo "🔍 Verifying documentation deployment..."
+	@echo "Testing CloudFront direct URL..."
+	@curl -I -s https://$(shell aws cloudfront get-distribution --id $(docs_cloudfront_id) --profile mach1 --query 'Distribution.DomainName' --output text) | head -1
+	@echo "Testing custom domain URL..."
+	@curl -I -s https://spatialsystem.mach1.tech | head -1 || echo "❌ Custom domain not accessible"
+	@echo "DNS lookup for spatialsystem.mach1.tech:"
+	@dig spatialsystem.mach1.tech CNAME +short || nslookup spatialsystem.mach1.tech
 
 # configure for debug and setup dev envs with common IDEs
 dev: clean-dev dev-monitor dev-panner dev-player dev-orientationmanager dev-system-helper dev-transcoder
