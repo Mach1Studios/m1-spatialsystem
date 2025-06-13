@@ -380,15 +380,7 @@ a:hover {
     padding-bottom: 10px;
 }
 
-.product-content h2::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 50px;
-    height: 3px;
-    background-color: var(--accent-color);
-}
+/* Removed h2 underline - .product-content h2::after */
 
 .product-content h3 {
     color: var(--text-primary);
@@ -929,7 +921,7 @@ a:hover {
         page-break-inside: avoid;
     }
     
-    .doc-section h3::after, .product-content h2::after {
+    .doc-section h3::after {
         background-color: #333;
     }
     
