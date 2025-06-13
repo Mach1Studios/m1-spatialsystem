@@ -42,6 +42,15 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
+      - name: Setup Makefile variables
+        run: |
+          echo "Setting up Makefile variables..."
+          
+          # Ensure Makefile.variables exists (will auto-generate from example if needed)
+          make Makefile.variables || true
+          
+          echo "✅ Makefile variables setup complete"
+
       - name: Verify prerequisites
         run: |
           echo "Checking prerequisites..."
