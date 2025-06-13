@@ -17,15 +17,19 @@
     --new-white: #FAFAFA;
     --v2-yellow: #F3C635;
 
+    /* Updated to match website colors */
+    --m1yellow: #FFC61E;
     --mach1-yellow: #FFC61E;
     --mach1-yellow-dark: #e6b100;
     --mach1-yellow-light: #ffd24d;
-    --dark-bg: #121212;
-    --dark-bg-lighter: #1a1a1a;
-    --dark-bg-lightest: #2a2a2a;
-    --text-primary: #e0e0e0;
-    --text-secondary: #b0b0b0;
-    --text-muted: #888888;
+    --dark-bg: #1A1A1A;
+    --dark-bg-lighter: #282828;
+    --dark-bg-lightest: #363636;
+    --text-primary: #eaeaea;
+    --text-secondary: #626161;
+    --text-muted: #999999;
+    --link: #eaeaea;
+    --link-hover: #fff;
     --border-color: #333333;
     --accent-color: var(--gray-five);
     --transition-speed: 0.3s;
@@ -40,13 +44,42 @@
 }
 
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: 'ProximaNova', 'Inter', 'Helvetica Neue', Arial, sans-serif;
     line-height: 1.6;
     color: var(--text-primary);
     background-color: var(--dark-bg);
     display: flex;
     flex-direction: column;
     min-height: 100vh;
+}
+
+/* Link styling - matching research blog exactly */
+a {
+    color: var(--link);
+    text-decoration: none;
+    transition: all 0.2s;
+    border-bottom: 1px dotted rgba(234, 234, 234, 0.3);
+}
+
+a:hover {
+    color: var(--link-hover);
+    border-bottom-color: var(--link-hover);
+}
+
+/* Navigation and special links don't have underlines */
+.toc-sidebar a, .sidebar-logo a, .product-list a, .btn, .product-title a,
+.search-result, .no-underline {
+    border-bottom: none;
+}
+
+/* Interactive controls use accent color - matching research blog */
+.btn, button, .interactive, .action-link {
+    color: var(--mach1-yellow);
+    border-bottom: none;
+}
+
+.btn:hover, button:hover, .interactive:hover, .action-link:hover {
+    color: #ffd54f;
 }
 
 /* Layout */
