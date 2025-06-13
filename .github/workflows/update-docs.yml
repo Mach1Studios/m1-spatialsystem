@@ -1,0 +1,78 @@
+name: Update Documentation
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'installer/resources/docs/**'
+      - 'm1-*/**/*.h'
+      - 'm1-*/**/*.hpp'
+      - 'm1-*/**/*.cpp'
+      - 'm1-*/**/*.c'
+      - '.github/workflows/update-docs.yml'
+  workflow_dispatch:
+    inputs:
+      force_rebuild:
+        description: 'Force complete rebuild of documentation'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  deploy-docs:
+    runs-on: ubuntu-latest
+    
+    env:
+      docs_s3_bucket_name: mach1-spatialsystem-docs
+      docs_cloudfront_id: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID || 'EJ9SMUUNVGZ4B' }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Verify prerequisites
+        run: |
+          echo "Checking prerequisites..."
+          node --version
+          aws --version
+          aws sts get-caller-identity
+          
+          echo "Using hardcoded variables:"
+          echo "S3 Bucket: $docs_s3_bucket_name"
+          echo "CloudFront ID: $docs_cloudfront_id"
+          
+          echo "✅ All prerequisites met"
+
+      - name: Deploy documentation
+        run: |
+          echo "🚀 Deploying documentation using make docs-deploy..."
+          
+          # Pass variables directly to make command to override any local Makefile.variables
+          make docs-deploy \
+            docs_s3_bucket_name="$docs_s3_bucket_name" \
+            docs_cloudfront_id="$docs_cloudfront_id"
+
+      - name: Deployment summary
+        if: success()
+        run: |
+          echo "✅ Documentation deployment completed successfully!"
+          echo "📚 Available at: https://spatialsystem.mach1.tech"
+
+      - name: Handle deployment failure
+        if: failure()
+        run: |
+          echo "❌ Documentation deployment failed"
+          echo "Check the logs above for details"
+          exit 1 
