@@ -43,6 +43,11 @@ M1SystemHelperService::M1SystemHelperService() {
     
     DBG("Helper listening to port: " + juce::String(configManager->getHelperPort()));
     
+    // Initialize streaming components
+    audioStreamManager = std::make_unique<AudioStreamManager>();
+    externalMixer = std::make_unique<ExternalMixerProcessor>();
+    externalMixer->initialize(44100.0, 512); // Default sample rate and block size
+    
     // Register service for dependency injection
     Mach1::ServiceLocator::getInstance().registerService(eventSystem);
     

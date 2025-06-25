@@ -34,8 +34,8 @@ set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 add_subdirectory(../../m1-orientationmanager/Modules/m1_orientation_client/libs/m1-mathematics "${CMAKE_CURRENT_BINARY_DIR}/m1-mathematics_build")
 
 # add JUCE and other custom modules
-add_subdirectory(../../m1-orientationmanager/JUCE "${CMAKE_CURRENT_BINARY_DIR}/JUCE_build")
-add_subdirectory(../../m1-orientationmanager/Modules "${CMAKE_CURRENT_BINARY_DIR}/Modules_build")
+add_subdirectory(../../m1-player/JUCE "${CMAKE_CURRENT_BINARY_DIR}/JUCE_build")
+add_subdirectory(../../m1-player/Modules "${CMAKE_CURRENT_BINARY_DIR}/Modules_build")
 
 # PLUGIN/APP NAME & ID  (for dynamic naming schemes)
 set(CUSTOM_BUNDLE_ID "com.mach1.spatial.helper")
@@ -91,6 +91,10 @@ target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE
         m1_orientation_client
         m1_mathematics
         )
+
+# link m1-sdk
+target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE M1Encode M1Decode M1Transcode)
+target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ../../m1-player/Modules/m1-sdk/libmach1spatial/api_common/include ../../m1-player/Modules/m1-sdk/libmach1spatial/api_decode/include ../../m1-player/Modules/m1-sdk/libmach1spatial/api_encode/include ../../m1-player/Modules/m1-sdk/libmach1spatial/api_transcode/include ../../m1-player/Modules/m1-sdk/libmach1spatial/deps)
 
 ### setup info.plist and entitlements for macos
 if(APPLE)

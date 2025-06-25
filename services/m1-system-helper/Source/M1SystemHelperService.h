@@ -3,6 +3,8 @@
 #include "Common/Common.h"
 #include "Common/ServiceLocator.h"
 #include "Core/ConfigManager.h"
+#include "Core/AudioStreaming.h"
+#include "Core/ExternalMixerProcessor.h"
 #include "Managers/ClientManager.h"
 #include "Managers/PluginManager.h"
 #include "Managers/ServiceManager.h"
@@ -23,6 +25,10 @@ public:
     PluginManager& getPluginManager() { return *pluginManager; }
     ServiceManager& getServiceManager() { return *serviceManager; }
     
+    // New streaming functionality
+    AudioStreamManager& getAudioStreamManager() { return *audioStreamManager; }
+    ExternalMixerProcessor& getExternalMixer() { return *externalMixer; }
+    
     void updateClientSeenTime(juce::int64 time) {
         timeWhenHelperLastSeenAClient = time;
     }
@@ -40,6 +46,10 @@ private:
     std::unique_ptr<ServiceManager> serviceManager;
     std::unique_ptr<ConfigManager> configManager;
     std::unique_ptr<OSCHandler> oscHandler;
+    
+    // New streaming components
+    std::unique_ptr<AudioStreamManager> audioStreamManager;
+    std::unique_ptr<ExternalMixerProcessor> externalMixer;
     
     juce::int64 timeWhenHelperLastSeenAClient = 0;
     

@@ -7,6 +7,10 @@ file(GLOB source_files
         Core/EventSystem.h
         Core/ConfigManager.h
         Core/ConfigManager.cpp
+        Core/AudioStreaming.h
+        Core/AudioStreaming.cpp
+        Core/ExternalMixerProcessor.h
+        Core/ExternalMixerProcessor.cpp
         Network/OSCHandler.h
         Network/OSCHandler.cpp
         Managers/ClientManager.h
