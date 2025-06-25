@@ -74,7 +74,7 @@ void PluginManager::updatePluginSettings(int port, const juce::OSCMessage& messa
         // Optional stereo properties
         if (message.size() >= 13) {
             it->autoOrbit = message[10].getInt32();
-            it->stOrbitAzimuth = message[11].getFloat32();
+            it->stOrbitAzimuth = message[11].getInt32();
             it->stSpread = message[12].getFloat32();
         }
         
