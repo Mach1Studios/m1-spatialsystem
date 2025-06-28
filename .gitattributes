@@ -1,0 +1,8 @@
+# Ensure these files always have LF line endings for macOS builds
+*.sh eol=lf
+*.plist eol=lf
+*.json eol=lf
+.gitattributes eol=lf
+
+# Set default behavior for all other files
+* text=auto
