@@ -433,3 +433,4 @@ typings/
 !resources/**/[Rr]elease
 installer/resources/docs/index.html
 Makefile.variables
+.DS_Store

@@ -424,3 +424,42 @@ ifeq ($(detected_OS),Darwin)
 else ifeq ($(detected_OS),Windows)
 	$(WIN_INNO_PATH) "-Ssigntool=$(WIN_SIGNTOOL_PATH) sign -f $(WIN_CODESIGN_CERT_PATH) -p $(WIN_SIGNTOOL_PASS) -t http://timestamp.digicert.com $$f" "${CURDIR}/installer/win/installer.iss"
 endif
+
+deploy-installer:
+ifeq ($(detected_OS),Darwin)
+	@echo "### DEPLOYING TO S3 ###"
+	@if [ ! -f "installer/osx/build/signed/Mach1 Spatial System Installer.pkg" ]; then \
+		echo "Installer not found. Please run 'make installer-pkg' first."; \
+		exit 1; \
+	fi
+	@read -p "Version: " version; \
+	if [ -z "$$version" ]; then \
+		echo "Version cannot be empty"; \
+		exit 1; \
+	fi; \
+	aws s3 cp "installer/osx/build/signed/Mach1 Spatial System Installer.pkg" \
+		"s3://mach1-releases/$$version/Mach1 Spatial System Installer.pkg" \
+		--profile mach1 \
+		--content-disposition "Mach1 Spatial System Installer.pkg"; \
+	echo "Installer deployed to s3://mach1-releases/$$version/"; \
+	echo "REMINDER: Update the Avid Store Submission per version update!"
+else ifeq ($(detected_OS),Windows)
+	@echo "### DEPLOYING TO S3 ###"
+	@if not exist "installer\win\Output\Mach1 Spatial System Installer.exe" ( \
+		echo "Installer not found. Please run 'make installer-pkg' first." && \
+		exit 1 \
+	)
+	@set /p version="Version: " && \
+	if "!version!"=="" ( \
+		echo "Version cannot be empty" && \
+		exit 1 \
+	) && \
+	aws s3 cp "installer\win\Output\Mach1 Spatial System Installer.exe" \
+		"s3://mach1-releases/!version!/Mach1 Spatial System Installer.exe" \
+		--profile mach1 \
+		--content-disposition "Mach1 Spatial System Installer.exe" && \
+	echo "Installer deployed to s3://mach1-releases/!version!/" && \
+	echo "REMINDER: Update the Avid Store Submission per version update!"
+else
+	@echo "Installer deployment is not supported on this platform"
+endif
