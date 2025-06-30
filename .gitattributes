@@ -6,3 +6,5 @@
 
 # Set default behavior for all other files
 * text=auto
+*.plist eol=lf
+Makefile* eol=lf
