@@ -34,9 +34,25 @@ endif
 pull:
 	git pull --recurse-submodules
 
-git-nuke:
+git-submodule-clean:
 	git submodule foreach --recursive git clean -x -f -d
 	make pull
+
+git-nuke:
+	@echo "WARNING: This will completely nuke and re-fetch ALL submodules!"
+	@echo "This is intended for users who have old submodule histories after a rewrite."
+	@echo "Press Ctrl+C now if you want to cancel..."
+	@sleep 3
+	@echo " Deinitializing all submodules..."
+	git submodule deinit --all --force || true
+	@echo "Removing .git/modules to clear cached submodule references..."
+	rm -rf .git/modules
+	@echo " Removing submodule directories..."
+	git submodule foreach --recursive 'rm -rf "$$PWD"' || true
+	@echo "Re-initializing and updating all submodules from scratch..."
+	git submodule update --init --recursive --force
+	@echo "All submodules have been nuked and re-fetched successfully!"
+	@echo "TIP: You may want to run 'make clean' and 'make setup' after this."
 
 setup:
 ifeq ($(detected_OS),Darwin)
@@ -177,7 +193,7 @@ docs-deploy: docs-build
 		--paths "/*" \
 		--output json \
 		--query 'Invalidation.{Status:Status,CreateTime:CreateTime,Id:Id}' || (echo "❌ CloudFront invalidation failed" && exit 1)
-	@echo "✅ Documentation deployed to spatialsystem.mach1.tech"
+	@echo "Documentation deployed to spatialsystem.mach1.tech"
 
 docs-stage: docs-build
 	@echo "Deploying documentation to staging..."
@@ -189,12 +205,12 @@ docs-stage: docs-build
 		--paths "/*" \
 		--output json \
 		--query 'Invalidation.{Status:Status,CreateTime:CreateTime,Id:Id}' || (echo "❌ CloudFront invalidation failed" && exit 1)
-	@echo "✅ Documentation deployed to staging.spatialsystem.mach1.tech"
+	@echo "Documentation deployed to staging.spatialsystem.mach1.tech"
 
 docs-local: clean-docs-ports docs-build
 	@echo "Starting local documentation server..."
 	cd installer/resources/docs/dist && python3 -m http.server $(docs_port)
-	@echo "📚 Documentation available at http://localhost:$(docs_port)"
+	@echo "Documentation available at http://localhost:$(docs_port)"
 
 docs-verify:
 	@echo "🔍 Verifying documentation deployment..."
@@ -322,12 +338,12 @@ build: build-monitor build-panner build-player build-orientationmanager build-sy
 codesign:
 ifeq ($(detected_OS),Darwin)
 	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-monitor/build/M1-Monitor_artefacts/AAX/M1-Monitor.aaxplugin
-	$(WRAPTOOL) sign --verbose --account $(PACE_ACCOUNT) --wcguid "$(MONITOR_FULL_GUID)" --signid $(APPLE_CODESIGN_ID) --in m1-monitor/build/M1-Monitor_artefacts/AAX/M1-Monitor.aaxplugin --out m1-monitor/build/M1-Monitor_artefacts/AAX/M1-Monitor.aaxplugin
+	$(WRAPTOOL) sign --verbose --account $(PACE_ACCOUNT) --wcguid "$(M1_GLOBAL_GUID)" --signid $(APPLE_CODESIGN_ID) --in m1-monitor/build/M1-Monitor_artefacts/AAX/M1-Monitor.aaxplugin --out m1-monitor/build/M1-Monitor_artefacts/AAX/M1-Monitor.aaxplugin
 	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-monitor/build/M1-Monitor_artefacts/AU/M1-Monitor.component
 	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-monitor/build/M1-Monitor_artefacts/VST/M1-Monitor.vst
 	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-monitor/build/M1-Monitor_artefacts/VST3/M1-Monitor.vst3
 	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-panner/build/M1-Panner_artefacts/AAX/M1-Panner.aaxplugin
-	$(WRAPTOOL) sign --verbose --account $(PACE_ACCOUNT) --wcguid "$(PANNER_FULL_GUID)" --signid $(APPLE_CODESIGN_ID) --in m1-panner/build/M1-Panner_artefacts/AAX/M1-Panner.aaxplugin --out m1-panner/build/M1-Panner_artefacts/AAX/M1-Panner.aaxplugin
+	$(WRAPTOOL) sign --verbose --account $(PACE_ACCOUNT) --wcguid "$(M1_GLOBAL_GUID)" --signid $(APPLE_CODESIGN_ID) --in m1-panner/build/M1-Panner_artefacts/AAX/M1-Panner.aaxplugin --out m1-panner/build/M1-Panner_artefacts/AAX/M1-Panner.aaxplugin
 	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-panner/build/M1-Panner_artefacts/AU/M1-Panner.component
 	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-panner/build/M1-Panner_artefacts/VST/M1-Panner.vst
 	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-panner/build/M1-Panner_artefacts/VST3/M1-Panner.vst3
@@ -335,8 +351,8 @@ ifeq ($(detected_OS),Darwin)
 	codesign -v --force -o runtime --entitlements m1-orientationmanager/Resources/entitlements.mac.plist --sign $(APPLE_CODESIGN_CODE) --timestamp m1-orientationmanager/build/m1-orientationmanager_artefacts/m1-orientationmanager
 	codesign -v --force -o runtime --entitlements services/m1-system-helper/entitlements.mac.plist --sign $(APPLE_CODESIGN_CODE) --timestamp services/m1-system-helper/build/m1-system-helper_artefacts/m1-system-helper
 else ifeq ($(detected_OS),Windows)
-	$(WRAPTOOL) sign --verbose --account $(PACE_ACCOUNT) --wcguid "$(MONITOR_FULL_GUID)" --signid $(WIN_SIGNTOOL_ID) --in m1-monitor/build/M1-Monitor_artefacts/Release/AAX/M1-Monitor.aaxplugin --out m1-monitor/build/M1-Monitor_artefacts/Release/AAX/M1-Monitor.aaxplugin
-	$(WRAPTOOL) sign --verbose --account $(PACE_ACCOUNT) --wcguid "$(PANNER_FULL_GUID)" --signid $(WIN_SIGNTOOL_ID) --in m1-panner/build/M1-Panner_artefacts/Release/AAX/M1-Panner.aaxplugin --out m1-panner/build/M1-Panner_artefacts/Release/AAX/M1-Panner.aaxplugin
+	$(WRAPTOOL) sign --verbose --account $(PACE_ACCOUNT) --wcguid "$(M1_GLOBAL_GUID)" --signid $(WIN_SIGNTOOL_ID) --in m1-monitor/build/M1-Monitor_artefacts/Release/AAX/M1-Monitor.aaxplugin --out m1-monitor/build/M1-Monitor_artefacts/Release/AAX/M1-Monitor.aaxplugin
+	$(WRAPTOOL) sign --verbose --account $(PACE_ACCOUNT) --wcguid "$(M1_GLOBAL_GUID)" --signid $(WIN_SIGNTOOL_ID) --in m1-panner/build/M1-Panner_artefacts/Release/AAX/M1-Panner.aaxplugin --out m1-panner/build/M1-Panner_artefacts/Release/AAX/M1-Panner.aaxplugin
 endif
 
 # codesigning and notarizing m1-transcoder is done via electron-builder
