@@ -1,4 +1,6 @@
+#if defined(__APPLE__)
 #include <unistd.h>
+#endif
 #include "ServiceManager.h"
 
 namespace Mach1 {

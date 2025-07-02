@@ -5,12 +5,12 @@
 # Auto-generate Makefile.variables from example if it doesn't exist
 Makefile.variables:
 	@if [ ! -f "Makefile.variables" ] && [ -f "Makefile.variables.example" ]; then \
-		echo "📋 Makefile.variables not found, creating from example..."; \
+		echo "Makefile.variables not found, creating from example..."; \
 		cp Makefile.variables.example Makefile.variables; \
-		echo "✅ Created Makefile.variables from example"; \
-		echo "⚠️  Please review and update Makefile.variables with your actual values"; \
+		echo "Created Makefile.variables from example"; \
+		echo " Please review and update Makefile.variables with your actual values"; \
 	elif [ ! -f "Makefile.variables.example" ]; then \
-		echo "❌ Neither Makefile.variables nor Makefile.variables.example found"; \
+		echo " Neither Makefile.variables nor Makefile.variables.example found"; \
 		exit 1; \
 	fi
 
