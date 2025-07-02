@@ -4,8 +4,6 @@ AppVersion=2.0.20250630
 AppPublisher=Mach1
 DefaultDirName={pf64}\Mach1
 DisableProgramGroupPage=yes
-VersionInfoVersion=2.0.20250630
-VersionInfoDescription=
 SetupIconFile=data\mach1logo.ico
 OutputDir=Output
 OutputBaseFilename=Mach1 Spatial System Installer
@@ -19,16 +17,17 @@ UninstallDisplayName=Mach1 Spatial System Uninstaller
 PrivilegesRequired=admin
 
 [Types]
-Name: full; Description: Full installation
+Name: default; Description: Recommended installation
+Name: full; Description: Install everything
 Name: custom; Description: Custom installation; Flags: iscustom
 
 [Components]
-Name: aax; Description: AAX; Types: full
+Name: aax; Description: AAX; Types: full custom default
 Name: vst2; Description: VST2; Types: full
-//Name: vst3; Description: VST3
-Name: m1player; Description: M1-Player; Types: full
-Name: m1transcoder; Description: M1-Transcoder; Types: full custom; Flags: fixed
-Name: m1services; Description: M1 Background Services; Types: full custom; Flags: fixed
+Name: vst3; Description: VST3; Types: full custom default
+Name: m1player; Description: M1-Player; Types: full custom default
+Name: m1transcoder; Description: M1-Transcoder; Types: full default custom; Flags: fixed
+Name: m1services; Description: M1 Background Services; Types: full default custom; Flags: fixed
 
 [UninstallDelete]
 Name: {app}; Type: filesandordirs
@@ -42,14 +41,10 @@ Source: "..\..\m1-monitor\build\M1-Monitor_artefacts\Release\VST\M1-Monitor.dll"
 Source: "..\..\m1-panner\build\M1-Panner_artefacts\Release\VST\M1-Panner.dll"; DestDir: "{code:GetDir|0}"; Components: vst2; Flags: ignoreversion
 Source: "..\resources\templates\Reaper\*"; DestDir: "{app}\templates\Reaper"; Components: vst2; Flags: ignoreversion recursesubdirs createallsubdirs
 
-//Source: "..\..\m1-monitor\build\M1-Monitor_artefacts\Release\VST3\M1-Monitor.vst3"; DestDir: "{code:GetDir|1}"; Components: vst3; Flags: ignoreversion
-//Source: "..\..\m1-panner\build\M1-Panner_artefacts\Release\VST3\M1-Panner.vst3"; DestDir: "{code:GetDir|1}"; Components: vst3; Flags: ignoreversion
+Source: "..\..\m1-monitor\build\M1-Monitor_artefacts\Release\VST3\M1-Monitor.vst3"; DestDir: "{code:GetDir|1}"; Components: vst3; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\..\m1-panner\build\M1-Panner_artefacts\Release\VST3\M1-Panner.vst3"; DestDir: "{code:GetDir|1}"; Components: vst3; Flags: ignoreversion recursesubdirs createallsubdirs
 
 Source: "..\..\m1-transcoder\dist\M1-Transcoder.exe"; Excludes: "ffmpeg.exe,ffmpeg.dll"; DestDir: "{app}"; Components: m1transcoder; Flags: ignoreversion; AfterInstall: RunPostinstallTranscoder
-Source: "..\resources\docs\Mach1-Monitor.pdf"; DestDir: "{app}\docs"; Components: m1transcoder; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "..\resources\docs\Mach1-Panner.pdf"; DestDir: "{app}\docs"; Components: m1transcoder; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "..\resources\docs\Mach1-Transcoder.pdf"; DestDir: "{app}\docs"; Components: m1transcoder; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "..\resources\docs\Mach1-UserGuide.pdf"; DestDir: "{app}\docs"; Components: m1transcoder; Flags: ignoreversion recursesubdirs createallsubdirs
 
 Source: "preinstall_player.bat"; Flags: dontcopy noencryption
 Source: "postinstall_transcoder.bat"; Flags: dontcopy noencryption
@@ -94,8 +89,8 @@ begin
     False, 'New Folder');
     Page1.Add('VST 64-bit plug-ins location');
     Page1.Values[0] := ExpandConstant('{pf64}\Steinberg\VstPlugins');
-    //Page1.Add('VST3 64-bit plug-ins location');
-    //Page1.Values[1] := ExpandConstant('{pf64}\Common Files\VST3');
+    Page1.Add('VST3 64-bit plug-ins location');
+    Page1.Values[1] := ExpandConstant('{pf64}\Common Files\VST3');
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);

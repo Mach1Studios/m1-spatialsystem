@@ -307,6 +307,9 @@ endif
 	cmake services/m1-system-helper -Bservices/m1-system-helper/build
 ifeq ($(detected_OS),Darwin)
 	cd m1-transcoder && ./scripts/setup.sh && npm install
+else ifeq ($(detected_OS),Windows)
+	cd m1-transcoder
+	npm install
 endif
 
 # Build targets for individual components
@@ -380,9 +383,9 @@ ifeq ($(detected_OS),Darwin)
 		curl -LO "https://github.com/Tracktion/pluginval/releases/latest/download/pluginval_macOS.zip"; \
 		unzip -o pluginval_macOS.zip; \
 		rm pluginval_macOS.zip; \
-		echo "✅ pluginval downloaded and extracted"; \
+		echo "pluginval downloaded and extracted"; \
 	else \
-		echo "✅ pluginval already exists"; \
+		echo "pluginval already exists"; \
 	fi
 else ifeq ($(detected_OS),Windows)
 	@if not exist "pluginval.exe" ( \
@@ -390,9 +393,9 @@ else ifeq ($(detected_OS),Windows)
 		curl -LO "https://github.com/Tracktion/pluginval/releases/latest/download/pluginval_Windows.zip" && \
 		7z x -aoa pluginval_Windows.zip && \
 		del pluginval_Windows.zip && \
-		echo "✅ pluginval downloaded and extracted" \
+		echo "pluginval downloaded and extracted" \
 	) else ( \
-		echo "✅ pluginval already exists" \
+		echo "pluginval already exists" \
 	)
 endif
 
@@ -405,7 +408,7 @@ ifeq ($(detected_OS),Darwin)
 else ifeq ($(detected_OS),Windows)
 	./pluginval.exe --strictness-level 10 --repeat 2 --verbose --skip-gui-tests --validate "m1-monitor/build-dev/M1-Monitor_artefacts/Debug/VST3/M1-Monitor.vst3"
 endif
-	@echo "✅ M1-Monitor validation completed"
+	@echo "M1-Monitor validation completed"
 
 test-panner: dev-panner download-pluginval
 	@echo "Building M1-Panner in development mode..."
@@ -416,10 +419,10 @@ ifeq ($(detected_OS),Darwin)
 else ifeq ($(detected_OS),Windows)
 	./pluginval.exe --strictness-level 10 --repeat 2 --verbose --skip-gui-tests --validate "m1-panner/build-dev/M1-Panner_artefacts/Debug/VST3/M1-Panner.vst3"
 endif
-	@echo "✅ M1-Panner validation completed"
+	@echo "M1-Panner validation completed"
 
 test-plugins: test-monitor test-panner
-	@echo "🎉 All plugin validations completed successfully!"
+	@echo "All plugin validations completed successfully!"
 
 clean-pluginval:
 ifeq ($(detected_OS),Darwin)
@@ -427,7 +430,7 @@ ifeq ($(detected_OS),Darwin)
 else ifeq ($(detected_OS),Windows)
 	del pluginval.exe
 endif
-	@echo "✅ pluginval cleaned up"
+	@echo "pluginval cleaned up"
 
 installer-pkg:
 ifeq ($(detected_OS),Darwin)
