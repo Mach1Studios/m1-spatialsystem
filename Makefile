@@ -192,7 +192,7 @@ docs-deploy: docs-build
 		--distribution-id $(docs_cloudfront_id) \
 		--paths "/*" \
 		--output json \
-		--query 'Invalidation.{Status:Status,CreateTime:CreateTime,Id:Id}' || (echo "❌ CloudFront invalidation failed" && exit 1)
+		--query 'Invalidation.{Status:Status,CreateTime:CreateTime,Id:Id}' || (echo "CloudFront invalidation failed" && exit 1)
 	@echo "Documentation deployed to spatialsystem.mach1.tech"
 
 docs-stage: docs-build
@@ -204,7 +204,7 @@ docs-stage: docs-build
 		--distribution-id $(docs_stage_cloudfront_id) \
 		--paths "/*" \
 		--output json \
-		--query 'Invalidation.{Status:Status,CreateTime:CreateTime,Id:Id}' || (echo "❌ CloudFront invalidation failed" && exit 1)
+		--query 'Invalidation.{Status:Status,CreateTime:CreateTime,Id:Id}' || (echo "CloudFront invalidation failed" && exit 1)
 	@echo "Documentation deployed to staging.spatialsystem.mach1.tech"
 
 docs-local: clean-docs-ports docs-build
@@ -217,7 +217,7 @@ docs-verify:
 	@echo "Testing CloudFront direct URL..."
 	@curl -I -s https://$(shell aws cloudfront get-distribution --id $(docs_cloudfront_id) --query 'Distribution.DomainName' --output text) | head -1
 	@echo "Testing custom domain URL..."
-	@curl -I -s https://spatialsystem.mach1.tech | head -1 || echo "❌ Custom domain not accessible"
+	@curl -I -s https://spatialsystem.mach1.tech | head -1 || echo "Custom domain not accessible"
 	@echo "DNS lookup for spatialsystem.mach1.tech:"
 	@dig spatialsystem.mach1.tech CNAME +short || nslookup spatialsystem.mach1.tech
 
@@ -292,7 +292,7 @@ overlay-debug:
 	cd m1-panner/Resources/overlay_debug && ./run_simulator.sh --title "Avid Video Engine"
 
 # run configure first
-package: update-versions build codesign notarize installer-pkg
+package: update-versions build docs-build codesign notarize installer-pkg
 
 # clean and configure for release
 configure: clean update-versions

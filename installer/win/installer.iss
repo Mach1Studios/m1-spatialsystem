@@ -58,6 +58,9 @@ Source: "..\..\m1-orientationmanager\build\M1-orientationmanager_artefacts\Relea
 Source: "..\..\services\m1-system-helper\build\M1-system-helper_artefacts\Release\m1-system-helper.exe"; DestDir: "{commonappdata}\Mach1"; Components: m1services; Flags: ignoreversion recursesubdirs createallsubdirs;
 Source: "..\resources\settings.json"; DestDir: "{commonappdata}\Mach1"; Components: m1services; Flags: ignoreversion recursesubdirs createallsubdirs; BeforeInstall: StopServices
 
+; Documentation files
+Source: "..\resources\docs\dist\*"; DestDir: "{app}\Docs"; Flags: ignoreversion recursesubdirs createallsubdirs
+
 [Run]
 Filename: "{commonappdata}\Mach1\service_stopper.bat"; Parameters: "install"; Flags: runascurrentuser runhidden; StatusMsg: "Stopping any existing services..."
 Filename: "{app}\download_ffmpeg.bat"; Parameters: "install"; Flags: postinstall runascurrentuser runhidden; StatusMsg: "Downloading required ffmpeg libs..."
@@ -73,6 +76,7 @@ WelcomeLabel1=Mach1 Spatial System
 [Icons]
 Name: "{group}\M1-Player"; Filename: "{app}\M1-Player.exe"; Components: m1player
 Name: "{group}\M1-Transcoder"; Filename: "{app}\M1-Transcoder.exe"; Components: m1transcoder
+Name: "{group}\Documentation"; Filename: "{app}\Docs\index.html"; Comment: "Open Mach1 Spatial System Documentation"
 Name: "{group}\Uninstall"; Filename: "{uninstallexe}"
 
 [Code]
