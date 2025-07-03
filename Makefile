@@ -160,6 +160,32 @@ ifeq ($(detected_OS),Darwin)
 	rm -rf ~/Library/Audio/Plug-Ins/VST3/M1-Panner.vst3
 	rm -rf ~/Library/Audio/Plug-Ins/Components/M1-Monitor.component
 	rm -rf ~/Library/Audio/Plug-Ins/Components/M1-Panner.component
+else ifeq ($(detected_OS),Windows)
+	@echo "WARNING: You must run this command as Administrator to remove system files!"
+	@takeown /f "$(ProgramFiles)\Mach1" /r /d y >nul 2>&1
+	@icacls "$(ProgramFiles)\Mach1" /grant %USERNAME%:F /t >nul 2>&1
+	@if exist "$(ProgramFiles)\Mach1" (rmdir /s /q "$(ProgramFiles)\Mach1")
+	@takeown /f "$(ProgramFiles)\Common Files\Avid\Audio\Plug-Ins\M1-Monitor.aaxplugin" /r /d y >nul 2>&1
+	@icacls "$(ProgramFiles)\Common Files\Avid\Audio\Plug-Ins\M1-Monitor.aaxplugin" /grant %USERNAME%:F /t >nul 2>&1
+	@if exist "$(ProgramFiles)\Common Files\Avid\Audio\Plug-Ins\M1-Monitor.aaxplugin" (rmdir /s /q "$(ProgramFiles)\Common Files\Avid\Audio\Plug-Ins\M1-Monitor.aaxplugin")
+	@takeown /f "$(ProgramFiles)\Common Files\Avid\Audio\Plug-Ins\M1-Panner.aaxplugin" /r /d y >nul 2>&1
+	@icacls "$(ProgramFiles)\Common Files\Avid\Audio\Plug-Ins\M1-Panner.aaxplugin" /grant %USERNAME%:F /t >nul 2>&1
+	@if exist "$(ProgramFiles)\Common Files\Avid\Audio\Plug-Ins\M1-Panner.aaxplugin" (rmdir /s /q "$(ProgramFiles)\Common Files\Avid\Audio\Plug-Ins\M1-Panner.aaxplugin")
+	@takeown /f "$(ProgramFiles)\Steinberg\VstPlugins\M1-Monitor.dll" /d y >nul 2>&1
+	@icacls "$(ProgramFiles)\Steinberg\VstPlugins\M1-Monitor.dll" /grant %USERNAME%:F >nul 2>&1
+	@if exist "$(ProgramFiles)\Steinberg\VstPlugins\M1-Monitor.dll" (del /f /q "$(ProgramFiles)\Steinberg\VstPlugins\M1-Monitor.dll")
+	@takeown /f "$(ProgramFiles)\Steinberg\VstPlugins\M1-Panner.dll" /d y >nul 2>&1
+	@icacls "$(ProgramFiles)\Steinberg\VstPlugins\M1-Panner.dll" /grant %USERNAME%:F >nul 2>&1
+	@if exist "$(ProgramFiles)\Steinberg\VstPlugins\M1-Panner.dll" (del /f /q "$(ProgramFiles)\Steinberg\VstPlugins\M1-Panner.dll")
+	@takeown /f "$(ProgramFiles)\Common Files\VST3\M1-Monitor.vst3" /r /d y >nul 2>&1
+	@icacls "$(ProgramFiles)\Common Files\VST3\M1-Monitor.vst3" /grant %USERNAME%:F /t >nul 2>&1
+	@if exist "$(ProgramFiles)\Common Files\VST3\M1-Monitor.vst3" (rmdir /s /q "$(ProgramFiles)\Common Files\VST3\M1-Monitor.vst3")
+	@takeown /f "$(ProgramFiles)\Common Files\VST3\M1-Panner.vst3" /r /d y >nul 2>&1
+	@icacls "$(ProgramFiles)\Common Files\VST3\M1-Panner.vst3" /grant %USERNAME%:F /t >nul 2>&1
+	@if exist "$(ProgramFiles)\Common Files\VST3\M1-Panner.vst3" (rmdir /s /q "$(ProgramFiles)\Common Files\VST3\M1-Panner.vst3")
+	@takeown /f "$(ProgramData)\Mach1" /r /d y >nul 2>&1
+	@icacls "$(ProgramData)\Mach1" /grant %USERNAME%:F /t >nul 2>&1
+	@if exist "$(ProgramData)\Mach1" (rmdir /s /q "$(ProgramData)\Mach1")
 endif
 
 # Add these helper functions at the top of the Makefile
@@ -321,8 +347,7 @@ endif
 ifeq ($(detected_OS),Darwin)
 	cd m1-transcoder && ./scripts/setup.sh && npm install
 else ifeq ($(detected_OS),Windows)
-	cd m1-transcoder
-	npm install
+	cd m1-transcoder && npm install
 endif
 
 # Build targets for individual components
