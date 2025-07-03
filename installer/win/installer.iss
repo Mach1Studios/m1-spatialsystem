@@ -59,7 +59,7 @@ Source: "..\..\services\m1-system-helper\build\M1-system-helper_artefacts\Releas
 Source: "..\resources\settings.json"; DestDir: "{commonappdata}\Mach1"; Components: m1services; Flags: ignoreversion recursesubdirs createallsubdirs; BeforeInstall: StopServices
 
 ; Documentation files
-Source: "..\resources\docs\dist\*"; DestDir: "{app}\Docs"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\resources\docs\dist\*"; Excludes: "*cloudfront-function.js"; DestDir: "{app}\Docs"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Run]
 Filename: "{commonappdata}\Mach1\service_stopper.bat"; Parameters: "install"; Flags: runascurrentuser runhidden; StatusMsg: "Stopping any existing services..."

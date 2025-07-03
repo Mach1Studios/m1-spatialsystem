@@ -171,17 +171,30 @@ endef
 FORCE:
 
 clean-docs-ports:
-	# Kill any processes using our docs port
-	$(call kill_port,$(docs_port))
+ifeq ($(detected_OS),Darwin)
+	@lsof -ti:$(docs_port) | xargs kill -9 2>/dev/null || true
+else ifeq ($(detected_OS),Windows)
+	@for /f "tokens=5" %%a in ('netstat -aon ^| findstr :$(docs_port)') do taskkill /PID %%a /F 2>nul || exit 0
+else
+	@lsof -ti:$(docs_port) | xargs kill -9 2>/dev/null || true
+endif
 
 clean-docs-dist:
+ifeq ($(detected_OS),Windows)
+	@if exist installer\resources\docs\dist (rmdir /s /q installer\resources\docs\dist)
+else
 	@echo "Cleaning documentation dist folder..."
 	rm -rf installer/resources/docs/dist
+endif
 
 # Documentation deployment commands
 docs-build: clean-docs-dist FORCE
 	@echo "Building documentation..."
+ifeq ($(detected_OS),Windows)
+	cd installer\resources\docs && node build-docs.js
+else
 	cd installer/resources/docs && node build-docs.js
+endif
 
 docs-deploy: docs-build
 	@echo "Deploying documentation to spatialsystem.mach1.tech..."
