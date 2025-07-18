@@ -67,14 +67,14 @@ ifeq ($(detected_OS),Darwin)
 	sudo mkdir -p /Library/Application\ Support/Mach1
 	sudo cp m1-orientationmanager/Resources/settings.json /Library/Application\ Support/Mach1/settings.json
 	sudo cp m1-orientationmanager/Resources/com.mach1.spatial.orientationmanager.plist /Library/LaunchAgents/com.mach1.spatial.orientationmanager.plist
-	sudo cp services/m1-system-helper/com.mach1.spatial.helper.plist /Library/LaunchAgents/com.mach1.spatial.helper.plist
+	sudo cp services/m1-system-helper/Resources/macos/com.mach1.spatial.helper.plist /Library/LaunchAgents/com.mach1.spatial.helper.plist
 endif
 
 clean-services:
 ifeq ($(detected_OS),Darwin)
-	rm -f /Library/Application\ Support/Mach1/settings.json
-	rm -f /Library/LaunchAgents/com.mach1.spatial.orientationmanager.plist
-	rm -f /Library/LaunchAgents/com.mach1.spatial.helper.plist
+	sudo rm -f /Library/Application\ Support/Mach1/settings.json
+	sudo rm -f /Library/LaunchAgents/com.mach1.spatial.orientationmanager.plist
+	sudo rm -f /Library/LaunchAgents/com.mach1.spatial.helper.plist
 	killall m1-system-helper || true
 	killall m1-orientationmanager || true
 endif
@@ -176,8 +176,8 @@ docs-deploy: docs-build
 		--distribution-id $(docs_cloudfront_id) \
 		--paths "/*" \
 		--output json \
-		--query 'Invalidation.{Status:Status,CreateTime:CreateTime,Id:Id}' || (echo "❌ CloudFront invalidation failed" && exit 1)
-	@echo "✅ Documentation deployed to spatialsystem.mach1.tech"
+		--query 'Invalidation.{Status:Status,CreateTime:CreateTime,Id:Id}' || (echo "CloudFront invalidation failed" && exit 1)
+	@echo "Documentation deployed to spatialsystem.mach1.tech"
 
 docs-stage: docs-build
 	@echo "Deploying documentation to staging..."
@@ -188,8 +188,8 @@ docs-stage: docs-build
 		--distribution-id $(docs_stage_cloudfront_id) \
 		--paths "/*" \
 		--output json \
-		--query 'Invalidation.{Status:Status,CreateTime:CreateTime,Id:Id}' || (echo "❌ CloudFront invalidation failed" && exit 1)
-	@echo "✅ Documentation deployed to staging.spatialsystem.mach1.tech"
+		--query 'Invalidation.{Status:Status,CreateTime:CreateTime,Id:Id}' || (echo "CloudFront invalidation failed" && exit 1)
+	@echo "Documentation deployed to staging.spatialsystem.mach1.tech"
 
 docs-local: clean-docs-ports docs-build
 	@echo "Starting local documentation server..."
@@ -201,7 +201,7 @@ docs-verify:
 	@echo "Testing CloudFront direct URL..."
 	@curl -I -s https://$(shell aws cloudfront get-distribution --id $(docs_cloudfront_id) --query 'Distribution.DomainName' --output text) | head -1
 	@echo "Testing custom domain URL..."
-	@curl -I -s https://spatialsystem.mach1.tech | head -1 || echo "❌ Custom domain not accessible"
+	@curl -I -s https://spatialsystem.mach1.tech | head -1 || echo "Custom domain not accessible"
 	@echo "DNS lookup for spatialsystem.mach1.tech:"
 	@dig spatialsystem.mach1.tech CNAME +short || nslookup spatialsystem.mach1.tech
 
@@ -333,7 +333,7 @@ ifeq ($(detected_OS),Darwin)
 	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-panner/build/M1-Panner_artefacts/VST3/M1-Panner.vst3
 	codesign -v --force -o runtime --entitlements m1-player/Resources/M1-Player.entitlements --sign $(APPLE_CODESIGN_CODE) --timestamp m1-player/build/M1-Player_artefacts/Release/M1-Player.app
 	codesign -v --force -o runtime --entitlements m1-orientationmanager/Resources/entitlements.mac.plist --sign $(APPLE_CODESIGN_CODE) --timestamp m1-orientationmanager/build/m1-orientationmanager_artefacts/m1-orientationmanager
-	codesign -v --force -o runtime --entitlements services/m1-system-helper/entitlements.mac.plist --sign $(APPLE_CODESIGN_CODE) --timestamp services/m1-system-helper/build/m1-system-helper_artefacts/m1-system-helper
+	codesign -v --force -o runtime --entitlements services/m1-system-helper/Resources/macos/entitlements.mac.plist --sign $(APPLE_CODESIGN_CODE) --timestamp services/m1-system-helper/build/m1-system-helper_artefacts/m1-system-helper
 else ifeq ($(detected_OS),Windows)
 	$(WRAPTOOL) sign --verbose --account $(PACE_ACCOUNT) --wcguid "$(MONITOR_FULL_GUID)" --signid $(WIN_SIGNTOOL_ID) --in m1-monitor/build/M1-Monitor_artefacts/Release/AAX/M1-Monitor.aaxplugin --out m1-monitor/build/M1-Monitor_artefacts/Release/AAX/M1-Monitor.aaxplugin
 	$(WRAPTOOL) sign --verbose --account $(PACE_ACCOUNT) --wcguid "$(PANNER_FULL_GUID)" --signid $(WIN_SIGNTOOL_ID) --in m1-panner/build/M1-Panner_artefacts/Release/AAX/M1-Panner.aaxplugin --out m1-panner/build/M1-Panner_artefacts/Release/AAX/M1-Panner.aaxplugin

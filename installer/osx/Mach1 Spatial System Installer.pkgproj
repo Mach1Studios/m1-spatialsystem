@@ -518,7 +518,7 @@
 				<key>USE_HFS+_COMPRESSION</key>
 				<false/>
 				<key>VERSION</key>
-				<string>2.0.20250608</string>
+				<string>2.0.20250701</string>
 			</dict>
 			<key>TYPE</key>
 			<integer>0</integer>
@@ -1006,7 +1006,7 @@
 											<key>GID</key>
 											<integer>0</integer>
 											<key>PATH</key>
-											<string>../../services/m1-system-helper/com.mach1.spatial.helper.plist</string>
+											<string>../../services/m1-system-helper/Resources/macos/com.mach1.spatial.helper.plist</string>
 											<key>PATH_TYPE</key>
 											<integer>1</integer>
 											<key>PERMISSIONS</key>
@@ -3825,7 +3825,7 @@
 				<key>USE_HFS+_COMPRESSION</key>
 				<false/>
 				<key>VERSION</key>
-				<string>2.0.20250608</string>
+				<string>2.0.20250701</string>
 			</dict>
 			<key>TYPE</key>
 			<integer>0</integer>
@@ -4379,7 +4379,7 @@
 				<key>USE_HFS+_COMPRESSION</key>
 				<false/>
 				<key>VERSION</key>
-				<string>2.0.20250609</string>
+				<string>2.0.20250714</string>
 			</dict>
 			<key>TYPE</key>
 			<integer>0</integer>
@@ -5501,7 +5501,7 @@
 				<key>USE_HFS+_COMPRESSION</key>
 				<false/>
 				<key>VERSION</key>
-				<string>2.0.20250609</string>
+				<string>2.0.20250714</string>
 			</dict>
 			<key>TYPE</key>
 			<integer>0</integer>
@@ -6607,7 +6607,7 @@
 				<key>USE_HFS+_COMPRESSION</key>
 				<false/>
 				<key>VERSION</key>
-				<string>2.0.20250609</string>
+				<string>2.0.20250714</string>
 			</dict>
 			<key>TYPE</key>
 			<integer>0</integer>
@@ -7713,7 +7713,7 @@
 				<key>USE_HFS+_COMPRESSION</key>
 				<false/>
 				<key>VERSION</key>
-				<string>2.0.20250609</string>
+				<string>2.0.20250714</string>
 			</dict>
 			<key>TYPE</key>
 			<integer>0</integer>

@@ -3,10 +3,11 @@
 
 namespace Mach1 {
 
-OSCHandler::OSCHandler(ClientManager* clientManager, PluginManager* pluginManager, ServiceManager* serviceManager)
+OSCHandler::OSCHandler(ClientManager* clientManager, PluginManager* pluginManager, ServiceManager* serviceManager, PannerTrackingManager* pannerTrackingManager)
     : clientManager(clientManager)
     , pluginManager(pluginManager)
     , serviceManager(serviceManager)
+    , pannerTrackingManager(pannerTrackingManager)
 {
     setupMessageHandlers();
     startTimer(20);
@@ -196,6 +197,12 @@ void OSCHandler::handleRegisterPlugin(const juce::OSCMessage& message) {
         plugin.time = juce::Time::currentTimeMillis();
         pluginManager->registerPlugin(plugin);
         pluginManager->sendMonitorSettings(masterMode, masterYaw, masterPitch, masterRoll);
+        
+        // Also register with the panner tracking manager for unified tracking
+        if (pannerTrackingManager) {
+            pannerTrackingManager->registerOSCPanner(plugin);
+            DBG("[OSCHandler] Registered panner plugin on port " + juce::String(plugin.port) + " with tracking manager");
+        }
     }
 }
 
