@@ -41,6 +41,7 @@ private:
     void handleSetPlayerFrameRate(const juce::OSCMessage& message);
     void handleSetPlayerPosition(const juce::OSCMessage& message);
     void handleSetPlayerIsPlaying(const juce::OSCMessage& message);
+    void handleRequestCurrentChannelConfig(const juce::OSCMessage& message);
 
     ClientManager* clientManager;
     PluginManager* pluginManager;
