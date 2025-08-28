@@ -1,15 +1,15 @@
 [submodule "m1-panner"]
 	path = m1-panner
-	url = git@github.com:Mach1Studios/m1-panner.git
+	url = https://github.com/Mach1Studios/m1-panner.git
 [submodule "m1-monitor"]
 	path = m1-monitor
-	url = git@github.com:Mach1Studios/m1-monitor.git
+	url = https://github.com/Mach1Studios/m1-monitor.git
 [submodule "m1-player"]
 	path = m1-player
-	url = git@github.com:Mach1Studios/m1-player.git
+	url = https://github.com/Mach1Studios/m1-player.git
 [submodule "m1-orientationmanager"]
 	path = m1-orientationmanager
-	url = git@github.com:Mach1Studios/m1-orientationmanager.git
+	url = https://github.com/Mach1Studios/m1-orientationmanager.git
 [submodule "m1-transcoder"]
 	path = m1-transcoder
-	url = git@github.com:Mach1Studios/m1-transcoder.git
+	url = https://github.com/Mach1Studios/m1-transcoder.git
