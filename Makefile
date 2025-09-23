@@ -506,15 +506,7 @@ else ifeq ($(detected_OS),Windows)
 		echo "Installer not found. Please run 'make installer-pkg' first." && \
 		exit 1 \
 	)
-	@powershell -Command "$$version = Read-Host 'Version'; if ($$version -eq '') { Write-Host 'Version cannot be empty'; exit 1 } else { Write-Host $$version }" > temp_version.txt && \
-	set /p version=<temp_version.txt && \
-	del temp_version.txt && \
-	aws s3 cp "installer\win\Output\Mach1 Spatial System Installer.exe" \
-		"s3://mach1-releases/$$version/Mach1 Spatial System Installer.exe" \
-		--profile mach1 \
-		--content-disposition "Mach1 Spatial System Installer.exe" && \
-	echo "Installer deployed to s3://mach1-releases/$$version/" && \
-	echo "REMINDER: Update the Avid Store Submission per version update!"
+	@powershell -Command "$$version = Read-Host 'Version'; if ($$version -eq '') { Write-Host 'Version cannot be empty'; exit 1 } else { aws s3 cp 'installer\win\Output\Mach1 Spatial System Installer.exe' \"s3://mach1-releases/$$version/Mach1 Spatial System Installer.exe\" --profile mach1 --content-disposition \"Mach1 Spatial System Installer.exe\"; Write-Host \"Installer deployed to s3://mach1-releases/$$version/\"; Write-Host \"REMINDER: Update the Avid Store Submission per version update!\" }"
 else
 	@echo "Installer deployment is not supported on this platform"
 endif
