@@ -17,6 +17,12 @@ VST2_PATH=
 WRAPTOOL=
 PACE_ACCOUNT=
 
+# AAX Validator (dsh tool) - Path to PACE AAX Validator CommandLineTools/dsh
+# Example macOS arm64: /Users/username/SDKs/aax-validator-dsh-2024-6-0-138bab0d-mac-arm64/CommandLineTools/dsh
+# Example macOS x64:   /Users/username/SDKs/aax-validator-dsh-2024-6-0-138bab0d-mac-x64/CommandLineTools/dsh
+# Example Windows:     C:\SDKs\aax-validator-dsh-2024-6-0-138bab0d-win-x64\CommandLineTools\dsh.exe
+AAX_VALIDATOR_PATH=
+
 APPLE_TEAM_CODE=
 APPLE_CODESIGN_ID="Developer ID Application: [NAME] ($(APPLE_TEAM_CODE))"
 APPLE_CODESIGN_CODE=
@@ -28,10 +34,8 @@ WIN_SIGNTOOL_ID=
 WIN_SIGNTOOL_PASS=
 WIN_CODESIGN_CERT_PATH=
 
-PANNER_FULL_GUID=
-MONITOR_FULL_GUID=
-TRANSCODER_GUID=
-PLAYER_GUID=
+PANNER_FREE_GUID=
+MONITOR_FREE_GUID=
 M1_GLOBAL_GUID=
 
 # Private

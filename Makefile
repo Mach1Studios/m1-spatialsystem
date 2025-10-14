@@ -31,6 +31,9 @@ ifneq ($(detected_OS),Windows)
 	@./installer/generate_version.sh
 endif
 
+.PHONY: test-aax-monitor test-aax-panner test-aax-plugins test-aax-release
+.PHONY: verify-aax-signing diagnose-aax
+
 pull:
 	git pull --recurse-submodules
 
@@ -331,7 +334,7 @@ overlay-debug:
 	cd m1-panner/Resources/overlay_debug && ./run_simulator.sh --title "Avid Video Engine"
 
 # run configure first
-package: update-versions build docs-build codesign notarize installer-pkg
+package: update-versions build docs-build codesign notarize test-aax-release installer-pkg
 
 # clean and configure for release
 configure: clean update-versions
@@ -379,12 +382,12 @@ build: build-monitor build-panner build-player build-orientationmanager build-sy
 codesign:
 ifeq ($(detected_OS),Darwin)
 	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-monitor/build/M1-Monitor_artefacts/AAX/M1-Monitor.aaxplugin
-	$(WRAPTOOL) sign --verbose --account $(PACE_ACCOUNT) --wcguid "$(M1_GLOBAL_GUID)" --signid $(APPLE_CODESIGN_ID) --in m1-monitor/build/M1-Monitor_artefacts/AAX/M1-Monitor.aaxplugin --out m1-monitor/build/M1-Monitor_artefacts/AAX/M1-Monitor.aaxplugin
+	$(WRAPTOOL) sign --verbose --account $(PACE_ACCOUNT) --wcguid "$(MONITOR_FREE_GUID)" --signid $(APPLE_CODESIGN_ID) --in m1-monitor/build/M1-Monitor_artefacts/AAX/M1-Monitor.aaxplugin --out m1-monitor/build/M1-Monitor_artefacts/AAX/M1-Monitor.aaxplugin --autoinstall on
 	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-monitor/build/M1-Monitor_artefacts/AU/M1-Monitor.component
 	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-monitor/build/M1-Monitor_artefacts/VST/M1-Monitor.vst
 	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-monitor/build/M1-Monitor_artefacts/VST3/M1-Monitor.vst3
 	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-panner/build/M1-Panner_artefacts/AAX/M1-Panner.aaxplugin
-	$(WRAPTOOL) sign --verbose --account $(PACE_ACCOUNT) --wcguid "$(M1_GLOBAL_GUID)" --signid $(APPLE_CODESIGN_ID) --in m1-panner/build/M1-Panner_artefacts/AAX/M1-Panner.aaxplugin --out m1-panner/build/M1-Panner_artefacts/AAX/M1-Panner.aaxplugin
+	$(WRAPTOOL) sign --verbose --account $(PACE_ACCOUNT) --wcguid "$(PANNER_FREE_GUID)" --signid $(APPLE_CODESIGN_ID) --in m1-panner/build/M1-Panner_artefacts/AAX/M1-Panner.aaxplugin --out m1-panner/build/M1-Panner_artefacts/AAX/M1-Panner.aaxplugin --autoinstall on
 	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-panner/build/M1-Panner_artefacts/AU/M1-Panner.component
 	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-panner/build/M1-Panner_artefacts/VST/M1-Panner.vst
 	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-panner/build/M1-Panner_artefacts/VST3/M1-Panner.vst3
@@ -392,8 +395,8 @@ ifeq ($(detected_OS),Darwin)
 	codesign -v --force -o runtime --entitlements m1-orientationmanager/Resources/entitlements.mac.plist --sign $(APPLE_CODESIGN_CODE) --timestamp m1-orientationmanager/build/m1-orientationmanager_artefacts/m1-orientationmanager
 	codesign -v --force -o runtime --entitlements services/m1-system-helper/entitlements.mac.plist --sign $(APPLE_CODESIGN_CODE) --timestamp services/m1-system-helper/build/m1-system-helper_artefacts/m1-system-helper
 else ifeq ($(detected_OS),Windows)
-	$(WRAPTOOL) sign --verbose --account $(PACE_ACCOUNT) --wcguid "$(M1_GLOBAL_GUID)" --signid $(WIN_SIGNTOOL_ID) --in m1-monitor/build/M1-Monitor_artefacts/Release/AAX/M1-Monitor.aaxplugin --out m1-monitor/build/M1-Monitor_artefacts/Release/AAX/M1-Monitor.aaxplugin
-	$(WRAPTOOL) sign --verbose --account $(PACE_ACCOUNT) --wcguid "$(M1_GLOBAL_GUID)" --signid $(WIN_SIGNTOOL_ID) --in m1-panner/build/M1-Panner_artefacts/Release/AAX/M1-Panner.aaxplugin --out m1-panner/build/M1-Panner_artefacts/Release/AAX/M1-Panner.aaxplugin
+	$(WRAPTOOL) sign --verbose --account $(PACE_ACCOUNT) --wcguid "$(MONITOR_FREE_GUID)" --signid $(WIN_SIGNTOOL_ID) --in m1-monitor/build/M1-Monitor_artefacts/Release/AAX/M1-Monitor.aaxplugin --out m1-monitor/build/M1-Monitor_artefacts/Release/AAX/M1-Monitor.aaxplugin --autoinstall on
+	$(WRAPTOOL) sign --verbose --account $(PACE_ACCOUNT) --wcguid "$(PANNER_FREE_GUID)" --signid $(WIN_SIGNTOOL_ID) --in m1-panner/build/M1-Panner_artefacts/Release/AAX/M1-Panner.aaxplugin --out m1-panner/build/M1-Panner_artefacts/Release/AAX/M1-Panner.aaxplugin --autoinstall on
 endif
 
 # codesigning and notarizing m1-transcoder is done via electron-builder
@@ -437,6 +440,21 @@ else ifeq ($(detected_OS),Windows)
 	)
 endif
 
+# Helper function to check AAX validator is configured
+check-aax-validator:
+	@if [ -z "$(AAX_VALIDATOR_PATH)" ]; then \
+		echo "ERROR: AAX_VALIDATOR_PATH not set in Makefile.variables"; \
+		echo "Please set AAX_VALIDATOR_PATH to the path of the dsh tool."; \
+		echo "Example: /path/to/aax-validator-dsh-.../CommandLineTools/dsh"; \
+		exit 1; \
+	elif [ ! -f "$(AAX_VALIDATOR_PATH)" ]; then \
+		echo "ERROR: AAX validator not found at: $(AAX_VALIDATOR_PATH)"; \
+		echo "Please check your AAX_VALIDATOR_PATH in Makefile.variables"; \
+		exit 1; \
+	else \
+		echo "Using AAX validator at: $(AAX_VALIDATOR_PATH)"; \
+	fi
+
 test-monitor: dev-monitor download-pluginval
 	@echo "Building M1-Monitor in development mode..."
 	cmake --build m1-monitor/build-dev --config "Debug"
@@ -461,6 +479,196 @@ endif
 
 test-plugins: test-monitor test-panner
 	@echo "All plugin validations completed successfully!"
+
+# AAX-specific validation and diagnostics
+verify-aax-signing:
+	@echo "=== Verifying AAX Plugin Code Signing ==="
+ifeq ($(detected_OS),Darwin)
+	@echo "\n--- M1-Monitor AAX Plugin ---"
+	@if [ -f "m1-monitor/build/M1-Monitor_artefacts/AAX/M1-Monitor.aaxplugin/Contents/MacOS/M1-Monitor" ]; then \
+		codesign -dvvv m1-monitor/build/M1-Monitor_artefacts/AAX/M1-Monitor.aaxplugin 2>&1 | grep -E "(Authority|TeamIdentifier|Signature|Format)"; \
+		echo "Checking PACE wrapping:"; \
+		WRAP_OUTPUT=$$($(WRAPTOOL) verify --verbose --in m1-monitor/build/M1-Monitor_artefacts/AAX/M1-Monitor.aaxplugin 2>&1); \
+		echo "$$WRAP_OUTPUT"; \
+		if echo "$$WRAP_OUTPUT" | grep -q "signed, but not wrapped"; then \
+			echo ""; \
+			echo "CRITICAL WARNING: Plugin is signed but NOT PACE-wrapped!"; \
+			echo "   AAX plugins must be wrapped to load in Pro Tools."; \
+			echo "   Check your codesign target - WRAPTOOL sign step may have failed."; \
+		elif echo "$$WRAP_OUTPUT" | grep -q "verification failed\|error"; then \
+			echo "ERROR: PACE verification failed"; \
+		else \
+			echo "✓ Plugin is properly wrapped"; \
+		fi \
+	else \
+		echo "ERROR: M1-Monitor AAX plugin not found. Run 'make build-monitor' first."; \
+		exit 1; \
+	fi
+	@echo "\n--- M1-Panner AAX Plugin ---"
+	@if [ -f "m1-panner/build/M1-Panner_artefacts/AAX/M1-Panner.aaxplugin/Contents/MacOS/M1-Panner" ]; then \
+		codesign -dvvv m1-panner/build/M1-Panner_artefacts/AAX/M1-Panner.aaxplugin 2>&1 | grep -E "(Authority|TeamIdentifier|Signature|Format)"; \
+		echo "Checking PACE wrapping:"; \
+		WRAP_OUTPUT=$$($(WRAPTOOL) verify --verbose --in m1-panner/build/M1-Panner_artefacts/AAX/M1-Panner.aaxplugin 2>&1); \
+		echo "$$WRAP_OUTPUT"; \
+		if echo "$$WRAP_OUTPUT" | grep -q "signed, but not wrapped"; then \
+			echo ""; \
+			echo "CRITICAL WARNING: Plugin is signed but NOT PACE-wrapped!"; \
+			echo "   AAX plugins must be wrapped to load in Pro Tools."; \
+			echo "   Check your codesign target - WRAPTOOL sign step may have failed."; \
+		elif echo "$$WRAP_OUTPUT" | grep -q "verification failed\|error"; then \
+			echo "ERROR: PACE verification failed"; \
+		else \
+			echo "✓ Plugin is properly wrapped"; \
+		fi \
+	else \
+		echo "ERROR: M1-Panner AAX plugin not found. Run 'make build-panner' first."; \
+		exit 1; \
+	fi
+else ifeq ($(detected_OS),Windows)
+	@echo "\n--- M1-Monitor AAX Plugin ---"
+	@if exist "m1-monitor\build\M1-Monitor_artefacts\Release\AAX\M1-Monitor.aaxplugin" ( \
+		$(WRAPTOOL) verify --verbose --in m1-monitor\build\M1-Monitor_artefacts\Release\AAX\M1-Monitor.aaxplugin || echo "WARNING: PACE verification failed" \
+	) else ( \
+		echo "ERROR: M1-Monitor AAX plugin not found. Run 'make build-monitor' first." && exit 1 \
+	)
+	@echo "\n--- M1-Panner AAX Plugin ---"
+	@if exist "m1-panner\build\M1-Panner_artefacts\Release\AAX\M1-Panner.aaxplugin" ( \
+		$(WRAPTOOL) verify --verbose --in m1-panner\build\M1-Panner_artefacts\Release\AAX\M1-Panner.aaxplugin || echo "WARNING: PACE verification failed" \
+	) else ( \
+		echo "ERROR: M1-Panner AAX plugin not found. Run 'make build-panner' first." && exit 1 \
+	)
+endif
+	@echo "\n=== Code Signing Verification Complete ==="
+
+test-aax-monitor: dev-monitor check-aax-validator
+	@echo "Building M1-Monitor in development mode..."
+	cmake --build m1-monitor/build-dev --config "Debug"
+	@echo "Testing M1-Monitor AAX plugin..."
+ifeq ($(detected_OS),Darwin)
+	@if [ -f "m1-monitor/build-dev/M1-Monitor_artefacts/Debug/AAX/M1-Monitor.aaxplugin/Contents/MacOS/M1-Monitor" ]; then \
+		echo "Running PACE AAX Validator (dsh) on M1-Monitor..."; \
+		$(AAX_VALIDATOR_PATH) m1-monitor/build-dev/M1-Monitor_artefacts/Debug/AAX/M1-Monitor.aaxplugin || echo "WARNING: AAX validation had issues"; \
+	else \
+		echo "ERROR: M1-Monitor AAX plugin not found at m1-monitor/build-dev/M1-Monitor_artefacts/Debug/AAX/M1-Monitor.aaxplugin"; \
+		exit 1; \
+	fi
+else ifeq ($(detected_OS),Windows)
+	@if exist "m1-monitor\build-dev\M1-Monitor_artefacts\Debug\AAX\M1-Monitor.aaxplugin" ( \
+		echo "Running PACE AAX Validator (dsh) on M1-Monitor..." && \
+		$(AAX_VALIDATOR_PATH) m1-monitor\build-dev\M1-Monitor_artefacts\Debug\AAX\M1-Monitor.aaxplugin || echo "WARNING: AAX validation had issues" \
+	) else ( \
+		echo "ERROR: M1-Monitor AAX plugin not found" && exit 1 \
+	)
+endif
+	@echo "M1-Monitor AAX validation completed"
+
+test-aax-panner: dev-panner check-aax-validator
+	@echo "Building M1-Panner in development mode..."
+	cmake --build m1-panner/build-dev --config "Debug"
+	@echo "Testing M1-Panner AAX plugin..."
+ifeq ($(detected_OS),Darwin)
+	@if [ -f "m1-panner/build-dev/M1-Panner_artefacts/Debug/AAX/M1-Panner.aaxplugin/Contents/MacOS/M1-Panner" ]; then \
+		echo "Running PACE AAX Validator (dsh) on M1-Panner..."; \
+		$(AAX_VALIDATOR_PATH) m1-panner/build-dev/M1-Panner_artefacts/Debug/AAX/M1-Panner.aaxplugin || echo "WARNING: AAX validation had issues"; \
+	else \
+		echo "ERROR: M1-Panner AAX plugin not found at m1-panner/build-dev/M1-Panner_artefacts/Debug/AAX/M1-Panner.aaxplugin"; \
+		exit 1; \
+	fi
+else ifeq ($(detected_OS),Windows)
+	@if exist "m1-panner\build-dev\M1-Panner_artefacts\Debug\AAX\M1-Panner.aaxplugin" ( \
+		echo "Running PACE AAX Validator (dsh) on M1-Panner..." && \
+		$(AAX_VALIDATOR_PATH) m1-panner\build-dev\M1-Panner_artefacts\Debug\AAX\M1-Panner.aaxplugin || echo "WARNING: AAX validation had issues" \
+	) else ( \
+		echo "ERROR: M1-Panner AAX plugin not found" && exit 1 \
+	)
+endif
+	@echo "M1-Panner AAX validation completed"
+
+test-aax-plugins: test-aax-monitor test-aax-panner
+	@echo "All AAX plugin validations completed!"
+
+test-aax-release: check-aax-validator verify-aax-signing
+	@echo "=== Testing Release AAX Plugins ==="
+ifeq ($(detected_OS),Darwin)
+	@echo "\n--- Validating M1-Monitor Release AAX ---"; \
+	$(AAX_VALIDATOR_PATH) m1-monitor/build/M1-Monitor_artefacts/AAX/M1-Monitor.aaxplugin || echo "WARNING: M1-Monitor AAX validation had issues"; \
+	echo "\n--- Validating M1-Panner Release AAX ---"; \
+	$(AAX_VALIDATOR_PATH) m1-panner/build/M1-Panner_artefacts/AAX/M1-Panner.aaxplugin || echo "WARNING: M1-Panner AAX validation had issues"
+else ifeq ($(detected_OS),Windows)
+	@echo "\n--- Validating M1-Monitor Release AAX ---"
+	@$(AAX_VALIDATOR_PATH) m1-monitor\build\M1-Monitor_artefacts\Release\AAX\M1-Monitor.aaxplugin || echo "WARNING: M1-Monitor AAX validation had issues"
+	@echo "\n--- Validating M1-Panner Release AAX ---"
+	@$(AAX_VALIDATOR_PATH) m1-panner\build\M1-Panner_artefacts\Release\AAX\M1-Panner.aaxplugin || echo "WARNING: M1-Panner AAX validation had issues"
+endif
+	@echo "\n=== Release AAX Plugin Validation Complete ==="
+
+diagnose-aax:
+	@echo "=== AAX Plugin Diagnostic Report ==="
+ifeq ($(detected_OS),Darwin)
+	@echo "\n--- System Information ---"
+	@echo "macOS Version: $$(sw_vers -productVersion)"
+	@echo "Architecture: $$(uname -m)"
+	@echo "Pro Tools Installed: $$(if [ -d '/Applications/Pro Tools.app' ]; then echo 'Yes'; else echo 'No'; fi)"
+	@echo "\n--- AAX Plugin Directories ---"
+	@echo "Global AAX Plugins:"
+	@ls -la "/Library/Application Support/Avid/Audio/Plug-Ins/" 2>/dev/null | grep -E "(M1-Monitor|M1-Panner)" || echo "No Mach1 plugins found"
+	@echo "\nUser AAX Plugins:"
+	@ls -la "$$HOME/Library/Application Support/Avid/Audio/Plug-Ins/" 2>/dev/null | grep -E "(M1-Monitor|M1-Panner)" || echo "No Mach1 plugins found"
+	@echo "\n--- Code Signing Status ---"
+	@for plugin in "/Library/Application Support/Avid/Audio/Plug-Ins/M1-Monitor.aaxplugin" \
+	               "/Library/Application Support/Avid/Audio/Plug-Ins/M1-Panner.aaxplugin" \
+	               "$$HOME/Library/Application Support/Avid/Audio/Plug-Ins/M1-Monitor.aaxplugin" \
+	               "$$HOME/Library/Application Support/Avid/Audio/Plug-Ins/M1-Panner.aaxplugin"; do \
+		if [ -e "$$plugin" ]; then \
+			echo "\nChecking: $$plugin"; \
+			codesign -dv "$$plugin" 2>&1 | head -5; \
+			echo "Valid signature: $$(codesign -v "$$plugin" 2>&1 && echo 'YES' || echo 'NO')"; \
+			spctl -a -t install "$$plugin" 2>&1 | head -2; \
+		fi \
+	done
+	@echo "\n--- PACE iLok Status ---"
+	@if [ -d "/Applications/iLok License Manager.app" ]; then \
+		echo "iLok License Manager: Installed"; \
+		ps aux | grep -i ilok | grep -v grep | head -3 || echo "iLok daemon not running"; \
+	else \
+		echo "iLok License Manager: NOT INSTALLED"; \
+	fi
+	@echo "\n--- Gatekeeper & Quarantine ---"
+	@for plugin in "/Library/Application Support/Avid/Audio/Plug-Ins/M1-Monitor.aaxplugin" \
+	               "/Library/Application Support/Avid/Audio/Plug-Ins/M1-Panner.aaxplugin"; do \
+		if [ -e "$$plugin" ]; then \
+			echo "\nQuarantine attributes for $$plugin:"; \
+			xattr -l "$$plugin" 2>/dev/null | grep "com.apple.quarantine" || echo "No quarantine flag"; \
+		fi \
+	done
+	@echo "\n--- Recommendations ---"
+	@echo "1. If plugins have quarantine flags, run: sudo xattr -rd com.apple.quarantine '/Library/Application Support/Avid/Audio/Plug-Ins/M1-*.aaxplugin'"
+	@echo "2. Ensure iLok License Manager is installed and running"
+	@echo "3. Verify PACE signing with: $(WRAPTOOL) verify --in <plugin.aaxplugin>"
+	@echo "4. Check Pro Tools logs: ~/Library/Logs/Avid/"
+	@echo "5. Try clearing Pro Tools cache: ~/Library/Caches/com.avid.*"
+else ifeq ($(detected_OS),Windows)
+	@echo "\n--- System Information ---"
+	@systeminfo | findstr /C:"OS Name" /C:"OS Version"
+	@echo "\n--- AAX Plugin Directories ---"
+	@if exist "$(ProgramFiles)\Common Files\Avid\Audio\Plug-Ins\" ( \
+		dir "$(ProgramFiles)\Common Files\Avid\Audio\Plug-Ins\M1-*.aaxplugin" /s /b 2>nul || echo "No Mach1 plugins found" \
+	) else ( \
+		echo "AAX plugin directory does not exist" \
+	)
+	@echo "\n--- PACE iLok Status ---"
+	@if exist "$(ProgramFiles)\iLok License Manager\" ( \
+		echo "iLok License Manager: Installed" \
+	) else ( \
+		echo "iLok License Manager: NOT INSTALLED" \
+	)
+	@echo "\n--- Recommendations ---"
+	@echo "1. Ensure iLok License Manager is installed and running"
+	@echo "2. Verify PACE signing with: $(WRAPTOOL) verify --in <plugin.aaxplugin>"
+	@echo "3. Check Pro Tools logs in: %%APPDATA%%\Avid\"
+	@echo "4. Run Pro Tools as Administrator once to register plugins"
+endif
+	@echo "\n=== End Diagnostic Report ==="
 
 clean-pluginval:
 ifeq ($(detected_OS),Darwin)

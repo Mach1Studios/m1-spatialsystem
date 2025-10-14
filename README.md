@@ -26,6 +26,32 @@ To properly debug the services [m1-system-helper](services/m1-system-helper) and
 - Use SafeNet Authentication Client app to check and update current windows certificates for codesigning (via the hardware usb key)
 - Use `certmgr.exe` and open the Personal certificates to grab the `Thumbprint` from the relevant Digicert Codesigning Certificate to be used in the codesign step via `WIN_SIGNTOOL_ID`
 
+## AAX Plugin Validation
+
+AAX plugins require special validation to ensure they work properly in Pro Tools. 
+
+### Setup
+Set `AAX_VALIDATOR_PATH` in `Makefile.variables` to point to your PACE AAX Validator `dsh` tool:
+```makefile
+AAX_VALIDATOR_PATH=/path/to/aax-validator-dsh-.../CommandLineTools/dsh
+```
+
+### Available Targets
+- `make test-aax-monitor` - Validate M1-Monitor AAX plugin (dev build)
+- `make test-aax-panner` - Validate M1-Panner AAX plugin (dev build)
+- `make test-aax-plugins` - Validate both AAX plugins (dev builds)
+- `make test-aax-release` - Validate release AAX plugins
+- `make verify-aax-signing` - Verify code signing on AAX plugins
+- `make diagnose-aax` - Generate diagnostic report for AAX issues
+
+### User Diagnostic Tools
+
+If users report AAX plugins not loading in Pro Tools, diagnostic scripts are available:
+- **macOS**: `./installer/osx/diagnose_aax_issues.sh`
+- **Windows**: `installer\win\diagnose_aax_issues.bat`
+
+These scripts check for common issues (missing iLok, quarantine flags, code signing problems) and provide recommended fixes.
+
 ## Known Issues
 - [MacOS] m1-orientationmanager and external BLE device handling issues in macOS versions 12.0, 12.1 and 12.2
 
