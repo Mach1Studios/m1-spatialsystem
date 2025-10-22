@@ -2,6 +2,26 @@
 
 # MACH1 SPATIAL SYSTEM MakeFile
 
+.PHONY: help
+help:
+	@echo "MACH1 SPATIAL SYSTEM - Available Commands:"
+	@echo ""
+	@echo "Version Management:"
+	@echo "  make update-version VERSION=<version>  - Update central version and regenerate all components"
+	@echo "  make update-versions                   - Regenerate component versions from current base"
+	@echo ""
+	@echo "Development:"
+	@echo "  make dev                              - Setup development environment for all components"
+	@echo "  make clean                            - Clean all build directories"
+	@echo "  make configure                        - Configure for release build"
+	@echo "  make build                            - Build all components"
+	@echo ""
+	@echo "Packaging:"
+	@echo "  make package                          - Full package build (configure, build, codesign, notarize, installer)"
+	@echo "  make installer-pkg                    - Build installer packages"
+	@echo ""
+	@echo "For more details, see the Makefile or run individual commands with --help"
+
 # Auto-generate Makefile.variables from example if it doesn't exist
 Makefile.variables:
 	@if [ ! -f "Makefile.variables" ] && [ -f "Makefile.variables.example" ]; then \
@@ -29,6 +49,38 @@ update-versions:
 ifneq ($(detected_OS),Windows)
 	@chmod +x ./installer/generate_version.sh
 	@./installer/generate_version.sh
+endif
+
+.PHONY: update-version
+update-version:
+ifneq ($(detected_OS),Windows)
+	@if [ -z "$(VERSION)" ]; then \
+		echo "Usage: make update-version VERSION=<new_version>"; \
+		echo "Example: make update-version VERSION=2.0.1"; \
+		echo "Current version: $$(cat VERSION)"; \
+		echo ""; \
+		echo "This command updates the central VERSION file and regenerates all component versions."; \
+		exit 1; \
+	fi
+	@echo "Updating central version from $$(cat VERSION) to $(VERSION)"
+	@echo "$(VERSION)" > VERSION
+	@echo "Regenerating all component versions..."
+	@chmod +x ./installer/generate_version.sh
+	@./installer/generate_version.sh
+	@echo "Version update complete!"
+	@echo "Current versions:"
+	@echo "Central: $$(cat VERSION)"
+	@echo "m1-panner: $$(cat m1-panner/VERSION)"
+	@echo "m1-monitor: $$(cat m1-monitor/VERSION)"
+	@echo "m1-player: $$(cat m1-player/VERSION)"
+	@echo "m1-orientationmanager: $$(cat m1-orientationmanager/VERSION)"
+	@echo "m1-system-helper: $$(cat services/m1-system-helper/VERSION)"
+	@echo ""
+	@echo "Installer versions updated:"
+	@echo "macOS: $$(grep -c "$(VERSION)" installer/osx/Mach1\ Spatial\ System\ Installer.pkgproj) packages"
+	@echo "Windows: $$(grep AppVersion installer/win/installer.iss)"
+else
+	@echo "Version updates are not supported on Windows"
 endif
 
 .PHONY: test-aax-monitor test-aax-panner test-aax-plugins test-aax-release
@@ -428,6 +480,98 @@ ifeq ($(detected_OS),Darwin)
 	codesign -v --force -o runtime --entitlements m1-orientationmanager/Resources/entitlements.mac.plist --sign $(APPLE_CODESIGN_CODE) --timestamp m1-orientationmanager/build/m1-orientationmanager_artefacts/m1-orientationmanager
 	codesign -v --force -o runtime --entitlements services/m1-system-helper/entitlements.mac.plist --sign $(APPLE_CODESIGN_CODE) --timestamp services/m1-system-helper/build/m1-system-helper_artefacts/m1-system-helper
 	@echo "Applications code signed"
+endif
+
+# Notarize VST3 plugins for testing and distribution
+notarize-vst3:
+ifeq ($(detected_OS),Darwin)
+	@echo "=== Notarizing VST3 Plugins for Testing ==="
+	@echo "Creating zip archives for notarization..."
+	@mkdir -p installer/osx/build/notarize
+	# Create zip for M1-Monitor VST3
+	@if [ -d "m1-monitor/build/M1-Monitor_artefacts/VST3/M1-Monitor.vst3" ]; then \
+		ditto -c -k --keepParent "$(PWD)/m1-monitor/build/M1-Monitor_artefacts/VST3/M1-Monitor.vst3" "$(PWD)/installer/osx/build/notarize/M1-Monitor.vst3.zip"; \
+		echo "Created M1-Monitor.vst3.zip"; \
+	else \
+		echo "ERROR: M1-Monitor VST3 not found. Run 'make build-monitor' first."; \
+		exit 1; \
+	fi
+	# Create zip for M1-Panner VST3
+	@if [ -d "m1-panner/build/M1-Panner_artefacts/VST3/M1-Panner.vst3" ]; then \
+		ditto -c -k --keepParent "$(PWD)/m1-panner/build/M1-Panner_artefacts/VST3/M1-Panner.vst3" "$(PWD)/installer/osx/build/notarize/M1-Panner.vst3.zip"; \
+		echo "Created M1-Panner.vst3.zip"; \
+	else \
+		echo "ERROR: M1-Panner VST3 not found. Run 'make build-panner' first."; \
+		exit 1; \
+	fi
+	@echo ""
+	@echo "Submitting VST3 plugins for notarization..."
+	# Notarize M1-Monitor VST3
+	@echo "Notarizing M1-Monitor VST3..."
+	@xcrun notarytool submit --wait --keychain-profile 'notarize-app' --apple-id $(APPLE_USERNAME) --password $(ALTOOL_APPPASS) --team-id $(APPLE_TEAM_CODE) "installer/osx/build/notarize/M1-Monitor.vst3.zip" || (echo "M1-Monitor VST3 notarization failed" && exit 1)
+	# Notarize M1-Panner VST3
+	@echo "Notarizing M1-Panner VST3..."
+	@xcrun notarytool submit --wait --keychain-profile 'notarize-app' --apple-id $(APPLE_USERNAME) --password $(ALTOOL_APPPASS) --team-id $(APPLE_TEAM_CODE) "installer/osx/build/notarize/M1-Panner.vst3.zip" || (echo "M1-Panner VST3 notarization failed" && exit 1)
+	@echo ""
+	@echo "Stapling notarization tickets to VST3 plugins..."
+	# Staple tickets to the original VST3 bundles
+	@xcrun stapler staple m1-monitor/build/M1-Monitor_artefacts/VST3/M1-Monitor.vst3
+	@xcrun stapler staple m1-panner/build/M1-Panner_artefacts/VST3/M1-Panner.vst3
+	@echo ""
+	@echo "Creating notarized zip archives for distribution..."
+	# Create final notarized zips
+	@ditto -c -k --keepParent "$(PWD)/m1-monitor/build/M1-Monitor_artefacts/VST3/M1-Monitor.vst3" "$(PWD)/installer/osx/build/notarize/M1-Monitor-Notarized.vst3.zip"
+	@ditto -c -k --keepParent "$(PWD)/m1-panner/build/M1-Panner_artefacts/VST3/M1-Panner.vst3" "$(PWD)/installer/osx/build/notarize/M1-Panner-Notarized.vst3.zip"
+	@echo ""
+	@echo "=== VST3 Notarization Complete ==="
+	@echo "Notarized VST3 plugins available at:"
+	@echo "  installer/osx/build/notarize/M1-Monitor-Notarized.vst3.zip"
+	@echo "  installer/osx/build/notarize/M1-Panner-Notarized.vst3.zip"
+	@echo ""
+	@echo "Verification commands:"
+	@echo "  spctl -a -t install -v installer/osx/build/notarize/M1-Monitor-Notarized.vst3.zip"
+	@echo "  spctl -a -t install -v installer/osx/build/notarize/M1-Panner-Notarized.vst3.zip"
+	@echo ""
+	@echo "To install for testing:"
+	@echo "  unzip installer/osx/build/notarize/M1-Monitor-Notarized.vst3.zip -d ~/Library/Audio/Plug-Ins/VST3/"
+	@echo "  unzip installer/osx/build/notarize/M1-Panner-Notarized.vst3.zip -d ~/Library/Audio/Plug-Ins/VST3/"
+else
+	@echo "VST3 notarization is only supported on macOS"
+endif
+
+# Verify notarized VST3 plugins
+verify-vst3:
+ifeq ($(detected_OS),Darwin)
+	@echo "=== Verifying Notarized VST3 Plugins ==="
+	@echo "Checking M1-Monitor VST3..."
+	@if [ -f "installer/osx/build/notarize/M1-Monitor-Notarized.vst3.zip" ]; then \
+		spctl -a -t install -v installer/osx/build/notarize/M1-Monitor-Notarized.vst3.zip; \
+		echo "M1-Monitor VST3: ✓ Notarized and verified"; \
+	else \
+		echo "M1-Monitor VST3: ✗ Notarized zip not found"; \
+	fi
+	@echo ""
+	@echo "Checking M1-Panner VST3..."
+	@if [ -f "installer/osx/build/notarize/M1-Panner-Notarized.vst3.zip" ]; then \
+		spctl -a -t install -v installer/osx/build/notarize/M1-Panner-Notarized.vst3.zip; \
+		echo "M1-Panner VST3: ✓ Notarized and verified"; \
+	else \
+		echo "M1-Panner VST3: ✗ Notarized zip not found"; \
+	fi
+	@echo ""
+	@echo "=== VST3 Verification Complete ==="
+else
+	@echo "VST3 verification is only supported on macOS"
+endif
+
+# Clean notarization artifacts
+clean-notarize:
+ifeq ($(detected_OS),Darwin)
+	@echo "Cleaning notarization artifacts..."
+	@rm -rf installer/osx/build/notarize
+	@echo "Notarization artifacts cleaned"
+else
+	@echo "Notarization cleanup is only supported on macOS"
 endif
 
 # codesigning and notarizing m1-transcoder is done via electron-builder

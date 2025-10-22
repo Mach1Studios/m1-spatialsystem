@@ -9,20 +9,14 @@ generate_version() {
         # Get the short hash
         local hash=$(cd $dir && git rev-parse --short HEAD)
         local date=$(cd $dir && git show -s --date=format:'%Y%m%d' --format=%cd)
-        # Split base version into major.minor
-        local major=$(echo $base_version | cut -d. -f1)
-        local minor=$(echo $base_version | cut -d. -f2)
-        # Generate new version without newlines
-        echo "$major.$minor.$date"
+        # Use the full base version and append date
+        echo "$base_version.$date"
     elif [ -d "./.git/modules/$dir" ]; then
         # Get the short hash
         local hash=$(cd $dir && git rev-parse --short HEAD)
         local date=$(cd $dir && git show -s --date=format:'%Y%m%d' --format=%cd)
-        # Split base version into major.minor
-        local major=$(echo $base_version | cut -d. -f1)
-        local minor=$(echo $base_version | cut -d. -f2)
-        # Generate new version without newlines
-        echo "$major.$minor.$date"
+        # Use the full base version and append date
+        echo "$base_version.$date"
     else
         echo "$base_version"
     fi
@@ -30,20 +24,23 @@ generate_version() {
 
 # Update version files for all components
 update_versions() {
+    # Read the central base version
+    local base_version=$(cat ./VERSION)
+    
     # Update m1-panner version
-    generate_version "m1-panner" $(cat ./m1-panner/VERSION) > ./m1-panner/VERSION
+    generate_version "m1-panner" "$base_version" > ./m1-panner/VERSION
     
     # Update m1-monitor version
-    generate_version "m1-monitor" $(cat ./m1-monitor/VERSION) > ./m1-monitor/VERSION
+    generate_version "m1-monitor" "$base_version" > ./m1-monitor/VERSION
 
     # Update m1-player version
-    generate_version "m1-player" $(cat ./m1-player/VERSION) > ./m1-player/VERSION
+    generate_version "m1-player" "$base_version" > ./m1-player/VERSION
     
     # Update m1-orientationmanager version
-    generate_version "m1-orientationmanager" $(cat ./m1-orientationmanager/VERSION) > ./m1-orientationmanager/VERSION
+    generate_version "m1-orientationmanager" "$base_version" > ./m1-orientationmanager/VERSION
     
     # Update m1-system-helper version
-    generate_version "." $(cat ./services/m1-system-helper/VERSION) > ./services/m1-system-helper/VERSION
+    generate_version "." "$base_version" > ./services/m1-system-helper/VERSION
 }
 
 # Update installer version files
@@ -88,6 +85,12 @@ update_installer_versions() {
             s/(<key>IDENTIFIER<\/key>\s*<string>com\.mach1\.spatial\.orientationmanager\.[^<]*<\/string>.*?<key>VERSION<\/key>\s*<string>)[^<]*(<\/string>)/update_pkg_version($&, "'$om_ver'")/egs;
             s/(<key>IDENTIFIER<\/key>\s*<string>com\.mach1\.spatial\.helper\.[^<]*<\/string>.*?<key>VERSION<\/key>\s*<string>)[^<]*(<\/string>)/update_pkg_version($&, "'$helper_ver'")/egs;
             s/(<key>IDENTIFIER<\/key>\s*<string>com\.mach1\.spatial\.transcoder\.[^<]*<\/string>.*?<key>VERSION<\/key>\s*<string>)[^<]*(<\/string>)/update_pkg_version($&, "'$player_ver'")/egs;
+            
+            # Update plugin installer packages (AAX, VST2, VST3, AU installers)
+            s/(<key>IDENTIFIER<\/key>\s*<string>com\.mach1\.spatial\.plugins\.aax\.installer<\/string>.*?<key>VERSION<\/key>\s*<string>)[^<]*(<\/string>)/update_pkg_version($&, "'$panner_ver'")/egs;
+            s/(<key>IDENTIFIER<\/key>\s*<string>com\.mach1\.spatial\.plugins\.vst2\.installer<\/string>.*?<key>VERSION<\/key>\s*<string>)[^<]*(<\/string>)/update_pkg_version($&, "'$panner_ver'")/egs;
+            s/(<key>IDENTIFIER<\/key>\s*<string>com\.mach1\.spatial\.plugins\.vst3\.installer<\/string>.*?<key>VERSION<\/key>\s*<string>)[^<]*(<\/string>)/update_pkg_version($&, "'$panner_ver'")/egs;
+            s/(<key>IDENTIFIER<\/key>\s*<string>com\.mach1\.spatial\.plugins\.au\.installer<\/string>.*?<key>VERSION<\/key>\s*<string>)[^<]*(<\/string>)/update_pkg_version($&, "'$panner_ver'")/egs;
         ' "$temp_file"
 
         # Verify the changes look good before moving file
