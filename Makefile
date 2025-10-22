@@ -438,9 +438,9 @@ codesign-aax:
 ifeq ($(detected_OS),Darwin)
 	@echo "Code signing AAX plugins..."
 	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-monitor/build/M1-Monitor_artefacts/AAX/M1-Monitor.aaxplugin
-	$(WRAPTOOL) sign --verbose --account $(PACE_ACCOUNT) --signid $(APPLE_CODESIGN_ID) --customernumber $(CUSTOMER_NUMBER) --customername "Mach 1" --in m1-monitor/build/M1-Monitor_artefacts/AAX/M1-Monitor.aaxplugin --out m1-monitor/build/M1-Monitor_artefacts/AAX/M1-Monitor.aaxplugin
+	$(WRAPTOOL) sign --verbose --account $(PACE_ACCOUNT) --wcguid "$(MONITOR_FREE_GUID)" --signid $(APPLE_CODESIGN_ID) --in m1-monitor/build/M1-Monitor_artefacts/AAX/M1-Monitor.aaxplugin --out m1-monitor/build/M1-Monitor_artefacts/AAX/M1-Monitor.aaxplugin --autoinstall on
 	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-panner/build/M1-Panner_artefacts/AAX/M1-Panner.aaxplugin
-	$(WRAPTOOL) sign --verbose --account $(PACE_ACCOUNT) --signid $(APPLE_CODESIGN_ID) --customernumber $(CUSTOMER_NUMBER) --customername "Mach 1" --in m1-panner/build/M1-Panner_artefacts/AAX/M1-Panner.aaxplugin --out m1-panner/build/M1-Panner_artefacts/AAX/M1-Panner.aaxplugin
+	$(WRAPTOOL) sign --verbose --account $(PACE_ACCOUNT) --wcguid "$(PANNER_FREE_GUID)" --signid $(APPLE_CODESIGN_ID) --in m1-panner/build/M1-Panner_artefacts/AAX/M1-Panner.aaxplugin --out m1-panner/build/M1-Panner_artefacts/AAX/M1-Panner.aaxplugin --autoinstall on
 	@echo "AAX plugins code signed"
 else ifeq ($(detected_OS),Windows)
 	@echo "Code signing AAX plugins..."
@@ -872,10 +872,12 @@ ifeq ($(detected_OS),Darwin)
 		echo "Installer not found. Please run 'make installer-pkg' first."; \
 		exit 1; \
 	fi
-	@read -p "Version: " version; \
+	@current_version=$$(cat VERSION); \
+	suggested_version=$$(find . -maxdepth 2 -name "VERSION" -not -path "./VERSION" -exec cat {} \; | sort -V | tail -1); \
+	echo "Current central version: $$current_version"; \
+	read -p "Version [$$suggested_version]: " version; \
 	if [ -z "$$version" ]; then \
-		echo "Version cannot be empty"; \
-		exit 1; \
+		version=$$suggested_version; \
 	fi; \
 	aws s3 cp "installer/osx/build/signed/Mach1 Spatial System Installer.pkg" \
 		"s3://mach1-releases/$$version/Mach1 Spatial System Installer.pkg" \
@@ -889,7 +891,7 @@ else ifeq ($(detected_OS),Windows)
 		echo "Installer not found. Please run 'make installer-pkg' first." && \
 		exit 1 \
 	)
-	@powershell -Command "$$version = Read-Host 'Version'; if ($$version -eq '') { Write-Host 'Version cannot be empty'; exit 1 } else { aws s3 cp 'installer\win\Output\Mach1 Spatial System Installer.exe' \"s3://mach1-releases/$$version/Mach1 Spatial System Installer.exe\" --profile mach1 --content-disposition \"Mach1 Spatial System Installer.exe\"; Write-Host \"Installer deployed to s3://mach1-releases/$$version/\"; Write-Host \"REMINDER: Update the Avid Store Submission per version update!\" }"
+	@powershell -Command "$$current_version = Get-Content VERSION; $$component_versions = Get-ChildItem -Recurse -MaxDepth 2 -Name 'VERSION' | Where-Object { $$_ -ne 'VERSION' } | ForEach-Object { Get-Content $$_ }; $$suggested_version = $$component_versions | Sort-Object { [version]$$_ } | Select-Object -Last 1; Write-Host \"Current central version: $$current_version\"; Write-Host \"Newest component version: $$suggested_version\"; Write-Host \"Suggested version: $$suggested_version\"; $$version = Read-Host \"Version [$$suggested_version]\"; if ($$version -eq '') { $$version = $$suggested_version }; aws s3 cp 'installer\win\Output\Mach1 Spatial System Installer.exe' \"s3://mach1-releases/$$version/Mach1 Spatial System Installer.exe\" --profile mach1 --content-disposition \"Mach1 Spatial System Installer.exe\"; Write-Host \"Installer deployed to s3://mach1-releases/$$version/\"; Write-Host \"REMINDER: Update the Avid Store Submission per version update!\""
 else
 	@echo "Installer deployment is not supported on this platform"
 endif
