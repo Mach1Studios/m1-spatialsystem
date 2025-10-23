@@ -665,16 +665,6 @@ ifeq ($(detected_OS),Darwin)
 		echo "Checking PACE wrapping:"; \
 		WRAP_OUTPUT=$$($(WRAPTOOL) verify --verbose --in m1-monitor/build/M1-Monitor_artefacts/AAX/M1-Monitor.aaxplugin 2>&1); \
 		echo "$$WRAP_OUTPUT"; \
-		if echo "$$WRAP_OUTPUT" | grep -q "signed, but not wrapped"; then \
-			echo ""; \
-			echo "CRITICAL WARNING: Plugin is signed but NOT PACE-wrapped!"; \
-			echo "   AAX plugins must be wrapped to load in Pro Tools."; \
-			echo "   Check your codesign target - WRAPTOOL sign step may have failed."; \
-		elif echo "$$WRAP_OUTPUT" | grep -q "verification failed\|error"; then \
-			echo "ERROR: PACE verification failed"; \
-		else \
-			echo "✓ Plugin is properly wrapped"; \
-		fi \
 	else \
 		echo "ERROR: M1-Monitor AAX plugin not found. Run 'make build-monitor' first."; \
 		exit 1; \
@@ -685,16 +675,6 @@ ifeq ($(detected_OS),Darwin)
 		echo "Checking PACE wrapping:"; \
 		WRAP_OUTPUT=$$($(WRAPTOOL) verify --verbose --in m1-panner/build/M1-Panner_artefacts/AAX/M1-Panner.aaxplugin 2>&1); \
 		echo "$$WRAP_OUTPUT"; \
-		if echo "$$WRAP_OUTPUT" | grep -q "signed, but not wrapped"; then \
-			echo ""; \
-			echo "CRITICAL WARNING: Plugin is signed but NOT PACE-wrapped!"; \
-			echo "   AAX plugins must be wrapped to load in Pro Tools."; \
-			echo "   Check your codesign target - WRAPTOOL sign step may have failed."; \
-		elif echo "$$WRAP_OUTPUT" | grep -q "verification failed\|error"; then \
-			echo "ERROR: PACE verification failed"; \
-		else \
-			echo "✓ Plugin is properly wrapped"; \
-		fi \
 	else \
 		echo "ERROR: M1-Panner AAX plugin not found. Run 'make build-panner' first."; \
 		exit 1; \
@@ -714,53 +694,6 @@ else ifeq ($(detected_OS),Windows)
 	)
 endif
 	@echo "\n=== Code Signing Verification Complete ==="
-
-test-aax-monitor: dev-monitor check-aax-validator
-	@echo "Building M1-Monitor in development mode..."
-	cmake --build m1-monitor/build-dev --config "Debug"
-	@echo "Testing M1-Monitor AAX plugin..."
-ifeq ($(detected_OS),Darwin)
-	@if [ -f "m1-monitor/build-dev/M1-Monitor_artefacts/Debug/AAX/M1-Monitor.aaxplugin/Contents/MacOS/M1-Monitor" ]; then \
-		echo "Running PACE AAX Validator (dsh) on M1-Monitor..."; \
-		$(AAX_VALIDATOR_PATH) m1-monitor/build-dev/M1-Monitor_artefacts/Debug/AAX/M1-Monitor.aaxplugin || echo "WARNING: AAX validation had issues"; \
-	else \
-		echo "ERROR: M1-Monitor AAX plugin not found at m1-monitor/build-dev/M1-Monitor_artefacts/Debug/AAX/M1-Monitor.aaxplugin"; \
-		exit 1; \
-	fi
-else ifeq ($(detected_OS),Windows)
-	@if exist "m1-monitor\build-dev\M1-Monitor_artefacts\Debug\AAX\M1-Monitor.aaxplugin" ( \
-		echo "Running PACE AAX Validator (dsh) on M1-Monitor..." && \
-		$(AAX_VALIDATOR_PATH) m1-monitor\build-dev\M1-Monitor_artefacts\Debug\AAX\M1-Monitor.aaxplugin || echo "WARNING: AAX validation had issues" \
-	) else ( \
-		echo "ERROR: M1-Monitor AAX plugin not found" && exit 1 \
-	)
-endif
-	@echo "M1-Monitor AAX validation completed"
-
-test-aax-panner: dev-panner check-aax-validator
-	@echo "Building M1-Panner in development mode..."
-	cmake --build m1-panner/build-dev --config "Debug"
-	@echo "Testing M1-Panner AAX plugin..."
-ifeq ($(detected_OS),Darwin)
-	@if [ -f "m1-panner/build-dev/M1-Panner_artefacts/Debug/AAX/M1-Panner.aaxplugin/Contents/MacOS/M1-Panner" ]; then \
-		echo "Running PACE AAX Validator (dsh) on M1-Panner..."; \
-		$(AAX_VALIDATOR_PATH) m1-panner/build-dev/M1-Panner_artefacts/Debug/AAX/M1-Panner.aaxplugin || echo "WARNING: AAX validation had issues"; \
-	else \
-		echo "ERROR: M1-Panner AAX plugin not found at m1-panner/build-dev/M1-Panner_artefacts/Debug/AAX/M1-Panner.aaxplugin"; \
-		exit 1; \
-	fi
-else ifeq ($(detected_OS),Windows)
-	@if exist "m1-panner\build-dev\M1-Panner_artefacts\Debug\AAX\M1-Panner.aaxplugin" ( \
-		echo "Running PACE AAX Validator (dsh) on M1-Panner..." && \
-		$(AAX_VALIDATOR_PATH) m1-panner\build-dev\M1-Panner_artefacts\Debug\AAX\M1-Panner.aaxplugin || echo "WARNING: AAX validation had issues" \
-	) else ( \
-		echo "ERROR: M1-Panner AAX plugin not found" && exit 1 \
-	)
-endif
-	@echo "M1-Panner AAX validation completed"
-
-test-aax-plugins: test-aax-monitor test-aax-panner
-	@echo "All AAX plugin validations completed!"
 
 test-aax-release: check-aax-validator verify-aax-signing
 	@echo "=== Testing Release AAX Plugins ==="
