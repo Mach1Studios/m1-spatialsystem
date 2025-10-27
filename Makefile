@@ -386,7 +386,7 @@ overlay-debug:
 	cd m1-panner/Resources/overlay_debug && ./run_simulator.sh --title "Avid Video Engine"
 
 # run configure first
-package: update-versions build docs-build codesign notarize test-aax-release installer-pkg
+package: update-versions build docs-build codesign notarize installer-pkg
 
 # clean and configure for release
 configure: clean update-versions
@@ -697,18 +697,22 @@ endif
 
 test-aax-release: check-aax-validator verify-aax-signing
 	@echo "=== Testing Release AAX Plugins ==="
+	@echo "NOTE: Ensure iLok License Manager is running for PACE support"
+	@echo "NOTE: macOS 15+ (Sequoia) may cause validator Ruby errors - this is a known Avid compatibility issue"
 ifeq ($(detected_OS),Darwin)
 	@echo "\n--- Validating M1-Monitor Release AAX ---"; \
-	$(AAX_VALIDATOR_PATH) m1-monitor/build/M1-Monitor_artefacts/AAX/M1-Monitor.aaxplugin || echo "WARNING: M1-Monitor AAX validation had issues"; \
+	printf "load_dish aaxval\nruntests \"$(shell pwd)/m1-monitor/build/M1-Monitor_artefacts/AAX/M1-Monitor.aaxplugin\"\nexit\n" | $(AAX_VALIDATOR_PATH) || echo "WARNING: M1-Monitor AAX validation had issues"; \
 	echo "\n--- Validating M1-Panner Release AAX ---"; \
-	$(AAX_VALIDATOR_PATH) m1-panner/build/M1-Panner_artefacts/AAX/M1-Panner.aaxplugin || echo "WARNING: M1-Panner AAX validation had issues"
+	printf "load_dish aaxval\nruntests \"$(shell pwd)/m1-panner/build/M1-Panner_artefacts/AAX/M1-Panner.aaxplugin\"\nexit\n" | $(AAX_VALIDATOR_PATH) || echo "WARNING: M1-Panner AAX validation had issues"
 else ifeq ($(detected_OS),Windows)
 	@echo "\n--- Validating M1-Monitor Release AAX ---"
-	@$(AAX_VALIDATOR_PATH) m1-monitor\build\M1-Monitor_artefacts\Release\AAX\M1-Monitor.aaxplugin || echo "WARNING: M1-Monitor AAX validation had issues"
+	@(echo load_dish aaxval && echo runtests "$(shell pwd)\m1-monitor\build\M1-Monitor_artefacts\Release\AAX\M1-Monitor.aaxplugin" && echo exit) | $(AAX_VALIDATOR_PATH) || echo "WARNING: M1-Monitor AAX validation had issues"
 	@echo "\n--- Validating M1-Panner Release AAX ---"
-	@$(AAX_VALIDATOR_PATH) m1-panner\build\M1-Panner_artefacts\Release\AAX\M1-Panner.aaxplugin || echo "WARNING: M1-Panner AAX validation had issues"
+	@(echo load_dish aaxval && echo runtests "$(shell pwd)\m1-panner\build\M1-Panner_artefacts\Release\AAX\M1-Panner.aaxplugin" && echo exit) | $(AAX_VALIDATOR_PATH) || echo "WARNING: M1-Panner AAX validation had issues"
 endif
 	@echo "\n=== Release AAX Plugin Validation Complete ==="
+	@echo "TIP: If tests abort with Ruby errors on macOS 15+, manually test in Pro Tools"
+	@echo "TIP: Kill stuck processes with: pkill -f aaxval_test"
 
 diagnose-aax:
 	@echo "=== AAX Plugin Diagnostic Report ==="
