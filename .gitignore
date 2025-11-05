@@ -434,3 +434,4 @@ typings/
 installer/resources/docs/index.html
 Makefile.variables
 .DS_Store
+signing-metadata.json
