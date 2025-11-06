@@ -30,6 +30,17 @@ APPLE_CODESIGN_INSTALLER_ID="Developer ID Installer: [NAME] ($(APPLE_TEAM_CODE))
 
 WIN_INNO_PATH=
 WIN_SIGNTOOL_PATH=
+
+# Azure CodeSigning with signtool.exe
+AZURE_DLIB_PATH= # bin\x64\Azure.CodeSigning.Dlib.dll
+AZURE_METADATA_PATH= # m1-spatialsystem\signing-metadata.json
+AZURE_TIMESTAMP_URL="http://timestamp.acs.microsoft.com"
+AZURE_CLIENT_ID=
+AZURE_TENANT_ID=
+AZURE_SECRET_ID=
+AZURE_CLIENT_SECRET=
+
+# Legacy (deprecated - keeping for reference)
 WIN_SIGNTOOL_ID=
 WIN_SIGNTOOL_PASS=
 WIN_CODESIGN_CERT_PATH=

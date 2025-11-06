@@ -18,7 +18,14 @@ help:
 	@echo ""
 	@echo "Packaging:"
 	@echo "  make package                          - Full package build (configure, build, codesign, notarize, installer)"
-	@echo "  make installer-pkg                    - Build installer packages"
+	@echo "  make installer-pkg                    - Build installer packages (Windows installer is signed automatically)"
+	@echo ""
+	@echo "Code Signing:"
+	@echo "  make codesign                         - Sign all binaries (macOS/Windows)"
+	@echo "  make codesign-vst3                    - Sign VST3 plugins only"
+	@echo "  make codesign-apps                    - Sign applications only"
+	@echo "  make test-azure-signing               - Test Azure Trusted Signing setup (Windows)"
+	@echo "  make verify-win-signing               - Verify all Windows signatures including installer"
 	@echo ""
 	@echo "For more details, see the Makefile or run individual commands with --help"
 
@@ -434,6 +441,74 @@ build: build-monitor build-panner build-player build-orientationmanager build-sy
 codesign: codesign-aax codesign-vst codesign-vst3 codesign-au codesign-apps
 	@echo "All code signing completed"
 
+# Test Azure signing setup
+test-azure-signing:
+ifeq ($(detected_OS),Windows)
+	@echo "=== Testing Azure CodeSigning Setup ==="
+	@echo "Checking environment variables..."
+	@if not defined AZURE_CLIENT_ID echo WARNING: AZURE_CLIENT_ID not set in environment
+	@if not defined AZURE_TENANT_ID echo WARNING: AZURE_TENANT_ID not set in environment
+	@if not defined AZURE_CLIENT_SECRET echo WARNING: AZURE_CLIENT_SECRET not set in environment
+	@echo ""
+	@echo "Checking files..."
+	@if exist $(AZURE_DLIB_PATH) (echo [OK] Azure DLL found: $(AZURE_DLIB_PATH)) else (echo [ERROR] Azure DLL not found: $(AZURE_DLIB_PATH))
+	@if exist $(AZURE_METADATA_PATH) (echo [OK] Metadata file found: $(AZURE_METADATA_PATH)) else (echo [ERROR] Metadata file not found: $(AZURE_METADATA_PATH))
+	@if exist $(WIN_SIGNTOOL_PATH) (echo [OK] SignTool found: $(WIN_SIGNTOOL_PATH)) else (echo [ERROR] SignTool not found: $(WIN_SIGNTOOL_PATH))
+	@echo ""
+	@echo "Metadata content:"
+	@type $(AZURE_METADATA_PATH)
+	@echo ""
+	@echo "=== Setup Check Complete ==="
+	@echo ""
+	@echo "To manually test signing, use:"
+	@echo "  set AZURE_CLIENT_ID=$(AZURE_CLIENT_ID)"
+	@echo "  set AZURE_TENANT_ID=$(AZURE_TENANT_ID)"
+	@echo "  set AZURE_CLIENT_SECRET=$(AZURE_CLIENT_SECRET)"
+	@echo "  $(WIN_SIGNTOOL_PATH) sign /v /debug /fd SHA256 /tr $(AZURE_TIMESTAMP_URL) /td SHA256 /dlib $(AZURE_DLIB_PATH) /dmdf $(AZURE_METADATA_PATH) <file_to_sign>"
+endif
+
+# Verify Windows signatures
+verify-win-signing:
+ifeq ($(detected_OS),Windows)
+	@echo "=== Verifying Windows Code Signatures ==="
+	@echo ""
+	@echo "--- VST3 Plugins ---"
+	@if exist "m1-monitor\build\M1-Monitor_artefacts\Release\VST3\M1-Monitor.vst3\Contents\x86_64-win\M1-Monitor.vst3" ( \
+		echo Checking M1-Monitor VST3... && \
+		$(WIN_SIGNTOOL_PATH) verify /pa /v "m1-monitor\build\M1-Monitor_artefacts\Release\VST3\M1-Monitor.vst3\Contents\x86_64-win\M1-Monitor.vst3" \
+	) else (echo SKIP: M1-Monitor VST3 not found)
+	@if exist "m1-panner\build\M1-Panner_artefacts\Release\VST3\M1-Panner.vst3\Contents\x86_64-win\M1-Panner.vst3" ( \
+		echo Checking M1-Panner VST3... && \
+		$(WIN_SIGNTOOL_PATH) verify /pa /v "m1-panner\build\M1-Panner_artefacts\Release\VST3\M1-Panner.vst3\Contents\x86_64-win\M1-Panner.vst3" \
+	) else (echo SKIP: M1-Panner VST3 not found)
+	@echo ""
+	@echo "--- Applications ---"
+	@if exist "m1-player\build\M1-Player_artefacts\Release\M1-Player.exe" ( \
+		echo Checking M1-Player... && \
+		$(WIN_SIGNTOOL_PATH) verify /pa /v "m1-player\build\M1-Player_artefacts\Release\M1-Player.exe" \
+	) else (echo SKIP: M1-Player not found)
+	@if exist "m1-orientationmanager\build\m1-orientationmanager_artefacts\Release\m1-orientationmanager.exe" ( \
+		echo Checking m1-orientationmanager... && \
+		$(WIN_SIGNTOOL_PATH) verify /pa /v "m1-orientationmanager\build\m1-orientationmanager_artefacts\Release\m1-orientationmanager.exe" \
+	) else (echo SKIP: m1-orientationmanager not found)
+	@if exist "services\m1-system-helper\build\m1-system-helper_artefacts\Release\m1-system-helper.exe" ( \
+		echo Checking m1-system-helper... && \
+		$(WIN_SIGNTOOL_PATH) verify /pa /v "services\m1-system-helper\build\m1-system-helper_artefacts\Release\m1-system-helper.exe" \
+	) else (echo SKIP: m1-system-helper not found)
+	@echo ""
+	@echo "--- Installer ---"
+	@if exist "installer\win\Output\Mach1 Spatial System Installer.exe" ( \
+		echo Checking installer... && \
+		$(WIN_SIGNTOOL_PATH) verify /pa /v "installer\win\Output\Mach1 Spatial System Installer.exe" && \
+		echo Installer signature: OK \
+	) else (echo SKIP: Installer not found)
+	@echo ""
+	@echo "=== Verification Complete ==="
+	@echo ""
+	@echo "Note: Valid signatures should show 'Successfully verified'"
+	@echo "and issuer should be 'Microsoft Identity Verification Root...' for Azure Trusted Signing"
+endif
+
 codesign-aax:
 ifeq ($(detected_OS),Darwin)
 	@echo "Code signing AAX plugins..."
@@ -444,8 +519,34 @@ ifeq ($(detected_OS),Darwin)
 	@echo "AAX plugins code signed"
 else ifeq ($(detected_OS),Windows)
 	@echo "Code signing AAX plugins..."
-	$(WRAPTOOL) sign --verbose --account $(PACE_ACCOUNT) --wcguid "$(MONITOR_FREE_GUID)" --signid $(WIN_SIGNTOOL_ID) --in m1-monitor/build/M1-Monitor_artefacts/Release/AAX/M1-Monitor.aaxplugin --out m1-monitor/build/M1-Monitor_artefacts/Release/AAX/M1-Monitor.aaxplugin --autoinstall on
-	$(WRAPTOOL) sign --verbose --account $(PACE_ACCOUNT) --wcguid "$(PANNER_FREE_GUID)" --signid $(WIN_SIGNTOOL_ID) --in m1-panner/build/M1-Panner_artefacts/Release/AAX/M1-Panner.aaxplugin --out m1-panner/build/M1-Panner_artefacts/Release/AAX/M1-Panner.aaxplugin --autoinstall on
+	@echo "Signing M1-Monitor AAX plugin..."
+	@if not exist "m1-monitor\build\M1-Monitor_artefacts\Release\AAX\M1-Monitor.aaxplugin" ( \
+		echo ERROR: M1-Monitor AAX plugin not found. Run 'make build-monitor' first. && \
+		exit 1 \
+	)
+	@if not exist "installer\win\aax-signtool.bat" ( \
+		echo ERROR: Azure signing wrapper not found at installer\win\aax-signtool.bat && \
+		exit 1 \
+	)
+	@echo "Setting up Azure Trusted Signing environment..."
+	@echo "Running wraptool for M1-Monitor with Azure Trusted Signing..."
+	@set SIGNTOOL_PATH=$(WIN_SIGNTOOL_PATH) && set ACS_DLIB=$(AZURE_DLIB_PATH) && set ACS_JSON=$(AZURE_METADATA_PATH) && set AZURE_TENANT_ID=$(AZURE_TENANT_ID) && set AZURE_CLIENT_ID=$(AZURE_CLIENT_ID) && set AZURE_SECRET_ID=$(AZURE_CLIENT_SECRET) && $(WRAPTOOL) sign --signtool "$(CURDIR)/installer/win/aax-signtool.bat" --signid 1 --verbose --installedbinaries --account $(PACE_ACCOUNT) --wcguid "$(MONITOR_FREE_GUID)" --in m1-monitor/build/M1-Monitor_artefacts/Release/AAX/M1-Monitor.aaxplugin --out m1-monitor/build/M1-Monitor_artefacts/Release/AAX/M1-Monitor.aaxplugin || ( \
+		echo ERROR: M1-Monitor signing failed. && \
+		exit 1 \
+	)
+	@echo "M1-Monitor AAX plugin signed successfully"
+	@echo "Signing M1-Panner AAX plugin..."
+	@if not exist "m1-panner\build\M1-Panner_artefacts\Release\AAX\M1-Panner.aaxplugin" ( \
+		echo ERROR: M1-Panner AAX plugin not found. Run 'make build-panner' first. && \
+		exit 1 \
+	)
+	@echo "Setting up Azure Trusted Signing environment..."
+	@echo "Running wraptool for M1-Panner with Azure Trusted Signing..."
+	@set SIGNTOOL_PATH=$(WIN_SIGNTOOL_PATH) && set ACS_DLIB=$(AZURE_DLIB_PATH) && set ACS_JSON=$(AZURE_METADATA_PATH) && set AZURE_TENANT_ID=$(AZURE_TENANT_ID) && set AZURE_CLIENT_ID=$(AZURE_CLIENT_ID) && set AZURE_SECRET_ID=$(AZURE_CLIENT_SECRET) && $(WRAPTOOL) sign --signtool "$(CURDIR)/installer/win/aax-signtool.bat" --signid 1 --verbose --installedbinaries --account $(PACE_ACCOUNT) --wcguid "$(PANNER_FREE_GUID)" --in m1-panner/build/M1-Panner_artefacts/Release/AAX/M1-Panner.aaxplugin --out m1-panner/build/M1-Panner_artefacts/Release/AAX/M1-Panner.aaxplugin || ( \
+		echo ERROR: M1-Panner signing failed. && \
+		exit 1 \
+	)
+	@echo "M1-Panner AAX plugin signed successfully"
 	@echo "AAX plugins code signed"
 endif
 
@@ -462,6 +563,19 @@ ifeq ($(detected_OS),Darwin)
 	@echo "Code signing VST3 plugins..."
 	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-monitor/build/M1-Monitor_artefacts/VST3/M1-Monitor.vst3
 	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-panner/build/M1-Panner_artefacts/VST3/M1-Panner.vst3
+	@echo "VST3 plugins code signed"
+else ifeq ($(detected_OS),Windows)
+	@echo "Code signing VST3 plugins with Azure Trusted Signing..."
+	@if exist "m1-monitor\build\M1-Monitor_artefacts\Release\VST3\M1-Monitor.vst3\Contents\x86_64-win\M1-Monitor.vst3" ( \
+		powershell -ExecutionPolicy Bypass -File installer\win\sign-file.ps1 -FilePath "m1-monitor\build\M1-Monitor_artefacts\Release\VST3\M1-Monitor.vst3\Contents\x86_64-win\M1-Monitor.vst3" \
+	) else ( \
+		echo "SKIP: M1-Monitor VST3 not found" \
+	)
+	@if exist "m1-panner\build\M1-Panner_artefacts\Release\VST3\M1-Panner.vst3\Contents\x86_64-win\M1-Panner.vst3" ( \
+		powershell -ExecutionPolicy Bypass -File installer\win\sign-file.ps1 -FilePath "m1-panner\build\M1-Panner_artefacts\Release\VST3\M1-Panner.vst3\Contents\x86_64-win\M1-Panner.vst3" \
+	) else ( \
+		echo "SKIP: M1-Panner VST3 not found" \
+	)
 	@echo "VST3 plugins code signed"
 endif
 
@@ -480,6 +594,24 @@ ifeq ($(detected_OS),Darwin)
 	codesign -v --force -o runtime --entitlements m1-orientationmanager/Resources/entitlements.mac.plist --sign $(APPLE_CODESIGN_CODE) --timestamp m1-orientationmanager/build/m1-orientationmanager_artefacts/m1-orientationmanager
 	codesign -v --force -o runtime --entitlements services/m1-system-helper/entitlements.mac.plist --sign $(APPLE_CODESIGN_CODE) --timestamp services/m1-system-helper/build/m1-system-helper_artefacts/m1-system-helper
 	@echo "Applications code signed"
+else ifeq ($(detected_OS),Windows)
+	@echo "Code signing Windows applications with Azure Trusted Signing..."
+	@if exist "m1-player\build\M1-Player_artefacts\Release\M1-Player.exe" ( \
+		powershell -ExecutionPolicy Bypass -File installer\win\sign-file.ps1 -FilePath "m1-player\build\M1-Player_artefacts\Release\M1-Player.exe" \
+	) else ( \
+		echo "SKIP: M1-Player not found" \
+	)
+	@if exist "m1-orientationmanager\build\m1-orientationmanager_artefacts\Release\m1-orientationmanager.exe" ( \
+		powershell -ExecutionPolicy Bypass -File installer\win\sign-file.ps1 -FilePath "m1-orientationmanager\build\m1-orientationmanager_artefacts\Release\m1-orientationmanager.exe" \
+	) else ( \
+		echo "SKIP: m1-orientationmanager not found" \
+	)
+	@if exist "services\m1-system-helper\build\m1-system-helper_artefacts\Release\m1-system-helper.exe" ( \
+		powershell -ExecutionPolicy Bypass -File installer\win\sign-file.ps1 -FilePath "services\m1-system-helper\build\m1-system-helper_artefacts\Release\m1-system-helper.exe" \
+	) else ( \
+		echo "SKIP: m1-system-helper not found" \
+	)
+	@echo "Windows applications code signed"
 endif
 
 # Notarize VST3 plugins for testing and distribution
@@ -799,7 +931,16 @@ ifeq ($(detected_OS),Darwin)
 	xcrun notarytool submit --wait --keychain-profile 'notarize-app' --apple-id $(APPLE_USERNAME) --password $(ALTOOL_APPPASS) --team-id $(APPLE_TEAM_CODE) "installer/osx/build/signed/Mach1 Spatial System Installer.pkg"
 	xcrun stapler staple installer/osx/build/signed/Mach1\ Spatial\ System\ Installer.pkg
 else ifeq ($(detected_OS),Windows)
-	$(WIN_INNO_PATH) "-Ssigntool=$(WIN_SIGNTOOL_PATH) sign -f $(WIN_CODESIGN_CERT_PATH) -p $(WIN_SIGNTOOL_PASS) -t http://timestamp.digicert.com $$f" "${CURDIR}/installer/win/installer.iss"
+	@echo "Building Windows installer..."
+	$(WIN_INNO_PATH) "${CURDIR}/installer/win/installer.iss"
+	@echo "Signing Windows installer with Azure Trusted Signing..."
+	@if exist "installer\win\Output\Mach1 Spatial System Installer.exe" ( \
+		powershell -ExecutionPolicy Bypass -File installer\win\sign-file.ps1 -FilePath "installer\win\Output\Mach1 Spatial System Installer.exe" \
+	) else ( \
+		echo "ERROR: Installer not found at installer\win\Output\Mach1 Spatial System Installer.exe" && \
+		exit 1 \
+	)
+	@echo "Windows installer built and signed"
 endif
 
 deploy-installer:
