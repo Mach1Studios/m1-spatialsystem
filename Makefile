@@ -15,6 +15,7 @@ help:
 	@echo "  make clean                            - Clean all build directories"
 	@echo "  make configure                        - Configure for release build"
 	@echo "  make build                            - Build all components"
+	@echo "  make build-vlc                        - Build VLC from source (for m1-player)"
 	@echo ""
 	@echo "Packaging:"
 	@echo "  make package                          - Full package build (configure, build, codesign, notarize, installer)"
@@ -82,6 +83,7 @@ ifneq ($(detected_OS),Windows)
 	@echo "m1-player: $$(cat m1-player/VERSION)"
 	@echo "m1-orientationmanager: $$(cat m1-orientationmanager/VERSION)"
 	@echo "m1-system-helper: $$(cat services/m1-system-helper/VERSION)"
+	@echo "m1-transcoder: $$(cat m1-transcoder/VERSION)"
 	@echo ""
 	@echo "Installer versions updated:"
 	@echo "macOS: $$(grep -c "$(VERSION)" installer/osx/Mach1\ Spatial\ System\ Installer.pkgproj) packages"
@@ -120,6 +122,9 @@ setup:
 ifeq ($(detected_OS),Darwin)
 	# Assumes you have installed Homebrew package manager
 	brew install yasm cmake p7zip ninja act pre-commit launchcontrol
+	# VLC 3.x build dependencies (use FFmpeg 6.x for compatibility)
+	brew install autoconf automake libtool pkg-config
+	brew install ffmpeg@6 && brew link ffmpeg@6
 	npm install -g nodemon
 	cd m1-transcoder && ./scripts/setup.sh
 	cd m1-panner && pre-commit install
@@ -128,6 +133,8 @@ else ifeq ($(detected_OS),Windows)
 	@choco version >nul || (echo "chocolately is not working or installed" && exit 1)
 	@echo "choco is installed and working"
 	@choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' --apply-install-arguments-to-dependencies
+	@choco install pkgconfiglite autoconf automake libtool
+	@pip3 install meson
 	@if not exist "$(pip show pre-commit)" (pip install pre-commit)
 	npm install -g nodemon
 	cd m1-panner && pre-commit install
@@ -341,9 +348,32 @@ endif
 
 dev-player:
 ifeq ($(detected_OS),Darwin)
-	cmake m1-player -Bm1-player/build-dev -G "Xcode"
+	@echo "Configuring m1-player (dev)..."
+	cmake m1-player -Bm1-player/build-dev -G "Xcode" -DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF || true
+	@if [ ! -f "m1-player/build-dev/vlc-install/lib/libvlc.dylib" ]; then \
+		echo ""; \
+		echo "VLC libraries not found. Building VLC from source..."; \
+		echo ""; \
+		cd m1-player && ./build_vlc.sh build-dev && \
+		echo "" && \
+		echo "VLC build complete! Reconfiguring CMake..." && \
+		echo "" && \
+		cd .. && cmake m1-player -Bm1-player/build-dev -G "Xcode" -DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF; \
+	fi
 else
-	cmake m1-player -Bm1-player/build-dev
+	@echo "Configuring m1-player (dev)..."
+	cmake m1-player -Bm1-player/build-dev -DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF || true
+	@if [ ! -f "m1-player/build-dev/vlc-install/lib/libvlc.lib" ] && [ ! -f "m1-player/build-dev/vlc-install/lib/libvlc.dll.a" ]; then \
+		echo ""; \
+		echo "VLC libraries not found. Building VLC from source..."; \
+		echo "This will take 20-40 minutes..."; \
+		echo ""; \
+		cd m1-player && ./build_vlc.sh build-dev && \
+		echo "" && \
+		echo "VLC build complete! Reconfiguring CMake..." && \
+		echo "" && \
+		cd .. && cmake m1-player -Bm1-player/build-dev -DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF; \
+	fi
 endif
 
 dev-orientationmanager:
@@ -400,9 +430,33 @@ configure: clean update-versions
 	cmake m1-monitor -Bm1-monitor/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF
 	cmake m1-panner -Bm1-panner/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF
 ifeq ($(detected_OS),Darwin)
-	cmake m1-player -Bm1-player/build -G "Xcode"
+	@echo "Configuring m1-player (release)..."
+	cmake m1-player -Bm1-player/build -G "Xcode" -DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF || true
+	@if [ ! -f "m1-player/build/vlc-install/lib/libvlc.dylib" ]; then \
+		echo ""; \
+		echo "VLC libraries not found. Building VLC from source..."; \
+		echo "This will take 20-40 minutes..."; \
+		echo ""; \
+		cd m1-player && ./build_vlc.sh build && \
+		echo "" && \
+		echo "VLC build complete! Reconfiguring CMake..." && \
+		echo "" && \
+		cd .. && cmake m1-player -Bm1-player/build -G "Xcode" -DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF; \
+	fi
 else
-	cmake m1-player -Bm1-player/build
+	@echo "Configuring m1-player (release)..."
+	cmake m1-player -Bm1-player/build -DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF || true
+	@if [ ! -f "m1-player/build/vlc-install/lib/libvlc.lib" ] && [ ! -f "m1-player/build/vlc-install/lib/libvlc.dll.a" ]; then \
+		echo ""; \
+		echo "VLC libraries not found. Building VLC from source..."; \
+		echo "This will take 20-40 minutes..."; \
+		echo ""; \
+		cd m1-player && ./build_vlc.sh build && \
+		echo "" && \
+		echo "VLC build complete! Reconfiguring CMake..." && \
+		echo "" && \
+		cd .. && cmake m1-player -Bm1-player/build -DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF; \
+	fi
 endif
 	cmake m1-orientationmanager -Bm1-orientationmanager/build
 	cmake services/m1-system-helper -Bservices/m1-system-helper/build
@@ -421,6 +475,37 @@ build-panner:
 
 build-player:
 	cmake --build m1-player/build --config "Release"
+
+# Build VLC from source (happens automatically as part of build-player)
+# Use this target if you want to build VLC separately first
+build-vlc:
+	@echo "Building VLC from source..."
+ifeq ($(detected_OS),Darwin)
+	@if [ -d "m1-player/build-dev" ]; then \
+		echo "Using development build directory (build-dev)"; \
+		cd m1-player && ./build_vlc.sh build-dev; \
+	elif [ -d "m1-player/build" ]; then \
+		echo "Using release build directory (build)"; \
+		cd m1-player && ./build_vlc.sh build; \
+	else \
+		echo "Error: Neither m1-player/build nor m1-player/build-dev found."; \
+		echo "Run 'make configure' or 'make dev-player' first."; \
+		exit 1; \
+	fi
+else
+	@if [ -d "m1-player/build-dev" ]; then \
+		echo "Using development build directory (build-dev)"; \
+		cd m1-player && ./build_vlc.sh build-dev; \
+	elif [ -d "m1-player/build" ]; then \
+		echo "Using release build directory (build)"; \
+		cd m1-player && ./build_vlc.sh build; \
+	else \
+		echo "Error: Neither m1-player/build nor m1-player/build-dev found."; \
+		echo "Run 'make configure' or 'make dev-player' first."; \
+		exit 1; \
+	fi
+endif
+	@echo "VLC build complete"
 
 build-orientationmanager:
 	cmake --build m1-orientationmanager/build --config "Release"
@@ -590,6 +675,10 @@ endif
 codesign-apps:
 ifeq ($(detected_OS),Darwin)
 	@echo "Code signing applications..."
+	# Sign bundled libraries and plugins inside M1-Player.app first (required for notarization)
+	# This signs all dylibs in Contents (Frameworks and PlugIns) with the same identity
+	find m1-player/build/M1-Player_artefacts/Release/M1-Player.app/Contents -type f -name "*.dylib" -exec codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp -o runtime {} \;
+	
 	codesign -v --force -o runtime --entitlements m1-player/Resources/M1-Player.entitlements --sign $(APPLE_CODESIGN_CODE) --timestamp m1-player/build/M1-Player_artefacts/Release/M1-Player.app
 	codesign -v --force -o runtime --entitlements m1-orientationmanager/Resources/entitlements.mac.plist --sign $(APPLE_CODESIGN_CODE) --timestamp m1-orientationmanager/build/m1-orientationmanager_artefacts/m1-orientationmanager
 	codesign -v --force -o runtime --entitlements services/m1-system-helper/entitlements.mac.plist --sign $(APPLE_CODESIGN_CODE) --timestamp services/m1-system-helper/build/m1-system-helper_artefacts/m1-system-helper
