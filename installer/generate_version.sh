@@ -41,6 +41,23 @@ update_versions() {
     
     # Update m1-system-helper version
     generate_version "." "$base_version" > ./services/m1-system-helper/VERSION
+
+    # Update m1-transcoder version
+    local transcoder_version=$(generate_version "m1-transcoder" "$base_version")
+    echo "$transcoder_version" > ./m1-transcoder/VERSION
+    
+    # Sync transcoder version to package.json for electron-builder
+    if [ -f "./m1-transcoder/package.json" ]; then
+        # Use node to update package.json version while preserving formatting
+        node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('./m1-transcoder/package.json', 'utf8'));
+            pkg.version = '$transcoder_version';
+            fs.writeFileSync('./m1-transcoder/package.json', JSON.stringify(pkg, null, 2) + '\n');
+        " 2>/dev/null || \
+        # Fallback to sed if node is not available
+        sed -i.bak 's/"version": "[^"]*"/"version": "'$transcoder_version'"/' ./m1-transcoder/package.json
+    fi
 }
 
 # Update installer version files
@@ -50,6 +67,7 @@ update_installer_versions() {
     local monitor_ver=$(cat ./m1-monitor/VERSION)
     local om_ver=$(cat ./m1-orientationmanager/VERSION)
     local helper_ver=$(cat ./services/m1-system-helper/VERSION)
+    local transcoder_ver=$(cat ./m1-transcoder/VERSION)
 
     local major=$(echo $panner_ver | cut -d. -f1)
     local minor=$(echo $panner_ver | cut -d. -f2)
@@ -84,7 +102,7 @@ update_installer_versions() {
             s/(<key>IDENTIFIER<\/key>\s*<string>com\.mach1\.spatial\.player\.[^<]*<\/string>.*?<key>VERSION<\/key>\s*<string>)[^<]*(<\/string>)/update_pkg_version($&, "'$player_ver'")/egs;
             s/(<key>IDENTIFIER<\/key>\s*<string>com\.mach1\.spatial\.orientationmanager\.[^<]*<\/string>.*?<key>VERSION<\/key>\s*<string>)[^<]*(<\/string>)/update_pkg_version($&, "'$om_ver'")/egs;
             s/(<key>IDENTIFIER<\/key>\s*<string>com\.mach1\.spatial\.helper\.[^<]*<\/string>.*?<key>VERSION<\/key>\s*<string>)[^<]*(<\/string>)/update_pkg_version($&, "'$helper_ver'")/egs;
-            s/(<key>IDENTIFIER<\/key>\s*<string>com\.mach1\.spatial\.transcoder\.[^<]*<\/string>.*?<key>VERSION<\/key>\s*<string>)[^<]*(<\/string>)/update_pkg_version($&, "'$player_ver'")/egs;
+            s/(<key>IDENTIFIER<\/key>\s*<string>com\.mach1\.spatial\.transcoder\.[^<]*<\/string>.*?<key>VERSION<\/key>\s*<string>)[^<]*(<\/string>)/update_pkg_version($&, "'$transcoder_ver'")/egs;
             
             # Update plugin installer packages (AAX, VST2, VST3, AU installers)
             s/(<key>IDENTIFIER<\/key>\s*<string>com\.mach1\.spatial\.plugins\.aax\.installer<\/string>.*?<key>VERSION<\/key>\s*<string>)[^<]*(<\/string>)/update_pkg_version($&, "'$panner_ver'")/egs;
@@ -103,6 +121,7 @@ update_installer_versions() {
             echo "Player: $player_ver"
             echo "OrientationManager: $om_ver"
             echo "Helper: $helper_ver"
+            echo "Transcoder: $transcoder_ver"
         else
             echo "Error: Failed to update package versions or XML structure is incorrect"
             rm "$temp_file"
@@ -128,3 +147,4 @@ echo "m1-player: $(cat ./m1-player/VERSION)"
 echo "m1-monitor: $(cat ./m1-monitor/VERSION)"
 echo "m1-orientationmanager: $(cat ./m1-orientationmanager/VERSION)"
 echo "m1-system-helper: $(cat ./services/m1-system-helper/VERSION)"
+echo "m1-transcoder: $(cat ./m1-transcoder/VERSION)"
