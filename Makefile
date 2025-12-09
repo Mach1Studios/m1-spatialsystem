@@ -2,7 +2,7 @@
 
 # MACH1 SPATIAL SYSTEM MakeFile
 
-.PHONY: help
+.PHONY: help show-arch
 help:
 	@echo "MACH1 SPATIAL SYSTEM - Available Commands:"
 	@echo ""
@@ -17,6 +17,12 @@ help:
 	@echo "  make build                            - Build all components"
 	@echo "  make build-vlc                        - Build VLC from source (for m1-player)"
 	@echo ""
+	@echo "Cross-compilation (macOS only - requires x86_64 Homebrew at /usr/local):"
+	@echo "  make dev-player-x86                   - Configure m1-player for x86_64 (dev build)"
+	@echo "  make configure-player-x86             - Configure m1-player for x86_64 (release build)"
+	@echo "  make build-player-x86                 - Build m1-player for x86_64"
+	@echo "  make show-arch                        - Show current build architecture info"
+	@echo ""
 	@echo "Packaging:"
 	@echo "  make package                          - Full package build (configure, build, codesign, notarize, installer)"
 	@echo "  make installer-pkg                    - Build installer packages (Windows installer is signed automatically)"
@@ -29,6 +35,35 @@ help:
 	@echo "  make verify-win-signing               - Verify all Windows signatures including installer"
 	@echo ""
 	@echo "For more details, see the Makefile or run individual commands with --help"
+
+# Show current build architecture (useful for CI/CD and distribution)
+show-arch:
+ifeq ($(detected_OS),Darwin)
+	@echo "=== Build Architecture Information ==="
+	@echo "Host OS: macOS"
+	@echo "Host Architecture: $$(uname -m)"
+	@if [ "$$(uname -m)" = "arm64" ]; then \
+		echo "Target: Apple Silicon (ARM64)"; \
+		echo "Homebrew: /opt/homebrew"; \
+		echo "Deployment Target: macOS 11.0+"; \
+	else \
+		echo "Target: Intel (x86_64)"; \
+		echo "Homebrew: /usr/local"; \
+		echo "Deployment Target: macOS 10.14+"; \
+	fi
+	@echo ""
+	@echo "NOTE: m1-player builds for HOST architecture only."
+	@echo "      For distribution, build on each target platform separately."
+else ifeq ($(detected_OS),Windows)
+	@echo "=== Build Architecture Information ==="
+	@echo "Host OS: Windows"
+	@if "%PROCESSOR_ARCHITECTURE%"=="AMD64" echo "Architecture: x86_64 (64-bit)"
+	@if "%PROCESSOR_ARCHITECTURE%"=="x86" echo "Architecture: x86 (32-bit)"
+else
+	@echo "=== Build Architecture Information ==="
+	@echo "Host OS: $(detected_OS)"
+	@echo "Architecture: $$(uname -m)"
+endif
 
 # Auto-generate Makefile.variables from example if it doesn't exist
 Makefile.variables:
@@ -376,6 +411,37 @@ else
 	fi
 endif
 
+# Cross-compile m1-player for x86_64 on Apple Silicon (via Rosetta 2)
+# Requires x86_64 Homebrew installed at /usr/local with all VLC dependencies
+dev-player-x86:
+ifeq ($(detected_OS),Darwin)
+	@echo "Configuring m1-player for x86_64 (cross-compilation via Rosetta)..."
+	@if [ ! -d "/usr/local/bin" ]; then \
+		echo "ERROR: x86_64 Homebrew not found at /usr/local"; \
+		echo "Install it with:"; \
+		echo "  arch -x86_64 /bin/bash -c \"\$$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""; \
+		exit 1; \
+	fi
+	arch -x86_64 cmake m1-player -Bm1-player/build-dev-x86 -G "Xcode" \
+		-DCMAKE_OSX_ARCHITECTURES=x86_64 \
+		-DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF || true
+	@if [ ! -f "m1-player/build-dev-x86/vlc-install/lib/libvlc.dylib" ]; then \
+		echo ""; \
+		echo "VLC libraries not found. Building VLC for x86_64..."; \
+		echo ""; \
+		cd m1-player && arch -x86_64 ./build_vlc.sh build-dev-x86 && \
+		echo "" && \
+		echo "VLC build complete! Reconfiguring CMake..." && \
+		echo "" && \
+		cd .. && arch -x86_64 cmake m1-player -Bm1-player/build-dev-x86 -G "Xcode" \
+			-DCMAKE_OSX_ARCHITECTURES=x86_64 \
+			-DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF; \
+	fi
+else
+	@echo "ERROR: dev-player-x86 is only available on macOS"
+	@exit 1
+endif
+
 dev-orientationmanager:
 ifeq ($(detected_OS),Darwin)
 	cmake m1-orientationmanager -Bm1-orientationmanager/build-dev -G "Xcode" -DENABLE_DEBUG_EMULATOR_DEVICE=ON -DCMAKE_INSTALL_PREFIX="/Library/Application Support/Mach1"
@@ -476,8 +542,62 @@ build-panner:
 build-player:
 	cmake --build m1-player/build --config "Release"
 
+# Cross-compile release build for x86_64 on Apple Silicon
+build-player-x86:
+ifeq ($(detected_OS),Darwin)
+	arch -x86_64 cmake --build m1-player/build-x86 --config "Release"
+else
+	@echo "ERROR: build-player-x86 is only available on macOS"
+	@exit 1
+endif
+
+# Configure m1-player for x86_64 release (cross-compilation on Apple Silicon)
+configure-player-x86:
+ifeq ($(detected_OS),Darwin)
+	@echo "Configuring m1-player for x86_64 release (cross-compilation via Rosetta)..."
+	@if [ ! -d "/usr/local/bin" ]; then \
+		echo "ERROR: x86_64 Homebrew not found at /usr/local"; \
+		echo "Install it with:"; \
+		echo "  arch -x86_64 /bin/bash -c \"\$$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""; \
+		exit 1; \
+	fi
+	arch -x86_64 cmake m1-player -Bm1-player/build-x86 -G "Xcode" \
+		-DCMAKE_OSX_ARCHITECTURES=x86_64 \
+		-DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF || true
+	@if [ ! -f "m1-player/build-x86/vlc-install/lib/libvlc.dylib" ]; then \
+		echo ""; \
+		echo "VLC libraries not found. Building VLC for x86_64..."; \
+		echo "This will take 20-40 minutes..."; \
+		echo ""; \
+		cd m1-player && arch -x86_64 ./build_vlc.sh build-x86 && \
+		echo "" && \
+		echo "VLC build complete! Reconfiguring CMake..." && \
+		echo "" && \
+		cd .. && arch -x86_64 cmake m1-player -Bm1-player/build-x86 -G "Xcode" \
+			-DCMAKE_OSX_ARCHITECTURES=x86_64 \
+			-DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF; \
+	fi
+else
+	@echo "ERROR: configure-player-x86 is only available on macOS"
+	@exit 1
+endif
+
 # Build VLC from source (happens automatically as part of build-player)
 # Use this target if you want to build VLC separately first
+#
+# ARCHITECTURE NOTE:
+# VLC and m1-player are built for the HOST architecture only.
+# Universal binaries are NOT supported due to VLC/Homebrew dependencies.
+# For distribution:
+#   - Build on Apple Silicon Mac for ARM64 (.app for M1/M2/M3 Macs)
+#   - Build on Intel Mac for x86_64 (.app for older Intel Macs)
+# The installer should be built and deployed separately for each architecture.
+#
+# CROSS-COMPILATION (macOS only):
+# To build x86_64 on Apple Silicon, use the x86 targets:
+#   make dev-player-x86   (for development)
+#   make build-player-x86 (for release)
+# Requires x86_64 Homebrew installed at /usr/local
 build-vlc:
 	@echo "Building VLC from source..."
 ifeq ($(detected_OS),Darwin)
