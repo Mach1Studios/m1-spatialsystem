@@ -65,11 +65,9 @@ jobs:
       APPLE_CODESIGN_INSTALLER_ID: ${{ secrets.APPLE_CODESIGN_INSTALLER_ID }}
       APPLE_USERNAME: ${{ secrets.APPLE_USERNAME }}
       ALTOOL_APPPASS: ${{ secrets.ALTOOL_APPPASS }}
-      PACE_ACCOUNT: ${{ secrets.PACE_ACCOUNT }}
       PANNER_FREE_GUID: ${{ secrets.PANNER_FREE_GUID }}
       MONITOR_FREE_GUID: ${{ secrets.MONITOR_FREE_GUID }}
       VST2_PATH: ${{ github.workspace }}/SDKs/VST2_SDK
-      WRAPTOOL: ${{ secrets.WRAPTOOL_PATH || '/Applications/PACEAntiPiracy/Eden/Fusion/Versions/5/bin/wraptool' }}
     
     steps:
       - name: Checkout repository
@@ -99,25 +97,25 @@ jobs:
 
       - name: Import Apple Developer Certificate
         env:
-          APPLE_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
-          KEYCHAIN_PASSWORD: ${{ secrets.MACOS_CI_KEYCHAIN_PWD }}
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+          MACOS_CI_KEYCHAIN_PWD: ${{ secrets.MACOS_CI_KEYCHAIN_PWD }}
         run: |
           # Create a temporary keychain
           KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
-          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security create-keychain -p "$MACOS_CI_KEYCHAIN_PWD" $KEYCHAIN_PATH
           security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security unlock-keychain -p "$MACOS_CI_KEYCHAIN_PWD" $KEYCHAIN_PATH
           
           # Import certificate
-          echo "$APPLE_CERTIFICATE" | base64 --decode > $RUNNER_TEMP/certificate.p12
-          security import $RUNNER_TEMP/certificate.p12 -P "$APPLE_CERTIFICATE_PASSWORD" \
+          echo "$MACOS_CERTIFICATE" | base64 --decode > $RUNNER_TEMP/certificate.p12
+          security import $RUNNER_TEMP/certificate.p12 -P "$MACOS_CERTIFICATE_PWD" \
             -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
           security list-keychain -d user -s $KEYCHAIN_PATH
           
           # Allow codesign to access the keychain
           security set-key-partition-list -S apple-tool:,apple:,codesign: \
-            -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+            -s -k "$MACOS_CI_KEYCHAIN_PWD" $KEYCHAIN_PATH
           
           echo "Certificate imported successfully"
 
@@ -146,9 +144,6 @@ jobs:
           cat > Makefile.variables << 'EOF'
           M1SDK_PATH=
           VST2_PATH=${{ github.workspace }}/SDKs/VST2_SDK
-          WRAPTOOL=${{ env.WRAPTOOL }}
-          PACE_ACCOUNT=${{ secrets.PACE_ACCOUNT }}
-          AAX_VALIDATOR_PATH=
           APPLE_TEAM_CODE=${{ secrets.APPLE_TEAM_CODE }}
           APPLE_CODESIGN_ID=${{ secrets.APPLE_CODESIGN_ID }}
           APPLE_CODESIGN_CODE=${{ secrets.APPLE_CODESIGN_CODE }}
@@ -250,11 +245,9 @@ jobs:
       APPLE_CODESIGN_INSTALLER_ID: ${{ secrets.APPLE_CODESIGN_INSTALLER_ID }}
       APPLE_USERNAME: ${{ secrets.APPLE_USERNAME }}
       ALTOOL_APPPASS: ${{ secrets.ALTOOL_APPPASS }}
-      PACE_ACCOUNT: ${{ secrets.PACE_ACCOUNT }}
       PANNER_FREE_GUID: ${{ secrets.PANNER_FREE_GUID }}
       MONITOR_FREE_GUID: ${{ secrets.MONITOR_FREE_GUID }}
       VST2_PATH: ${{ github.workspace }}/SDKs/VST2_SDK
-      WRAPTOOL: ${{ secrets.WRAPTOOL_PATH || '/Applications/PACEAntiPiracy/Eden/Fusion/Versions/5/bin/wraptool' }}
     
     steps:
       - name: Checkout repository
@@ -284,21 +277,21 @@ jobs:
 
       - name: Import Apple Developer Certificate
         env:
-          APPLE_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
-          KEYCHAIN_PASSWORD: ${{ secrets.MACOS_CI_KEYCHAIN_PWD }}
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+          MACOS_CI_KEYCHAIN_PWD: ${{ secrets.MACOS_CI_KEYCHAIN_PWD }}
         run: |
           KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
-          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security create-keychain -p "$MACOS_CI_KEYCHAIN_PWD" $KEYCHAIN_PATH
           security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security unlock-keychain -p "$MACOS_CI_KEYCHAIN_PWD" $KEYCHAIN_PATH
           
-          echo "$APPLE_CERTIFICATE" | base64 --decode > $RUNNER_TEMP/certificate.p12
-          security import $RUNNER_TEMP/certificate.p12 -P "$APPLE_CERTIFICATE_PASSWORD" \
+          echo "$MACOS_CERTIFICATE" | base64 --decode > $RUNNER_TEMP/certificate.p12
+          security import $RUNNER_TEMP/certificate.p12 -P "$MACOS_CERTIFICATE_PWD" \
             -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
           security list-keychain -d user -s $KEYCHAIN_PATH
           security set-key-partition-list -S apple-tool:,apple:,codesign: \
-            -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+            -s -k "$MACOS_CI_KEYCHAIN_PWD" $KEYCHAIN_PATH
 
       - name: Setup notarization credentials
         run: |
@@ -322,9 +315,6 @@ jobs:
           cat > Makefile.variables << 'EOF'
           M1SDK_PATH=
           VST2_PATH=${{ github.workspace }}/SDKs/VST2_SDK
-          WRAPTOOL=${{ env.WRAPTOOL }}
-          PACE_ACCOUNT=${{ secrets.PACE_ACCOUNT }}
-          AAX_VALIDATOR_PATH=
           APPLE_TEAM_CODE=${{ secrets.APPLE_TEAM_CODE }}
           APPLE_CODESIGN_ID=${{ secrets.APPLE_CODESIGN_ID }}
           APPLE_CODESIGN_CODE=${{ secrets.APPLE_CODESIGN_CODE }}
@@ -463,8 +453,6 @@ jobs:
           cat > Makefile.variables << 'EOF'
           M1SDK_PATH=
           VST2_PATH=${{ github.workspace }}/SDKs/VST2_SDK
-          WRAPTOOL=C:\Program Files\PACE Anti-Piracy\Eden\Fusion\Versions\5\bin\wraptool.exe
-          PACE_ACCOUNT=${{ secrets.PACE_ACCOUNT }}
           WIN_INNO_PATH=C:\Program Files (x86)\Inno Setup 6\ISCC.exe
           WIN_SIGNTOOL_PATH=C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe
           AZURE_DLIB_PATH=${{ github.workspace }}\azure-codesigning\lib\net8.0\any\Azure.CodeSigning.Dlib.dll
