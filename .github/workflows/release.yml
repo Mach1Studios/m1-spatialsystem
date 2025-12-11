@@ -55,7 +55,7 @@ jobs:
   # =============================================================================
   build-macos-arm64:
     if: ${{ github.event.inputs.build_macos_arm64 != 'false' }}
-    runs-on: macos-14  # ARM64 runner
+    runs-on: macos-15  # ARM64 runner
     timeout-minutes: 180
     
     env:
@@ -119,7 +119,7 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple:,codesign: \
             -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
           
-          echo "✅ Certificate imported successfully"
+          echo "Certificate imported successfully"
 
       - name: Setup notarization credentials
         run: |
@@ -131,7 +131,6 @@ jobs:
       - name: Setup SDKs (VST2, AAX)
         env:
           VST2_SDK_URL: ${{ secrets.VST2_SDK_URL }}
-          AAX_SDK_URL: ${{ secrets.AAX_SDK_URL }}
         run: |
           mkdir -p SDKs
           
@@ -139,21 +138,13 @@ jobs:
           if [ -n "$VST2_SDK_URL" ]; then
             curl -L "$VST2_SDK_URL" -o SDKs/vst2_sdk.zip
             unzip -q SDKs/vst2_sdk.zip -d SDKs/
-            echo "✅ VST2 SDK downloaded"
-          fi
-          
-          # Download AAX SDK if URL provided
-          if [ -n "$AAX_SDK_URL" ]; then
-            curl -L "$AAX_SDK_URL" -o SDKs/aax_sdk.zip
-            unzip -q SDKs/aax_sdk.zip -d SDKs/
-            echo "✅ AAX SDK downloaded"
+            echo "VST2 SDK downloaded"
           fi
 
       - name: Setup Makefile.variables
         run: |
           cat > Makefile.variables << 'EOF'
           M1SDK_PATH=
-          AAX_PATH=${{ github.workspace }}/SDKs/AAX
           VST2_PATH=${{ github.workspace }}/SDKs/VST2_SDK
           WRAPTOOL=${{ env.WRAPTOOL }}
           PACE_ACCOUNT=${{ secrets.PACE_ACCOUNT }}
@@ -168,26 +159,26 @@ jobs:
           APPLE_USERNAME=${{ secrets.APPLE_USERNAME }}
           ALTOOL_APPPASS=${{ secrets.ALTOOL_APPPASS }}
           EOF
-          echo "✅ Makefile.variables created"
+          echo "Makefile.variables created"
 
       - name: Update version
         run: |
           VERSION_CLEAN="${VERSION#v}"
           echo "$VERSION_CLEAN" > VERSION
           make update-versions
-          echo "✅ Version set to $VERSION_CLEAN"
+          echo "Version set to $VERSION_CLEAN"
 
       - name: Configure and build all components
         run: |
-          echo "🔧 Configuring all components..."
+          echo "Configuring all components..."
           make configure
           
-          echo "🔨 Building all components..."
+          echo "Building all components..."
           make build
 
       - name: Code sign non-AAX binaries
         run: |
-          echo "🔏 Code signing VST, VST3, AU, and Apps..."
+          echo "Code signing VST, VST3, AU, and Apps..."
           # Sign everything EXCEPT AAX (requires USB iLok)
           make codesign-vst || true
           make codesign-vst3
@@ -196,12 +187,12 @@ jobs:
 
       - name: Notarize applications
         run: |
-          echo "📝 Notarizing applications..."
+          echo "Notarizing applications..."
           make notarize
 
       - name: Package build artifacts
         run: |
-          echo "📦 Packaging build artifacts..."
+          echo "Packaging build artifacts..."
           mkdir -p artifacts/macos-arm64
           
           # Copy plugin builds
@@ -230,7 +221,7 @@ jobs:
           COMMIT_SHA="${{ github.sha }}"
           SHORT_SHA="${COMMIT_SHA:0:8}"
           
-          echo "📤 Uploading to S3..."
+          echo "Uploading to S3..."
           aws s3 cp artifacts/macos-arm64-builds.tar.gz \
             "s3://$ARTIFACTS_BUCKET/builds/$VERSION_CLEAN/macos-arm64-builds.tar.gz" \
             --region us-east-1
@@ -240,7 +231,7 @@ jobs:
             "s3://$ARTIFACTS_BUCKET/commits/$SHORT_SHA/macos-arm64-builds.tar.gz" \
             --region us-east-1
           
-          echo "✅ Artifacts uploaded to:"
+          echo "Artifacts uploaded to:"
           echo "   s3://$ARTIFACTS_BUCKET/builds/$VERSION_CLEAN/"
           echo "   s3://$ARTIFACTS_BUCKET/commits/$SHORT_SHA/"
 
@@ -249,7 +240,7 @@ jobs:
   # =============================================================================
   build-macos-x86:
     if: ${{ github.event.inputs.build_macos_x86 != 'false' }}
-    runs-on: macos-13  # Intel runner
+    runs-on: macos-15-intel  # Intel runner
     timeout-minutes: 180
     
     env:
@@ -319,23 +310,17 @@ jobs:
       - name: Setup SDKs (VST2, AAX)
         env:
           VST2_SDK_URL: ${{ secrets.VST2_SDK_URL }}
-          AAX_SDK_URL: ${{ secrets.AAX_SDK_URL }}
         run: |
           mkdir -p SDKs
           if [ -n "$VST2_SDK_URL" ]; then
             curl -L "$VST2_SDK_URL" -o SDKs/vst2_sdk.zip
             unzip -q SDKs/vst2_sdk.zip -d SDKs/
           fi
-          if [ -n "$AAX_SDK_URL" ]; then
-            curl -L "$AAX_SDK_URL" -o SDKs/aax_sdk.zip
-            unzip -q SDKs/aax_sdk.zip -d SDKs/
-          fi
 
       - name: Setup Makefile.variables
         run: |
           cat > Makefile.variables << 'EOF'
           M1SDK_PATH=
-          AAX_PATH=${{ github.workspace }}/SDKs/AAX
           VST2_PATH=${{ github.workspace }}/SDKs/VST2_SDK
           WRAPTOOL=${{ env.WRAPTOOL }}
           PACE_ACCOUNT=${{ secrets.PACE_ACCOUNT }}
@@ -451,21 +436,15 @@ jobs:
           Expand-Archive -Path azure-codesigning.zip -DestinationPath azure-codesigning
           echo "AZURE_DLIB_PATH=${{ github.workspace }}\azure-codesigning\lib\net8.0\any\Azure.CodeSigning.Dlib.dll" >> $env:GITHUB_ENV
 
-      - name: Setup SDKs (VST2, AAX)
+      - name: Setup SDKs (VST2)
         env:
           VST2_SDK_URL: ${{ secrets.VST2_SDK_URL }}
-          AAX_SDK_URL: ${{ secrets.AAX_SDK_URL }}
         run: |
           New-Item -ItemType Directory -Force -Path SDKs
           
           if ($env:VST2_SDK_URL) {
             Invoke-WebRequest -Uri $env:VST2_SDK_URL -OutFile SDKs\vst2_sdk.zip
             Expand-Archive -Path SDKs\vst2_sdk.zip -DestinationPath SDKs
-          }
-          
-          if ($env:AAX_SDK_URL) {
-            Invoke-WebRequest -Uri $env:AAX_SDK_URL -OutFile SDKs\aax_sdk.zip
-            Expand-Archive -Path SDKs\aax_sdk.zip -DestinationPath SDKs
           }
 
       - name: Create signing metadata
@@ -483,7 +462,6 @@ jobs:
         run: |
           cat > Makefile.variables << 'EOF'
           M1SDK_PATH=
-          AAX_PATH=${{ github.workspace }}/SDKs/AAX
           VST2_PATH=${{ github.workspace }}/SDKs/VST2_SDK
           WRAPTOOL=C:\Program Files\PACE Anti-Piracy\Eden\Fusion\Versions\5\bin\wraptool.exe
           PACE_ACCOUNT=${{ secrets.PACE_ACCOUNT }}
@@ -606,7 +584,7 @@ jobs:
           VERSION="${{ steps.version.outputs.version }}"
           SHORT_SHA="${{ steps.version.outputs.short_sha }}"
           
-          echo "## 🏗️ Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Version:** $VERSION" >> $GITHUB_STEP_SUMMARY
           echo "**Commit:** $SHORT_SHA" >> $GITHUB_STEP_SUMMARY
@@ -616,25 +594,25 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           
           if [ "${{ needs.build-macos-arm64.result }}" == "success" ]; then
-            echo "- ✅ macOS ARM64 (Apple Silicon)" >> $GITHUB_STEP_SUMMARY
+            echo "- macOS ARM64 (Apple Silicon)" >> $GITHUB_STEP_SUMMARY
           else
-            echo "- ❌ macOS ARM64 (Apple Silicon) - ${{ needs.build-macos-arm64.result }}" >> $GITHUB_STEP_SUMMARY
+            echo "- macOS ARM64 (Apple Silicon) - ${{ needs.build-macos-arm64.result }}" >> $GITHUB_STEP_SUMMARY
           fi
           
           if [ "${{ needs.build-macos-x86.result }}" == "success" ]; then
-            echo "- ✅ macOS x86_64 (Intel)" >> $GITHUB_STEP_SUMMARY
+            echo "- macOS x86_64 (Intel)" >> $GITHUB_STEP_SUMMARY
           else
-            echo "- ❌ macOS x86_64 (Intel) - ${{ needs.build-macos-x86.result }}" >> $GITHUB_STEP_SUMMARY
+            echo "- macOS x86_64 (Intel) - ${{ needs.build-macos-x86.result }}" >> $GITHUB_STEP_SUMMARY
           fi
           
           if [ "${{ needs.build-windows.result }}" == "success" ]; then
-            echo "- ✅ Windows x64" >> $GITHUB_STEP_SUMMARY
+            echo "- Windows x64" >> $GITHUB_STEP_SUMMARY
           else
-            echo "- ❌ Windows x64 - ${{ needs.build-windows.result }}" >> $GITHUB_STEP_SUMMARY
+            echo "- Windows x64 - ${{ needs.build-windows.result }}" >> $GITHUB_STEP_SUMMARY
           fi
           
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📥 Download Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "### Download Artifacts" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Artifacts uploaded to S3:" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
@@ -643,7 +621,7 @@ jobs:
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
-          echo "### 🔧 Complete Release Locally" >> $GITHUB_STEP_SUMMARY
+          echo "### Complete Release Locally" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "AAX signing requires a physical USB iLok dongle. Run locally:" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
