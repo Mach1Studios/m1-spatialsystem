@@ -73,8 +73,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: false  # Handle submodules manually for speed
           fetch-depth: 0
+
+      # Initialize only build-required submodules (skip examples for faster builds)
+      - name: Initialize submodules
+        run: |
+          chmod +x .github/scripts/init-submodules.sh 2>/dev/null || true
+          .github/scripts/init-submodules.sh || {
+            # Fallback: recursive with depth
+            git submodule update --init --recursive --depth 1
+          }
 
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1
@@ -253,8 +262,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: false  # Handle submodules manually for speed
           fetch-depth: 0
+
+      # Initialize only build-required submodules (skip examples for faster builds)
+      - name: Initialize submodules
+        run: |
+          chmod +x .github/scripts/init-submodules.sh 2>/dev/null || true
+          .github/scripts/init-submodules.sh || {
+            # Fallback: recursive with depth
+            git submodule update --init --recursive --depth 1
+          }
 
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1
@@ -397,11 +415,27 @@ jobs:
       AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
     
     steps:
+      # Enable long paths on Windows to handle deeply nested submodules
+      - name: Enable long paths
+        run: |
+          git config --system core.longpaths true
+          # Also set via registry for good measure
+          New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" -Name "LongPathsEnabled" -Value 1 -PropertyType DWORD -Force | Out-Null
+        shell: pwsh
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: false  # We'll handle submodules manually
           fetch-depth: 0
+
+      # Initialize submodules with depth limit to avoid deep nesting issues
+      - name: Initialize submodules (with depth limit)
+        run: |
+          # Use the shared script (works on Windows via Git Bash)
+          bash .github/scripts/init-submodules.sh
+        shell: bash
+        continue-on-error: false
 
       - name: Setup MSVC
         uses: microsoft/setup-msbuild@v2
