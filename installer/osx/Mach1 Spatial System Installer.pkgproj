@@ -1038,7 +1038,7 @@
 				<key>USE_HFS+_COMPRESSION</key>
 				<false/>
 				<key>VERSION</key>
-				<string>2.0.20251205</string>
+				<string>2.0.20251209</string>
 			</dict>
 			<key>TYPE</key>
 			<integer>0</integer>

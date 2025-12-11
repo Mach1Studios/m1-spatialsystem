@@ -24,8 +24,16 @@ help:
 	@echo "  make show-arch                        - Show current build architecture info"
 	@echo ""
 	@echo "Packaging:"
-	@echo "  make package                          - Full package build (configure, build, codesign, notarize, installer)"
-	@echo "  make installer-pkg                    - Build installer packages (Windows installer is signed automatically)"
+	@echo "  make package                          - Full local build (configure, build, codesign, notarize, installer)"
+	@echo "  make package-from-ci VERSION=x.x.x    - Download CI builds, sign AAX locally, create installer"
+	@echo "  make package-from-ci COMMIT=abc123    - Same as above, but by commit SHA"
+	@echo "  make list-ci-builds                   - List available CI builds in S3"
+	@echo "  make installer-pkg                    - Build installer packages only"
+	@echo ""
+	@echo "CI/CD Testing (local simulation):"
+	@echo "  make test-ci-build                    - Simulate full CI build locally"
+	@echo "  make test-ci-build-player-only        - Test just m1-player build (fastest)"
+	@echo "  make test-ci-yaml                     - Validate workflow YAML syntax"
 	@echo ""
 	@echo "Code Signing:"
 	@echo "  make codesign                         - Sign all binaries (macOS/Windows)"
@@ -488,8 +496,280 @@ endif
 overlay-debug:
 	cd m1-panner/Resources/overlay_debug && ./run_simulator.sh --title "Avid Video Engine"
 
-# run configure first
+# =============================================================================
+# Release Packaging
+# =============================================================================
+# Full local build: configure → build → sign → notarize → installer
 package: update-versions build docs-build codesign notarize installer-pkg
+
+# =============================================================================
+# Hybrid CI/CD Release (Recommended)
+# =============================================================================
+# Downloads pre-built artifacts from CI/CD, then signs AAX locally and creates installer.
+# This is the recommended workflow since AAX signing requires a physical USB iLok dongle.
+#
+# Usage:
+#   make package-from-ci VERSION=2.0.1           # By version tag
+#   make package-from-ci COMMIT=abc12345          # By commit SHA
+#
+# Prerequisites:
+#   - AWS CLI configured with access to mach1-build-artifacts bucket
+#   - USB iLok dongle connected for AAX signing
+#   - Apple Developer certificate in keychain for macOS
+#
+ARTIFACTS_BUCKET ?= mach1-build-artifacts
+CI_ARTIFACTS_DIR ?= ci-artifacts
+
+package-from-ci: download-ci-artifacts sign-aax-local installer-pkg-from-ci
+	@echo ""
+	@echo "========================================"
+	@echo "Release Complete!"
+	@echo "========================================"
+	@echo ""
+
+download-ci-artifacts:
+	@echo "========================================"
+	@echo "Downloading CI Build Artifacts"
+	@echo "========================================"
+ifeq ($(detected_OS),Darwin)
+	@if [ -z "$(VERSION)" ] && [ -z "$(COMMIT)" ]; then \
+		echo "ERROR: Specify VERSION or COMMIT"; \
+		echo "  make package-from-ci VERSION=2.0.1"; \
+		echo "  make package-from-ci COMMIT=abc12345"; \
+		exit 1; \
+	fi
+	@mkdir -p $(CI_ARTIFACTS_DIR)
+	@if [ -n "$(VERSION)" ]; then \
+		echo "Downloading version $(VERSION) artifacts..."; \
+		aws s3 cp "s3://$(ARTIFACTS_BUCKET)/builds/$(VERSION)/macos-arm64-builds.tar.gz" \
+			"$(CI_ARTIFACTS_DIR)/macos-arm64-builds.tar.gz" --region us-east-1 || \
+			(echo "ERROR: Artifacts not found for version $(VERSION)" && exit 1); \
+	elif [ -n "$(COMMIT)" ]; then \
+		echo "Downloading commit $(COMMIT) artifacts..."; \
+		aws s3 cp "s3://$(ARTIFACTS_BUCKET)/commits/$(COMMIT)/macos-arm64-builds.tar.gz" \
+			"$(CI_ARTIFACTS_DIR)/macos-arm64-builds.tar.gz" --region us-east-1 || \
+			(echo "ERROR: Artifacts not found for commit $(COMMIT)" && exit 1); \
+	fi
+	@echo "Extracting artifacts..."
+	@cd $(CI_ARTIFACTS_DIR) && tar -xzf macos-arm64-builds.tar.gz
+	@echo ""
+	@echo "Installing artifacts to build directories..."
+	@mkdir -p m1-monitor/build m1-panner/build m1-player/build
+	@mkdir -p m1-orientationmanager/build services/m1-system-helper/build
+	@cp -r $(CI_ARTIFACTS_DIR)/macos-arm64/M1-Monitor/* m1-monitor/build/ 2>/dev/null || true
+	@cp -r $(CI_ARTIFACTS_DIR)/macos-arm64/M1-Panner/* m1-panner/build/ 2>/dev/null || true
+	@cp -r $(CI_ARTIFACTS_DIR)/macos-arm64/M1-Player/* m1-player/build/ 2>/dev/null || true
+	@cp -r $(CI_ARTIFACTS_DIR)/macos-arm64/m1-orientationmanager/* m1-orientationmanager/build/ 2>/dev/null || true
+	@cp -r $(CI_ARTIFACTS_DIR)/macos-arm64/m1-system-helper/* services/m1-system-helper/build/ 2>/dev/null || true
+	@echo "Artifacts downloaded and installed"
+else ifeq ($(detected_OS),Windows)
+	@echo "Downloading Windows artifacts..."
+	@if not defined VERSION if not defined COMMIT ( \
+		echo ERROR: Specify VERSION or COMMIT && \
+		echo   make package-from-ci VERSION=2.0.1 && \
+		echo   make package-from-ci COMMIT=abc12345 && \
+		exit 1 \
+	)
+	@if not exist $(CI_ARTIFACTS_DIR) mkdir $(CI_ARTIFACTS_DIR)
+	@if defined VERSION ( \
+		aws s3 cp "s3://$(ARTIFACTS_BUCKET)/builds/$(VERSION)/windows-builds.zip" \
+			"$(CI_ARTIFACTS_DIR)\windows-builds.zip" --region us-east-1 \
+	) else ( \
+		aws s3 cp "s3://$(ARTIFACTS_BUCKET)/commits/$(COMMIT)/windows-builds.zip" \
+			"$(CI_ARTIFACTS_DIR)\windows-builds.zip" --region us-east-1 \
+	)
+	@7z x -y "$(CI_ARTIFACTS_DIR)\windows-builds.zip" -o"$(CI_ARTIFACTS_DIR)"
+	@echo Artifacts downloaded and extracted
+endif
+
+sign-aax-local:
+	@echo ""
+	@echo "========================================"
+	@echo "Signing AAX Plugins (USB iLok Required)"
+	@echo "========================================"
+ifeq ($(detected_OS),Darwin)
+	@echo "Ensure your USB iLok dongle is connected..."
+	@echo ""
+	@if [ -d "m1-monitor/build/M1-Monitor_artefacts/AAX" ] || [ -d "m1-monitor/build/AAX" ]; then \
+		echo "Signing M1-Monitor AAX..."; \
+		AAX_PATH=$$(find m1-monitor/build -name "M1-Monitor.aaxplugin" -type d | head -1); \
+		if [ -n "$$AAX_PATH" ]; then \
+			codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp "$$AAX_PATH"; \
+			$(WRAPTOOL) sign --verbose --account $(PACE_ACCOUNT) --wcguid "$(MONITOR_FREE_GUID)" \
+				--signid $(APPLE_CODESIGN_ID) --in "$$AAX_PATH" --out "$$AAX_PATH" --autoinstall on; \
+			echo "M1-Monitor AAX signed"; \
+		else \
+			echo "M1-Monitor.aaxplugin not found"; \
+		fi; \
+	fi
+	@if [ -d "m1-panner/build/M1-Panner_artefacts/AAX" ] || [ -d "m1-panner/build/AAX" ]; then \
+		echo "Signing M1-Panner AAX..."; \
+		AAX_PATH=$$(find m1-panner/build -name "M1-Panner.aaxplugin" -type d | head -1); \
+		if [ -n "$$AAX_PATH" ]; then \
+			codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp "$$AAX_PATH"; \
+			$(WRAPTOOL) sign --verbose --account $(PACE_ACCOUNT) --wcguid "$(PANNER_FREE_GUID)" \
+				--signid $(APPLE_CODESIGN_ID) --in "$$AAX_PATH" --out "$$AAX_PATH" --autoinstall on; \
+			echo "M1-Panner AAX signed"; \
+		else \
+			echo "M1-Panner.aaxplugin not found"; \
+		fi; \
+	fi
+	@echo ""
+	@echo "AAX signing complete!"
+else ifeq ($(detected_OS),Windows)
+	@echo "Signing AAX plugins on Windows..."
+	@echo "Ensure iLok License Manager is running..."
+	@if exist "m1-monitor\build\M1-Monitor_artefacts\Release\AAX\M1-Monitor.aaxplugin" ( \
+		set SIGNTOOL_PATH=$(WIN_SIGNTOOL_PATH) && \
+		set ACS_DLIB=$(AZURE_DLIB_PATH) && \
+		set ACS_JSON=$(AZURE_METADATA_PATH) && \
+		set AZURE_TENANT_ID=$(AZURE_TENANT_ID) && \
+		set AZURE_CLIENT_ID=$(AZURE_CLIENT_ID) && \
+		set AZURE_SECRET_ID=$(AZURE_CLIENT_SECRET) && \
+		$(WRAPTOOL) sign --signtool "$(CURDIR)/installer/win/aax-signtool.bat" --signid 1 --verbose \
+			--installedbinaries --account $(PACE_ACCOUNT) --wcguid "$(MONITOR_FREE_GUID)" \
+			--in m1-monitor\build\M1-Monitor_artefacts\Release\AAX\M1-Monitor.aaxplugin \
+			--out m1-monitor\build\M1-Monitor_artefacts\Release\AAX\M1-Monitor.aaxplugin \
+	)
+	@if exist "m1-panner\build\M1-Panner_artefacts\Release\AAX\M1-Panner.aaxplugin" ( \
+		set SIGNTOOL_PATH=$(WIN_SIGNTOOL_PATH) && \
+		set ACS_DLIB=$(AZURE_DLIB_PATH) && \
+		set ACS_JSON=$(AZURE_METADATA_PATH) && \
+		set AZURE_TENANT_ID=$(AZURE_TENANT_ID) && \
+		set AZURE_CLIENT_ID=$(AZURE_CLIENT_ID) && \
+		set AZURE_SECRET_ID=$(AZURE_CLIENT_SECRET) && \
+		$(WRAPTOOL) sign --signtool "$(CURDIR)/installer/win/aax-signtool.bat" --signid 1 --verbose \
+			--installedbinaries --account $(PACE_ACCOUNT) --wcguid "$(PANNER_FREE_GUID)" \
+			--in m1-panner\build\M1-Panner_artefacts\Release\AAX\M1-Panner.aaxplugin \
+			--out m1-panner\build\M1-Panner_artefacts\Release\AAX\M1-Panner.aaxplugin \
+	)
+endif
+
+installer-pkg-from-ci: sign-aax-local
+	@echo ""
+	@echo "========================================"
+	@echo "Creating Installer Package"
+	@echo "========================================"
+ifeq ($(detected_OS),Darwin)
+	@echo "Building and signing installer..."
+	packagesbuild -v installer/osx/Mach1\ Spatial\ System\ Installer.pkgproj
+	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp installer/osx/build/Mach1\ Spatial\ System\ Installer.pkg
+	mkdir -p installer/osx/build/signed
+	productsign --sign $(APPLE_CODESIGN_INSTALLER_ID) \
+		"installer/osx/build/Mach1 Spatial System Installer.pkg" \
+		"installer/osx/build/signed/Mach1 Spatial System Installer.pkg"
+	@echo ""
+	@echo "Notarizing installer..."
+	xcrun notarytool submit --wait --keychain-profile 'notarize-app' \
+		--apple-id $(APPLE_USERNAME) --password $(ALTOOL_APPPASS) --team-id $(APPLE_TEAM_CODE) \
+		"installer/osx/build/signed/Mach1 Spatial System Installer.pkg"
+	xcrun stapler staple installer/osx/build/signed/Mach1\ Spatial\ System\ Installer.pkg
+	@echo ""
+	@echo "Installer created at: installer/osx/build/signed/Mach1 Spatial System Installer.pkg"
+else ifeq ($(detected_OS),Windows)
+	@echo "Building Windows installer..."
+	$(WIN_INNO_PATH) "${CURDIR}/installer/win/installer.iss"
+	@echo "Signing installer..."
+	powershell -ExecutionPolicy Bypass -File installer\win\sign-file.ps1 \
+		-FilePath "installer\win\Output\Mach1 Spatial System Installer.exe"
+	@echo "Installer created at: installer\win\Output\Mach1 Spatial System Installer.exe"
+endif
+
+# List available CI builds
+list-ci-builds:
+	@echo "Available builds in S3:"
+	@echo ""
+	@echo "By Version:"
+	@aws s3 ls "s3://$(ARTIFACTS_BUCKET)/builds/" --region us-east-1 2>/dev/null || echo "  (none or access denied)"
+	@echo ""
+	@echo "By Commit (recent):"
+	@aws s3 ls "s3://$(ARTIFACTS_BUCKET)/commits/" --region us-east-1 2>/dev/null | tail -10 || echo "  (none or access denied)"
+
+# Clean CI artifacts
+clean-ci-artifacts:
+	@echo "Cleaning CI artifacts..."
+	rm -rf $(CI_ARTIFACTS_DIR)
+	@echo "CI artifacts cleaned"
+
+# =============================================================================
+# CI/CD Testing (Local Simulation)
+# =============================================================================
+# Simulates what CI/CD does, but runs locally. Useful for testing before push.
+#
+# Usage:
+#   make test-ci-build              - Simulate full CI build
+#   make test-ci-build-player-only  - Just build m1-player (fastest test)
+#
+test-ci-build:
+	@echo "========================================"
+	@echo "Simulating CI/CD Build Locally"
+	@echo "========================================"
+	@echo ""
+	@echo "This simulates what GitHub Actions does:"
+	@echo "  1. Clean build"
+	@echo "  2. Configure all projects"
+	@echo "  3. Build all projects"
+	@echo "  4. Sign non-AAX plugins"
+	@echo "  5. Package artifacts"
+	@echo ""
+	@echo "Press Ctrl+C to cancel, or wait 5 seconds..."
+	@sleep 5
+	@echo ""
+	$(MAKE) clean
+	$(MAKE) configure
+	$(MAKE) build
+	$(MAKE) codesign-vst3 || true
+	$(MAKE) codesign-au || true
+	$(MAKE) codesign-apps || true
+	@echo ""
+	@echo "========================================"
+	@echo "CI Build Simulation Complete!"
+	@echo "========================================"
+	@echo ""
+	@echo "Next steps to test full release flow:"
+	@echo "  1. Connect USB iLok"
+	@echo "  2. Run: make sign-aax-local"
+	@echo "  3. Run: make installer-pkg"
+
+test-ci-build-player-only:
+	@echo "========================================"
+	@echo "Testing m1-player Build (CI Simulation)"
+	@echo "========================================"
+	@echo ""
+	@echo "This tests the VLC build + m1-player compilation"
+	@echo "which is the most complex part of CI/CD."
+	@echo ""
+ifeq ($(detected_OS),Darwin)
+	rm -rf m1-player/build-test
+	cmake m1-player -Bm1-player/build-test -G "Xcode" \
+		-DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF || true
+	@if [ ! -f "m1-player/build-test/vlc-install/lib/libvlc.dylib" ]; then \
+		echo "Building VLC from source..."; \
+		cd m1-player && ./build_vlc.sh build-test && cd ..; \
+		cmake m1-player -Bm1-player/build-test -G "Xcode" \
+			-DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF; \
+	fi
+	cmake --build m1-player/build-test --config Release
+	@echo ""
+	@echo "m1-player build test complete!"
+	@echo "   Output: m1-player/build-test/M1-Player_artefacts/"
+else
+	@echo "This test is currently macOS-only"
+endif
+
+# Validate workflow YAML syntax
+test-ci-yaml:
+	@echo "Validating GitHub Actions workflow syntax..."
+	@if command -v actionlint >/dev/null 2>&1; then \
+		actionlint .github/workflows/*.yml; \
+		echo "Workflow YAML is valid"; \
+	elif command -v act >/dev/null 2>&1; then \
+		act -l > /dev/null 2>&1 && echo "Workflow YAML is valid (act)"; \
+	else \
+		echo "Install actionlint or act for YAML validation:"; \
+		echo "  brew install actionlint"; \
+		echo "  brew install act"; \
+	fi
 
 # clean and configure for release
 configure: clean update-versions
@@ -625,7 +905,7 @@ else
 		exit 1; \
 	fi
 endif
-	@echo "VLC build complete"
+	@echo "VLC setup complete"
 
 build-orientationmanager:
 	cmake --build m1-orientationmanager/build --config "Release"
