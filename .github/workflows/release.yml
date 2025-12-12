@@ -106,8 +106,8 @@ jobs:
 
       - name: Import Apple Developer Certificate
         env:
-          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
-          MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+          APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
+          APPLE_CERTIFICATE_P12_PWD: ${{ secrets.APPLE_CERTIFICATE_P12_PWD }}
           MACOS_CI_KEYCHAIN_PWD: ${{ secrets.MACOS_CI_KEYCHAIN_PWD }}
         run: |
           # Create a temporary keychain
@@ -117,8 +117,8 @@ jobs:
           security unlock-keychain -p "$MACOS_CI_KEYCHAIN_PWD" $KEYCHAIN_PATH
           
           # Import certificate
-          echo "$MACOS_CERTIFICATE" | base64 --decode > $RUNNER_TEMP/certificate.p12
-          security import $RUNNER_TEMP/certificate.p12 -P "$MACOS_CERTIFICATE_PWD" \
+          echo "$APPLE_CERTIFICATE_P12" | base64 --decode > $RUNNER_TEMP/certificate.p12
+          security import $RUNNER_TEMP/certificate.p12 -P "$APPLE_CERTIFICATE_P12_PWD" \
             -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
           security list-keychain -d user -s $KEYCHAIN_PATH
           
@@ -295,8 +295,8 @@ jobs:
 
       - name: Import Apple Developer Certificate
         env:
-          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
-          MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+          APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
+          APPLE_CERTIFICATE_P12_PWD: ${{ secrets.APPLE_CERTIFICATE_P12_PWD }}
           MACOS_CI_KEYCHAIN_PWD: ${{ secrets.MACOS_CI_KEYCHAIN_PWD }}
         run: |
           KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
@@ -304,8 +304,8 @@ jobs:
           security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
           security unlock-keychain -p "$MACOS_CI_KEYCHAIN_PWD" $KEYCHAIN_PATH
           
-          echo "$MACOS_CERTIFICATE" | base64 --decode > $RUNNER_TEMP/certificate.p12
-          security import $RUNNER_TEMP/certificate.p12 -P "$MACOS_CERTIFICATE_PWD" \
+          echo "$APPLE_CERTIFICATE_P12" | base64 --decode > $RUNNER_TEMP/certificate.p12
+          security import $RUNNER_TEMP/certificate.p12 -P "$APPLE_CERTIFICATE_P12_PWD" \
             -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
           security list-keychain -d user -s $KEYCHAIN_PATH
           security set-key-partition-list -S apple-tool:,apple:,codesign: \
@@ -453,12 +453,65 @@ jobs:
           choco install innosetup -y
           choco install 7zip -y
 
-      - name: Download Azure CodeSigning Tools
+      - name: Setup Azure Trusted Signing
         run: |
-          # Download Azure Code Signing SDK
-          Invoke-WebRequest -Uri "https://www.nuget.org/api/v2/package/Azure.CodeSigning.Sdk/1.0.52" -OutFile azure-codesigning.zip
-          Expand-Archive -Path azure-codesigning.zip -DestinationPath azure-codesigning
-          echo "AZURE_DLIB_PATH=${{ github.workspace }}\azure-codesigning\lib\net8.0\any\Azure.CodeSigning.Dlib.dll" >> $env:GITHUB_ENV
+          # Download Microsoft Trusted Signing Client (contains the Dlib for signtool)
+          # This is the same approach used locally via aax-signtool.bat
+          
+          $packageName = "Microsoft.Trusted.Signing.Client"
+          $outputDir = "trusted-signing-client"
+          
+          # Use nuget to download the package
+          nuget install $packageName -OutputDirectory $outputDir -Source https://api.nuget.org/v3/index.json
+          
+          # Find the Dlib DLL
+          $dlibPath = Get-ChildItem -Path $outputDir -Recurse -Filter "Azure.CodeSigning.Dlib.dll" | 
+                      Where-Object { $_.FullName -like "*x64*" } | 
+                      Select-Object -First 1
+          
+          if (-not $dlibPath) {
+            # Fallback: try any location
+            $dlibPath = Get-ChildItem -Path $outputDir -Recurse -Filter "Azure.CodeSigning.Dlib.dll" | 
+                        Select-Object -First 1
+          }
+          
+          if ($dlibPath) {
+            echo "Found Azure.CodeSigning.Dlib.dll at: $($dlibPath.FullName)"
+            echo "ACS_DLIB=$($dlibPath.FullName)" >> $env:GITHUB_ENV
+          } else {
+            echo "ERROR: Could not find Azure.CodeSigning.Dlib.dll"
+            Get-ChildItem -Path $outputDir -Recurse | ForEach-Object { echo $_.FullName }
+            exit 1
+          }
+          
+          # Set other required paths
+          echo "ACS_JSON=${{ github.workspace }}\signing-metadata.json" >> $env:GITHUB_ENV
+          
+          # Find signtool.exe from Windows SDK
+          $signtoolPaths = @(
+            "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe",
+            "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22000.0\x64\signtool.exe",
+            "C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x64\signtool.exe"
+          )
+          
+          $signtool = $signtoolPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
+          
+          if (-not $signtool) {
+            # Find any signtool
+            $signtool = Get-ChildItem -Path "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter "signtool.exe" | 
+                        Where-Object { $_.FullName -like "*x64*" } | 
+                        Select-Object -First 1 -ExpandProperty FullName
+          }
+          
+          if ($signtool) {
+            echo "Found signtool at: $signtool"
+            echo "SIGNTOOL_PATH=$signtool" >> $env:GITHUB_ENV
+          } else {
+            echo "ERROR: Could not find signtool.exe"
+            exit 1
+          }
+          
+          echo "Azure Trusted Signing setup complete"
 
       - name: Setup SDKs (VST2)
         env:
@@ -535,13 +588,85 @@ jobs:
           npm install
           npm run package-win
 
-      - name: Code sign non-AAX binaries
+      - name: Code sign Windows binaries with Azure Trusted Signing
+        env:
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
         run: |
-          # Sign everything EXCEPT AAX (requires USB iLok)
-          make codesign-vst3
-          make codesign-apps
-          # AAX signing skipped - requires physical USB iLok
-        shell: bash
+          # Sign binaries using signtool + Azure Trusted Signing Dlib
+          # This matches the local aax-signtool.bat approach
+          
+          # Skip if secrets not configured
+          if ([string]::IsNullOrEmpty($env:AZURE_CLIENT_ID)) {
+            echo "Azure Trusted Signing not configured, skipping code signing"
+            exit 0
+          }
+          
+          # Verify required files exist
+          if (-not (Test-Path $env:SIGNTOOL_PATH)) {
+            echo "ERROR: signtool.exe not found at $env:SIGNTOOL_PATH"
+            exit 1
+          }
+          if (-not (Test-Path $env:ACS_DLIB)) {
+            echo "ERROR: Azure.CodeSigning.Dlib.dll not found at $env:ACS_DLIB"
+            exit 1
+          }
+          if (-not (Test-Path $env:ACS_JSON)) {
+            echo "ERROR: signing-metadata.json not found at $env:ACS_JSON"
+            exit 1
+          }
+          
+          # Collect files to sign
+          $filesToSign = @()
+          
+          # Find VST3 plugins (the actual .vst3 DLL inside the bundle)
+          Get-ChildItem -Path "m1-monitor/build" -Recurse -Filter "*.vst3" -File | ForEach-Object { $filesToSign += $_.FullName }
+          Get-ChildItem -Path "m1-panner/build" -Recurse -Filter "*.vst3" -File | ForEach-Object { $filesToSign += $_.FullName }
+          
+          # Find executables
+          @(
+            "m1-player/build/M1-Player_artefacts/Release/M1-Player.exe",
+            "m1-orientationmanager/build/m1-orientationmanager_artefacts/Release/m1-orientationmanager.exe",
+            "services/m1-system-helper/build/m1-system-helper_artefacts/Release/m1-system-helper.exe"
+          ) | ForEach-Object {
+            if (Test-Path $_) { $filesToSign += $_ }
+          }
+          
+          echo "Files to sign: $($filesToSign.Count)"
+          echo "Using signtool: $env:SIGNTOOL_PATH"
+          echo "Using Dlib: $env:ACS_DLIB"
+          echo "Using metadata: $env:ACS_JSON"
+          
+          $successCount = 0
+          $failCount = 0
+          
+          foreach ($file in $filesToSign) {
+            echo ""
+            echo "Signing: $file"
+            
+            # Use the same command as aax-signtool.bat
+            & $env:SIGNTOOL_PATH sign /v /fd SHA256 `
+              /tr "http://timestamp.acs.microsoft.com" /td SHA256 `
+              /dlib $env:ACS_DLIB `
+              /dmdf $env:ACS_JSON `
+              $file
+            
+            if ($LASTEXITCODE -eq 0) {
+              echo "SUCCESS: Signed $file"
+              $successCount++
+            } else {
+              echo "WARNING: Failed to sign $file (exit code: $LASTEXITCODE)"
+              $failCount++
+            }
+          }
+          
+          echo ""
+          echo "=========================================="
+          echo "Signing complete: $successCount succeeded, $failCount failed"
+          echo "=========================================="
+        shell: pwsh
+        continue-on-error: true
 
       - name: Package build artifacts
         run: |
