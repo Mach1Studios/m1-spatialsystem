@@ -67,7 +67,6 @@ jobs:
       ALTOOL_APPPASS: ${{ secrets.ALTOOL_APPPASS }}
       PANNER_FREE_GUID: ${{ secrets.PANNER_FREE_GUID }}
       MONITOR_FREE_GUID: ${{ secrets.MONITOR_FREE_GUID }}
-      VST2_PATH: ${{ github.workspace }}/SDKs/VST2_SDK
     
     steps:
       - name: Checkout repository
@@ -135,7 +134,7 @@ jobs:
             --team-id "$APPLE_TEAM_CODE" \
             --password "$ALTOOL_APPPASS"
 
-      - name: Setup SDKs (VST2, AAX)
+      - name: Setup SDKs (VST2)
         env:
           VST2_SDK_URL: ${{ secrets.VST2_SDK_URL }}
         run: |
@@ -143,16 +142,40 @@ jobs:
           
           # Download VST2 SDK if URL provided
           if [ -n "$VST2_SDK_URL" ]; then
+            echo "Downloading VST2 SDK..."
             curl -L "$VST2_SDK_URL" -o SDKs/vst2_sdk.zip
             unzip -q SDKs/vst2_sdk.zip -d SDKs/
-            echo "VST2 SDK downloaded"
+            
+            # Handle different archive structures
+            if [ -d "SDKs/VST2_SDK" ]; then
+              echo "VST2 SDK extracted to SDKs/VST2_SDK"
+            elif [ -d "SDKs/vstsdk2.4" ]; then
+              mv SDKs/vstsdk2.4 SDKs/VST2_SDK
+              echo "VST2 SDK extracted and renamed"
+            elif [ -d "SDKs/pluginterfaces" ]; then
+              mkdir -p SDKs/VST2_SDK
+              mv SDKs/pluginterfaces SDKs/VST2_SDK/
+              echo "VST2 SDK headers extracted"
+            fi
+            
+            echo "BUILD_VST2=ON" >> $GITHUB_ENV
+            echo "VST2 SDK ready"
+          else
+            echo "VST2_SDK_URL not provided - VST2 builds will be skipped"
+            echo "BUILD_VST2=OFF" >> $GITHUB_ENV
           fi
 
       - name: Setup Makefile.variables
         run: |
-          cat > Makefile.variables << 'EOF'
+          # Set VST2 path only if SDK exists
+          VST2_PATH_VALUE=""
+          if [ "$BUILD_VST2" = "ON" ] && [ -d "${{ github.workspace }}/SDKs/VST2_SDK" ]; then
+            VST2_PATH_VALUE="${{ github.workspace }}/SDKs/VST2_SDK"
+          fi
+          
+          cat > Makefile.variables << EOF
           M1SDK_PATH=
-          VST2_PATH=${{ github.workspace }}/SDKs/VST2_SDK
+          VST2_PATH=$VST2_PATH_VALUE
           APPLE_TEAM_CODE=${{ secrets.APPLE_TEAM_CODE }}
           APPLE_CODESIGN_ID=${{ secrets.APPLE_CODESIGN_ID }}
           APPLE_CODESIGN_CODE=${{ secrets.APPLE_CODESIGN_CODE }}
@@ -163,7 +186,7 @@ jobs:
           APPLE_USERNAME=${{ secrets.APPLE_USERNAME }}
           ALTOOL_APPPASS=${{ secrets.ALTOOL_APPPASS }}
           EOF
-          echo "Makefile.variables created"
+          echo "Makefile.variables created (VST2: $BUILD_VST2)"
 
       - name: Update version
         run: |
@@ -192,16 +215,39 @@ jobs:
       - name: Configure and build all components
         run: |
           echo "Configuring all components..."
-          make configure
+          
+          # Configure with or without VST2 based on SDK availability
+          if [ "$BUILD_VST2" = "ON" ]; then
+            echo "Building with VST2 support"
+            make configure
+          else
+            echo "Building without VST2 (SDK not available)"
+            # Configure each project manually without VST2
+            cmake m1-monitor -Bm1-monitor/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_AU=ON -DBUILD_VST=OFF -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF
+            cmake m1-panner -Bm1-panner/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_AU=ON -DBUILD_VST=OFF -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF
+            cmake m1-player -Bm1-player/build -G "Xcode" -DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF || true
+            cmake m1-orientationmanager -Bm1-orientationmanager/build
+            cmake services/m1-system-helper -Bservices/m1-system-helper/build
+          fi
+          
+          # Build VLC if needed (for m1-player)
+          if [ ! -f "m1-player/build/vlc-install/lib/libvlc.dylib" ]; then
+            echo "Building VLC from source..."
+            cd m1-player && ./build_vlc.sh build && cd ..
+            # Reconfigure m1-player after VLC build
+            cmake m1-player -Bm1-player/build -G "Xcode" -DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF
+          fi
           
           echo "Building all components..."
           make build
 
       - name: Code sign non-AAX binaries
         run: |
-          echo "Code signing VST, VST3, AU, and Apps..."
+          echo "Code signing VST3, AU, and Apps..."
           # Sign everything EXCEPT AAX (requires USB iLok)
-          make codesign-vst || true
+          if [ "$BUILD_VST2" = "ON" ]; then
+            make codesign-vst || true
+          fi
           make codesign-vst3
           make codesign-au
           make codesign-apps
@@ -276,7 +322,6 @@ jobs:
       ALTOOL_APPPASS: ${{ secrets.ALTOOL_APPPASS }}
       PANNER_FREE_GUID: ${{ secrets.PANNER_FREE_GUID }}
       MONITOR_FREE_GUID: ${{ secrets.MONITOR_FREE_GUID }}
-      VST2_PATH: ${{ github.workspace }}/SDKs/VST2_SDK
     
     steps:
       - name: Checkout repository
@@ -338,21 +383,43 @@ jobs:
             --team-id "$APPLE_TEAM_CODE" \
             --password "$ALTOOL_APPPASS"
 
-      - name: Setup SDKs (VST2, AAX)
+      - name: Setup SDKs (VST2)
         env:
           VST2_SDK_URL: ${{ secrets.VST2_SDK_URL }}
         run: |
           mkdir -p SDKs
+          
           if [ -n "$VST2_SDK_URL" ]; then
+            echo "Downloading VST2 SDK..."
             curl -L "$VST2_SDK_URL" -o SDKs/vst2_sdk.zip
             unzip -q SDKs/vst2_sdk.zip -d SDKs/
+            
+            # Handle different archive structures
+            if [ -d "SDKs/VST2_SDK" ]; then
+              echo "VST2 SDK extracted"
+            elif [ -d "SDKs/vstsdk2.4" ]; then
+              mv SDKs/vstsdk2.4 SDKs/VST2_SDK
+            elif [ -d "SDKs/pluginterfaces" ]; then
+              mkdir -p SDKs/VST2_SDK
+              mv SDKs/pluginterfaces SDKs/VST2_SDK/
+            fi
+            
+            echo "BUILD_VST2=ON" >> $GITHUB_ENV
+          else
+            echo "VST2_SDK_URL not provided - VST2 builds will be skipped"
+            echo "BUILD_VST2=OFF" >> $GITHUB_ENV
           fi
 
       - name: Setup Makefile.variables
         run: |
-          cat > Makefile.variables << 'EOF'
+          VST2_PATH_VALUE=""
+          if [ "$BUILD_VST2" = "ON" ] && [ -d "${{ github.workspace }}/SDKs/VST2_SDK" ]; then
+            VST2_PATH_VALUE="${{ github.workspace }}/SDKs/VST2_SDK"
+          fi
+          
+          cat > Makefile.variables << EOF
           M1SDK_PATH=
-          VST2_PATH=${{ github.workspace }}/SDKs/VST2_SDK
+          VST2_PATH=$VST2_PATH_VALUE
           APPLE_TEAM_CODE=${{ secrets.APPLE_TEAM_CODE }}
           APPLE_CODESIGN_ID=${{ secrets.APPLE_CODESIGN_ID }}
           APPLE_CODESIGN_CODE=${{ secrets.APPLE_CODESIGN_CODE }}
@@ -384,13 +451,34 @@ jobs:
 
       - name: Configure and build all components
         run: |
-          make configure
+          # Configure with or without VST2 based on SDK availability
+          if [ "$BUILD_VST2" = "ON" ]; then
+            echo "Building with VST2 support"
+            make configure
+          else
+            echo "Building without VST2 (SDK not available)"
+            cmake m1-monitor -Bm1-monitor/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_AU=ON -DBUILD_VST=OFF -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF
+            cmake m1-panner -Bm1-panner/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_AU=ON -DBUILD_VST=OFF -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF
+            cmake m1-player -Bm1-player/build -G "Xcode" -DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF || true
+            cmake m1-orientationmanager -Bm1-orientationmanager/build
+            cmake services/m1-system-helper -Bservices/m1-system-helper/build
+          fi
+          
+          # Build VLC if needed
+          if [ ! -f "m1-player/build/vlc-install/lib/libvlc.dylib" ]; then
+            echo "Building VLC from source..."
+            cd m1-player && ./build_vlc.sh build && cd ..
+            cmake m1-player -Bm1-player/build -G "Xcode" -DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF
+          fi
+          
           make build
 
       - name: Code sign non-AAX binaries
         run: |
           # Sign everything EXCEPT AAX (requires USB iLok)
-          make codesign-vst || true
+          if [ "$BUILD_VST2" = "ON" ]; then
+            make codesign-vst || true
+          fi
           make codesign-vst3
           make codesign-au
           make codesign-apps
@@ -552,8 +640,24 @@ jobs:
           New-Item -ItemType Directory -Force -Path SDKs
           
           if ($env:VST2_SDK_URL) {
+            echo "Downloading VST2 SDK..."
             Invoke-WebRequest -Uri $env:VST2_SDK_URL -OutFile SDKs\vst2_sdk.zip
             Expand-Archive -Path SDKs\vst2_sdk.zip -DestinationPath SDKs
+            
+            # Handle different archive structures
+            if (Test-Path "SDKs\VST2_SDK") {
+              echo "VST2 SDK extracted"
+            } elseif (Test-Path "SDKs\vstsdk2.4") {
+              Rename-Item "SDKs\vstsdk2.4" "SDKs\VST2_SDK"
+            } elseif (Test-Path "SDKs\pluginterfaces") {
+              New-Item -ItemType Directory -Force -Path "SDKs\VST2_SDK"
+              Move-Item "SDKs\pluginterfaces" "SDKs\VST2_SDK\"
+            }
+            
+            echo "BUILD_VST2=ON" >> $env:GITHUB_ENV
+          } else {
+            echo "VST2_SDK_URL not provided - VST2 builds will be skipped"
+            echo "BUILD_VST2=OFF" >> $env:GITHUB_ENV
           }
 
       - name: Create signing metadata
@@ -569,9 +673,15 @@ jobs:
       - name: Setup Makefile.variables
         shell: bash
         run: |
-          cat > Makefile.variables << 'EOF'
+          # Set VST2 path only if SDK exists
+          VST2_PATH_VALUE=""
+          if [ "$BUILD_VST2" = "ON" ] && [ -d "SDKs/VST2_SDK" ]; then
+            VST2_PATH_VALUE="${{ github.workspace }}/SDKs/VST2_SDK"
+          fi
+          
+          cat > Makefile.variables << EOF
           M1SDK_PATH=
-          VST2_PATH=${{ github.workspace }}/SDKs/VST2_SDK
+          VST2_PATH=$VST2_PATH_VALUE
           WIN_INNO_PATH=C:\Program Files (x86)\Inno Setup 6\ISCC.exe
           WIN_SIGNTOOL_PATH=C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe
           AZURE_DLIB_PATH=${{ github.workspace }}\azure-codesigning\lib\net8.0\any\Azure.CodeSigning.Dlib.dll
@@ -584,6 +694,7 @@ jobs:
           MONITOR_FREE_GUID=${{ secrets.MONITOR_FREE_GUID }}
           M1_GLOBAL_GUID=${{ secrets.M1_GLOBAL_GUID }}
           EOF
+          echo "Makefile.variables created (VST2: $BUILD_VST2)"
 
       - name: Update version
         shell: bash

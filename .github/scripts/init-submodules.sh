@@ -68,6 +68,10 @@ init_project_submodules() {
     if [ -d "Modules/m1_orientation_client" ]; then
         cd Modules/m1_orientation_client
         git submodule update --init --depth 1 2>/dev/null || true
+        # Initialize m1-mathematics (required dependency)
+        if [ -d "libs" ]; then
+            git submodule update --init --depth 1 libs/m1-mathematics 2>/dev/null || true
+        fi
         cd ../..
     fi
     
