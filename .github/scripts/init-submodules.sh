@@ -35,7 +35,11 @@ init_project_submodules() {
     git submodule update --init --depth 1 Modules/juce_murka 2>/dev/null || true
     git submodule update --init --depth 1 Modules/juce_libvlc 2>/dev/null || true
     git submodule update --init --depth 1 Modules/m1-sdk 2>/dev/null || true
-    git submodule update --init --depth 1 Modules/m1_orientation_client 2>/dev/null || true
+    # m1_orientation_client needs recursive init for its nested submodules (m1-mathematics)
+    git submodule update --init --recursive --depth 1 Modules/m1_orientation_client 2>/dev/null || {
+        # Fallback: init without recursive, then manually init nested
+        git submodule update --init --depth 1 Modules/m1_orientation_client 2>/dev/null || true
+    }
     
     # m1-sdk build dependencies (skip examples - they have deep paths)
     if [ -d "Modules/m1-sdk" ]; then
@@ -64,13 +68,23 @@ init_project_submodules() {
         cd ../..
     fi
     
-    # m1_orientation_client dependencies
+    # m1_orientation_client dependencies (includes m1-mathematics)
     if [ -d "Modules/m1_orientation_client" ]; then
         cd Modules/m1_orientation_client
+        # Initialize all direct submodules first
         git submodule update --init --depth 1 2>/dev/null || true
-        # Initialize m1-mathematics (required dependency)
-        if [ -d "libs" ]; then
-            git submodule update --init --depth 1 libs/m1-mathematics 2>/dev/null || true
+        # Explicitly initialize m1-mathematics (REQUIRED for build)
+        git submodule update --init --depth 1 libs/m1-mathematics 2>/dev/null || {
+            echo "    Warning: Could not init libs/m1-mathematics, trying alternative..."
+            git submodule init libs/m1-mathematics 2>/dev/null || true
+            git submodule update --depth 1 libs/m1-mathematics 2>/dev/null || true
+        }
+        # Verify m1-mathematics was initialized
+        if [ -f "libs/m1-mathematics/CMakeLists.txt" ]; then
+            echo "    m1-mathematics initialized successfully"
+        else
+            echo "    ERROR: m1-mathematics CMakeLists.txt not found!"
+            ls -la libs/ 2>/dev/null || echo "    libs/ directory not found"
         fi
         cd ../..
     fi
@@ -79,15 +93,34 @@ init_project_submodules() {
 }
 
 # Initialize each project's submodules
+echo ""
+echo "--- Processing m1-monitor ---"
 init_project_submodules "m1-monitor"
+
+echo ""
+echo "--- Processing m1-panner ---"
 init_project_submodules "m1-panner"
+
+echo ""
+echo "--- Processing m1-player ---"
 init_project_submodules "m1-player"
 
-# m1-orientationmanager has simpler dependencies
+# m1-orientationmanager - also needs m1_orientation_client with m1-mathematics
 echo ""
 echo "Initializing m1-orientationmanager submodules..."
 cd m1-orientationmanager
 git submodule update --init --depth 1 2>/dev/null || true
+
+# Init nested submodules for m1_orientation_client (contains m1-mathematics)
+if [ -d "Modules/m1_orientation_client" ]; then
+    cd Modules/m1_orientation_client
+    git submodule update --init --depth 1 2>/dev/null || true
+    git submodule update --init --depth 1 libs/m1-mathematics 2>/dev/null || true
+    if [ -f "libs/m1-mathematics/CMakeLists.txt" ]; then
+        echo "  m1-mathematics initialized in m1-orientationmanager"
+    fi
+    cd ../..
+fi
 cd ..
 
 # m1-transcoder (electron app, skip juce_plugin deep submodules)
