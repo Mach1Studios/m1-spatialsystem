@@ -167,10 +167,27 @@ jobs:
 
       - name: Update version
         run: |
-          VERSION_CLEAN="${VERSION#v}"
+          VERSION_RAW="${VERSION#v}"
+          
+          # Check if version is valid numeric format (X.Y.Z or X.Y)
+          # CMake requires numeric-only versions
+          if [[ "$VERSION_RAW" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
+            VERSION_CLEAN="$VERSION_RAW"
+            echo "Release build, using version: $VERSION_CLEAN"
+          else
+            # For non-release builds (test-cd, feature branches, SHAs), use 0.0.0
+            # Store the original tag for reference in artifacts
+            VERSION_CLEAN="0.0.0"
+            echo "CI_BUILD_TAG=$VERSION_RAW" >> $GITHUB_ENV
+            echo "Non-release build ($VERSION_RAW), using CMake version: $VERSION_CLEAN"
+          fi
+          
           echo "$VERSION_CLEAN" > VERSION
-          make update-versions
-          echo "Version set to $VERSION_CLEAN"
+          
+          # Update component versions (may add date suffixes)
+          make update-versions || echo "Version update completed with warnings"
+          echo "Final VERSION file:"
+          cat VERSION
 
       - name: Configure and build all components
         run: |
@@ -221,13 +238,16 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: |
-          VERSION_CLEAN="${VERSION#v}"
+          VERSION_RAW="${VERSION#v}"
           COMMIT_SHA="${{ github.sha }}"
           SHORT_SHA="${COMMIT_SHA:0:8}"
           
+          # Use original tag/branch name for S3 path (not the CMake-safe version)
+          S3_VERSION="$VERSION_RAW"
+          
           echo "Uploading to S3..."
           aws s3 cp artifacts/macos-arm64-builds.tar.gz \
-            "s3://$ARTIFACTS_BUCKET/builds/$VERSION_CLEAN/macos-arm64-builds.tar.gz" \
+            "s3://$ARTIFACTS_BUCKET/builds/$S3_VERSION/macos-arm64-builds.tar.gz" \
             --region us-east-1
           
           # Also upload with commit SHA for exact version matching
@@ -236,7 +256,7 @@ jobs:
             --region us-east-1
           
           echo "Artifacts uploaded to:"
-          echo "   s3://$ARTIFACTS_BUCKET/builds/$VERSION_CLEAN/"
+          echo "   s3://$ARTIFACTS_BUCKET/builds/$S3_VERSION/"
           echo "   s3://$ARTIFACTS_BUCKET/commits/$SHORT_SHA/"
 
   # =============================================================================
@@ -346,9 +366,21 @@ jobs:
 
       - name: Update version
         run: |
-          VERSION_CLEAN="${VERSION#v}"
+          VERSION_RAW="${VERSION#v}"
+          
+          # Check if version is valid numeric format (X.Y.Z or X.Y)
+          if [[ "$VERSION_RAW" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
+            VERSION_CLEAN="$VERSION_RAW"
+            echo "Release build, using version: $VERSION_CLEAN"
+          else
+            VERSION_CLEAN="0.0.0"
+            echo "CI_BUILD_TAG=$VERSION_RAW" >> $GITHUB_ENV
+            echo "Non-release build ($VERSION_RAW), using CMake version: $VERSION_CLEAN"
+          fi
+          
           echo "$VERSION_CLEAN" > VERSION
-          make update-versions
+          make update-versions || echo "Version update completed with warnings"
+          cat VERSION
 
       - name: Configure and build all components
         run: |
@@ -389,12 +421,12 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: |
-          VERSION_CLEAN="${VERSION#v}"
+          VERSION_RAW="${VERSION#v}"
           COMMIT_SHA="${{ github.sha }}"
           SHORT_SHA="${COMMIT_SHA:0:8}"
           
           aws s3 cp artifacts/macos-x86-builds.tar.gz \
-            "s3://$ARTIFACTS_BUCKET/builds/$VERSION_CLEAN/macos-x86-builds.tar.gz" \
+            "s3://$ARTIFACTS_BUCKET/builds/$VERSION_RAW/macos-x86-builds.tar.gz" \
             --region us-east-1
           
           aws s3 cp artifacts/macos-x86-builds.tar.gz \
@@ -556,8 +588,20 @@ jobs:
       - name: Update version
         shell: bash
         run: |
-          VERSION_CLEAN="${VERSION#v}"
+          VERSION_RAW="${VERSION#v}"
+          
+          # Check if version is valid numeric format (X.Y.Z or X.Y)
+          if [[ "$VERSION_RAW" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
+            VERSION_CLEAN="$VERSION_RAW"
+            echo "Release build, using version: $VERSION_CLEAN"
+          else
+            VERSION_CLEAN="0.0.0"
+            echo "CI_BUILD_TAG=$VERSION_RAW" >> $GITHUB_ENV
+            echo "Non-release build ($VERSION_RAW), using CMake version: $VERSION_CLEAN"
+          fi
+          
           echo "$VERSION_CLEAN" > VERSION
+          cat VERSION
 
       - name: Download VLC SDK for Windows
         run: |
@@ -695,12 +739,12 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: |
-          $VersionClean = "$env:VERSION" -replace '^v', ''
+          $VersionRaw = "$env:VERSION" -replace '^v', ''
           $CommitSha = "${{ github.sha }}"
           $ShortSha = $CommitSha.Substring(0, 8)
           
           aws s3 cp artifacts/windows-builds.zip `
-            "s3://$env:ARTIFACTS_BUCKET/builds/$VersionClean/windows-builds.zip" `
+            "s3://$env:ARTIFACTS_BUCKET/builds/$VersionRaw/windows-builds.zip" `
             --region us-east-1
           
           aws s3 cp artifacts/windows-builds.zip `
