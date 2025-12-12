@@ -13,6 +13,9 @@ echo ""
 # Configure git for long paths (Windows compatibility)
 git config --global core.longpaths true 2>/dev/null || true
 
+# Configure git to use HTTPS instead of SSH for GitHub (needed for CI without SSH keys)
+git config --global url."https://github.com/".insteadOf "git@github.com:" 2>/dev/null || true
+
 # Initialize top-level submodules
 echo "Initializing top-level submodules..."
 git submodule update --init --depth 1 m1-monitor
@@ -73,18 +76,40 @@ init_project_submodules() {
         cd Modules/m1_orientation_client
         # Initialize all direct submodules first
         git submodule update --init --depth 1 2>/dev/null || true
+        
         # Explicitly initialize m1-mathematics (REQUIRED for build)
-        git submodule update --init --depth 1 libs/m1-mathematics 2>/dev/null || {
-            echo "    Warning: Could not init libs/m1-mathematics, trying alternative..."
-            git submodule init libs/m1-mathematics 2>/dev/null || true
-            git submodule update --depth 1 libs/m1-mathematics 2>/dev/null || true
+        echo "    Initializing libs/m1-mathematics..."
+        
+        # Configure git to use HTTPS instead of SSH for GitHub (needed for CI)
+        git config --global url."https://github.com/".insteadOf "git@github.com:" 2>/dev/null || true
+        
+        git submodule init libs/m1-mathematics 2>/dev/null || true
+        git submodule update --depth 1 --force libs/m1-mathematics 2>/dev/null || {
+            echo "    Shallow update failed, trying full clone..."
+            git submodule update --force libs/m1-mathematics 2>/dev/null || {
+                echo "    Standard update failed, trying manual clone..."
+                # Last resort: manually clone the submodule
+                rm -rf libs/m1-mathematics 2>/dev/null || true
+                # Get the URL and convert SSH to HTTPS
+                MATH_URL=$(git config -f .gitmodules --get submodule.libs/m1-mathematics.url 2>/dev/null)
+                # Convert git@github.com:org/repo.git to https://github.com/org/repo.git
+                MATH_URL_HTTPS=$(echo "$MATH_URL" | sed 's|git@github.com:|https://github.com/|')
+                echo "    Cloning from: $MATH_URL_HTTPS"
+                git clone --depth 1 "$MATH_URL_HTTPS" libs/m1-mathematics 2>/dev/null || {
+                    # Try without .git suffix
+                    MATH_URL_HTTPS="${MATH_URL_HTTPS%.git}"
+                    git clone --depth 1 "$MATH_URL_HTTPS" libs/m1-mathematics 2>/dev/null || true
+                }
+            }
         }
+        
         # Verify m1-mathematics was initialized
         if [ -f "libs/m1-mathematics/CMakeLists.txt" ]; then
             echo "    m1-mathematics initialized successfully"
         else
             echo "    ERROR: m1-mathematics CMakeLists.txt not found!"
-            ls -la libs/ 2>/dev/null || echo "    libs/ directory not found"
+            echo "    Contents of libs/m1-mathematics:"
+            ls -la libs/m1-mathematics/ 2>/dev/null || echo "    (empty or not found)"
         fi
         cd ../..
     fi
@@ -115,9 +140,24 @@ git submodule update --init --depth 1 2>/dev/null || true
 if [ -d "Modules/m1_orientation_client" ]; then
     cd Modules/m1_orientation_client
     git submodule update --init --depth 1 2>/dev/null || true
-    git submodule update --init --depth 1 libs/m1-mathematics 2>/dev/null || true
+    
+    echo "  Initializing libs/m1-mathematics..."
+    git config --global url."https://github.com/".insteadOf "git@github.com:" 2>/dev/null || true
+    
+    git submodule init libs/m1-mathematics 2>/dev/null || true
+    git submodule update --depth 1 --force libs/m1-mathematics 2>/dev/null || {
+        git submodule update --force libs/m1-mathematics 2>/dev/null || {
+            rm -rf libs/m1-mathematics 2>/dev/null || true
+            MATH_URL=$(git config -f .gitmodules --get submodule.libs/m1-mathematics.url 2>/dev/null)
+            MATH_URL_HTTPS=$(echo "$MATH_URL" | sed 's|git@github.com:|https://github.com/|')
+            git clone --depth 1 "$MATH_URL_HTTPS" libs/m1-mathematics 2>/dev/null || true
+        }
+    }
+    
     if [ -f "libs/m1-mathematics/CMakeLists.txt" ]; then
         echo "  m1-mathematics initialized in m1-orientationmanager"
+    else
+        echo "  WARNING: m1-mathematics not found in m1-orientationmanager"
     fi
     cd ../..
 fi
