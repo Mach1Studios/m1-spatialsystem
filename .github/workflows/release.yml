@@ -103,6 +103,16 @@ jobs:
         with:
           node-version: '18'
 
+      - name: Setup Python environment for m1-transcoder
+        run: |
+          # Create a virtual environment for Python packages (required for PEP 668 compliance)
+          python3 -m venv $HOME/.transcoder-venv
+          source $HOME/.transcoder-venv/bin/activate
+          pip install --upgrade pip
+          pip install pyinstaller
+          echo "$HOME/.transcoder-venv/bin" >> $GITHUB_PATH
+          echo "Python venv ready with pyinstaller"
+
       - name: Import Apple Developer Certificate
         env:
           APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
@@ -358,6 +368,15 @@ jobs:
         with:
           node-version: '18'
 
+      - name: Setup Python environment for m1-transcoder
+        run: |
+          python3 -m venv $HOME/.transcoder-venv
+          source $HOME/.transcoder-venv/bin/activate
+          pip install --upgrade pip
+          pip install pyinstaller
+          echo "$HOME/.transcoder-venv/bin" >> $GITHUB_PATH
+          echo "Python venv ready with pyinstaller"
+
       - name: Import Apple Developer Certificate
         env:
           APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
@@ -567,6 +586,15 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
+
+      - name: Setup Python environment for m1-transcoder
+        run: |
+          python -m venv $env:USERPROFILE\.transcoder-venv
+          & $env:USERPROFILE\.transcoder-venv\Scripts\Activate.ps1
+          pip install --upgrade pip
+          pip install pyinstaller
+          echo "$env:USERPROFILE\.transcoder-venv\Scripts" >> $env:GITHUB_PATH
+          echo "Python venv ready with pyinstaller"
 
       - name: Install dependencies
         run: |
