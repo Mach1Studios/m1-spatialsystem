@@ -56,11 +56,29 @@ init_project_submodules() {
         cd ../..
     fi
     
-    # juce_murka dependencies
+    # juce_murka dependencies (Murka uses SSH URL that needs HTTPS conversion)
     if [ -d "Modules/juce_murka" ]; then
         cd Modules/juce_murka
-        git submodule update --init --depth 1 Murka 2>/dev/null || true
+        
+        # fontstash uses HTTPS, should work directly
         git submodule update --init --depth 1 fontstash 2>/dev/null || true
+        
+        # Murka uses SSH URL git@github.com:Kiberchaika/Murka.git - needs HTTPS conversion
+        git submodule init Murka 2>/dev/null || true
+        git submodule update --depth 1 Murka 2>/dev/null || {
+            echo "    Murka shallow update failed, trying with URL conversion..."
+            rm -rf Murka 2>/dev/null || true
+            MURKA_URL=$(git config -f .gitmodules --get submodule.Murka.url 2>/dev/null || echo "git@github.com:Kiberchaika/Murka.git")
+            MURKA_URL_HTTPS=$(echo "$MURKA_URL" | sed 's|git@github.com:|https://github.com/|')
+            git clone --depth 1 "$MURKA_URL_HTTPS" Murka 2>/dev/null || true
+        }
+        
+        # Verify
+        if [ -f "Murka/src/Murka.h" ]; then
+            echo "    Murka initialized"
+        else
+            echo "    WARNING: Murka.h not found"
+        fi
         cd ../..
     fi
     
@@ -130,11 +148,44 @@ echo ""
 echo "--- Processing m1-player ---"
 init_project_submodules "m1-player"
 
-# m1-orientationmanager - also needs m1_orientation_client with m1-mathematics
+# m1-orientationmanager - needs juce_murka (with Murka submodule) and m1_orientation_client (with m1-mathematics)
 echo ""
 echo "Initializing m1-orientationmanager submodules..."
 cd m1-orientationmanager
 git submodule update --init --depth 1 2>/dev/null || true
+
+# juce_murka has nested submodules (Murka uses SSH URL that needs conversion)
+if [ -d "Modules/juce_murka" ]; then
+    echo "  Initializing juce_murka submodules (Murka, fontstash)..."
+    cd Modules/juce_murka
+    
+    # Initialize fontstash (uses HTTPS, should work)
+    git submodule update --init --depth 1 fontstash 2>/dev/null || true
+    
+    # Initialize Murka (uses SSH URL git@github.com:Kiberchaika/Murka.git)
+    git submodule init Murka 2>/dev/null || true
+    git submodule update --depth 1 Murka 2>/dev/null || {
+        echo "    Murka shallow update failed, trying with URL conversion..."
+        # Manual clone with HTTPS conversion
+        rm -rf Murka 2>/dev/null || true
+        mkdir -p Murka
+        MURKA_URL=$(git config -f .gitmodules --get submodule.Murka.url 2>/dev/null || echo "git@github.com:Kiberchaika/Murka.git")
+        MURKA_URL_HTTPS=$(echo "$MURKA_URL" | sed 's|git@github.com:|https://github.com/|')
+        echo "    Cloning from: $MURKA_URL_HTTPS"
+        git clone --depth 1 "$MURKA_URL_HTTPS" Murka 2>/dev/null || {
+            echo "    ERROR: Could not clone Murka"
+        }
+    }
+    
+    # Verify Murka was initialized (check for Murka.h header)
+    if [ -f "Murka/src/Murka.h" ]; then
+        echo "    Murka initialized successfully"
+    else
+        echo "    WARNING: Murka.h not found - juce_murka may fail to build"
+        ls -la Murka/ 2>/dev/null || echo "    (Murka directory empty or missing)"
+    fi
+    cd ../..
+fi
 
 # Init nested submodules for m1_orientation_client (contains m1-mathematics)
 if [ -d "Modules/m1_orientation_client" ]; then
