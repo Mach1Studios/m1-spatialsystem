@@ -208,9 +208,10 @@ jobs:
             VERSION_CLEAN="$VERSION_RAW"
             echo "Release build, using version: $VERSION_CLEAN"
           else
-            # For non-release builds (test-cd, feature branches, SHAs), use 0.0.0
-            # Store the original tag for reference in artifacts
-            VERSION_CLEAN="0.0.0"
+            # For non-release builds (test-cd, feature branches, SHAs), use 0.0
+            # After generate_version.sh appends date, this becomes 0.0.YYYYMMDD (valid semver)
+            # Using 0.0.0 would result in 0.0.0.YYYYMMDD (4 parts - invalid for npm/electron-builder)
+            VERSION_CLEAN="0.0"
             echo "CI_BUILD_TAG=$VERSION_RAW" >> $GITHUB_ENV
             echo "Non-release build ($VERSION_RAW), using CMake version: $VERSION_CLEAN"
           fi
@@ -459,7 +460,8 @@ jobs:
             VERSION_CLEAN="$VERSION_RAW"
             echo "Release build, using version: $VERSION_CLEAN"
           else
-            VERSION_CLEAN="0.0.0"
+            # Use 0.0 so after date append we get 0.0.YYYYMMDD (valid 3-part semver)
+            VERSION_CLEAN="0.0"
             echo "CI_BUILD_TAG=$VERSION_RAW" >> $GITHUB_ENV
             echo "Non-release build ($VERSION_RAW), using CMake version: $VERSION_CLEAN"
           fi
@@ -734,13 +736,21 @@ jobs:
             VERSION_CLEAN="$VERSION_RAW"
             echo "Release build, using version: $VERSION_CLEAN"
           else
-            VERSION_CLEAN="0.0.0"
+            # Use 0.0 so after date append we get 0.0.YYYYMMDD (valid 3-part semver)
+            VERSION_CLEAN="0.0"
             echo "CI_BUILD_TAG=$VERSION_RAW" >> $GITHUB_ENV
             echo "Non-release build ($VERSION_RAW), using CMake version: $VERSION_CLEAN"
           fi
           
           echo "$VERSION_CLEAN" > VERSION
+          
+          # Update component versions (propagates to package.json for electron-builder)
+          # Note: make update-versions skips Windows in Makefile, so run script directly
+          chmod +x ./installer/generate_version.sh
+          ./installer/generate_version.sh || echo "Version update completed with warnings"
+          echo "Final versions:"
           cat VERSION
+          cat m1-transcoder/VERSION 2>/dev/null || true
 
       - name: Download VLC SDK for Windows
         run: |
