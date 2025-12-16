@@ -67,6 +67,10 @@ jobs:
       ALTOOL_APPPASS: ${{ secrets.ALTOOL_APPPASS }}
       PANNER_FREE_GUID: ${{ secrets.PANNER_FREE_GUID }}
       MONITOR_FREE_GUID: ${{ secrets.MONITOR_FREE_GUID }}
+      # Aliases for electron-builder notarization (m1-transcoder/scripts/notarize.js)
+      APPLEID: ${{ secrets.APPLE_USERNAME }}
+      APPLEIDPASS: ${{ secrets.ALTOOL_APPPASS }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_CODE }}
     
     steps:
       - name: Checkout repository
@@ -333,6 +337,10 @@ jobs:
       ALTOOL_APPPASS: ${{ secrets.ALTOOL_APPPASS }}
       PANNER_FREE_GUID: ${{ secrets.PANNER_FREE_GUID }}
       MONITOR_FREE_GUID: ${{ secrets.MONITOR_FREE_GUID }}
+      # Aliases for electron-builder notarization (m1-transcoder/scripts/notarize.js)
+      APPLEID: ${{ secrets.APPLE_USERNAME }}
+      APPLEIDPASS: ${{ secrets.ALTOOL_APPPASS }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_CODE }}
     
     steps:
       - name: Checkout repository
