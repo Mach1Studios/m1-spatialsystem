@@ -107,6 +107,16 @@ jobs:
         with:
           node-version: '18'
 
+      - name: Cache Electron
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/electron
+            ~/Library/Caches/electron-builder
+          key: electron-cache-macos-${{ runner.arch }}-${{ hashFiles('m1-transcoder/package-lock.json') }}
+          restore-keys: |
+            electron-cache-macos-${{ runner.arch }}-
+
       - name: Setup Python environment for m1-transcoder
         run: |
           # Create a virtual environment for Python packages (required for PEP 668 compliance)
@@ -377,6 +387,16 @@ jobs:
         with:
           node-version: '18'
 
+      - name: Cache Electron
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/electron
+            ~/Library/Caches/electron-builder
+          key: electron-cache-macos-${{ runner.arch }}-${{ hashFiles('m1-transcoder/package-lock.json') }}
+          restore-keys: |
+            electron-cache-macos-${{ runner.arch }}-
+
       - name: Setup Python environment for m1-transcoder
         run: |
           python3 -m venv $HOME/.transcoder-venv
@@ -596,6 +616,16 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
+
+      - name: Cache Electron
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~\AppData\Local\electron\Cache
+            ~\AppData\Local\electron-builder\Cache
+          key: electron-cache-windows-${{ hashFiles('m1-transcoder/package-lock.json') }}
+          restore-keys: |
+            electron-cache-windows-
 
       - name: Setup Python environment for m1-transcoder
         run: |

@@ -34,6 +34,8 @@ help:
 	@echo "  make test-ci-build                    - Simulate full CI build locally"
 	@echo "  make test-ci-build-player-only        - Test just m1-player build (fastest)"
 	@echo "  make test-ci-yaml                     - Validate workflow YAML syntax"
+	@echo "  make test-ci-act-arm                  - Run macOS ARM64 job with act"
+	@echo "  make test-ci-act-arm DRYRUN=1         - Dry-run (show what would run)"
 	@echo ""
 	@echo "Code Signing:"
 	@echo "  make codesign                         - Sign all binaries (macOS/Windows)"
@@ -137,6 +139,8 @@ endif
 
 .PHONY: test-aax-monitor test-aax-panner test-aax-plugins test-aax-release
 .PHONY: verify-aax-signing diagnose-aax
+.PHONY: test-ci-build test-ci-build-player-only test-ci-yaml
+.PHONY: test-ci-act-arm
 
 pull:
 	git pull --recurse-submodules
