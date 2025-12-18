@@ -2,7 +2,7 @@
 
 # MACH1 SPATIAL SYSTEM MakeFile
 
-.PHONY: help
+.PHONY: help show-arch
 help:
 	@echo "MACH1 SPATIAL SYSTEM - Available Commands:"
 	@echo ""
@@ -15,10 +15,27 @@ help:
 	@echo "  make clean                            - Clean all build directories"
 	@echo "  make configure                        - Configure for release build"
 	@echo "  make build                            - Build all components"
+	@echo "  make build-vlc                        - Build VLC from source (for m1-player)"
+	@echo ""
+	@echo "Cross-compilation (macOS only - requires x86_64 Homebrew at /usr/local):"
+	@echo "  make dev-player-x86                   - Configure m1-player for x86_64 (dev build)"
+	@echo "  make configure-player-x86             - Configure m1-player for x86_64 (release build)"
+	@echo "  make build-player-x86                 - Build m1-player for x86_64"
+	@echo "  make show-arch                        - Show current build architecture info"
 	@echo ""
 	@echo "Packaging:"
-	@echo "  make package                          - Full package build (configure, build, codesign, notarize, installer)"
-	@echo "  make installer-pkg                    - Build installer packages (Windows installer is signed automatically)"
+	@echo "  make package                          - Full local build (configure, build, codesign, notarize, installer)"
+	@echo "  make package-from-ci VERSION=x.x.x    - Download CI builds, sign AAX locally, create installer"
+	@echo "  make package-from-ci COMMIT=abc123    - Same as above, but by commit SHA"
+	@echo "  make list-ci-builds                   - List available CI builds in S3"
+	@echo "  make installer-pkg                    - Build installer packages only"
+	@echo ""
+	@echo "CI/CD Testing (local simulation):"
+	@echo "  make test-ci-build                    - Simulate full CI build locally"
+	@echo "  make test-ci-build-player-only        - Test just m1-player build (fastest)"
+	@echo "  make test-ci-yaml                     - Validate workflow YAML syntax"
+	@echo "  make test-ci-act-arm                  - Run macOS ARM64 job with act"
+	@echo "  make test-ci-act-arm DRYRUN=1         - Dry-run (show what would run)"
 	@echo ""
 	@echo "Code Signing:"
 	@echo "  make codesign                         - Sign all binaries (macOS/Windows)"
@@ -28,6 +45,35 @@ help:
 	@echo "  make verify-win-signing               - Verify all Windows signatures including installer"
 	@echo ""
 	@echo "For more details, see the Makefile or run individual commands with --help"
+
+# Show current build architecture (useful for CI/CD and distribution)
+show-arch:
+ifeq ($(detected_OS),Darwin)
+	@echo "=== Build Architecture Information ==="
+	@echo "Host OS: macOS"
+	@echo "Host Architecture: $$(uname -m)"
+	@if [ "$$(uname -m)" = "arm64" ]; then \
+		echo "Target: Apple Silicon (ARM64)"; \
+		echo "Homebrew: /opt/homebrew"; \
+		echo "Deployment Target: macOS 11.0+"; \
+	else \
+		echo "Target: Intel (x86_64)"; \
+		echo "Homebrew: /usr/local"; \
+		echo "Deployment Target: macOS 10.14+"; \
+	fi
+	@echo ""
+	@echo "NOTE: m1-player builds for HOST architecture only."
+	@echo "      For distribution, build on each target platform separately."
+else ifeq ($(detected_OS),Windows)
+	@echo "=== Build Architecture Information ==="
+	@echo "Host OS: Windows"
+	@if "%PROCESSOR_ARCHITECTURE%"=="AMD64" echo "Architecture: x86_64 (64-bit)"
+	@if "%PROCESSOR_ARCHITECTURE%"=="x86" echo "Architecture: x86 (32-bit)"
+else
+	@echo "=== Build Architecture Information ==="
+	@echo "Host OS: $(detected_OS)"
+	@echo "Architecture: $$(uname -m)"
+endif
 
 # Auto-generate Makefile.variables from example if it doesn't exist
 Makefile.variables:
@@ -82,6 +128,7 @@ ifneq ($(detected_OS),Windows)
 	@echo "m1-player: $$(cat m1-player/VERSION)"
 	@echo "m1-orientationmanager: $$(cat m1-orientationmanager/VERSION)"
 	@echo "m1-system-helper: $$(cat services/m1-system-helper/VERSION)"
+	@echo "m1-transcoder: $$(cat m1-transcoder/VERSION)"
 	@echo ""
 	@echo "Installer versions updated:"
 	@echo "macOS: $$(grep -c "$(VERSION)" installer/osx/Mach1\ Spatial\ System\ Installer.pkgproj) packages"
@@ -92,6 +139,8 @@ endif
 
 .PHONY: test-aax-monitor test-aax-panner test-aax-plugins test-aax-release
 .PHONY: verify-aax-signing diagnose-aax
+.PHONY: test-ci-build test-ci-build-player-only test-ci-yaml
+.PHONY: test-ci-act-arm
 
 pull:
 	git pull --recurse-submodules
@@ -120,6 +169,9 @@ setup:
 ifeq ($(detected_OS),Darwin)
 	# Assumes you have installed Homebrew package manager
 	brew install yasm cmake p7zip ninja act pre-commit launchcontrol
+	# VLC 3.x build dependencies (use FFmpeg 6.x for compatibility)
+	brew install autoconf automake libtool pkg-config
+	brew install ffmpeg@6 && brew link ffmpeg@6
 	npm install -g nodemon
 	cd m1-transcoder && ./scripts/setup.sh
 	cd m1-panner && pre-commit install
@@ -128,6 +180,8 @@ else ifeq ($(detected_OS),Windows)
 	@choco version >nul || (echo "chocolately is not working or installed" && exit 1)
 	@echo "choco is installed and working"
 	@choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' --apply-install-arguments-to-dependencies
+	@choco install pkgconfiglite autoconf automake libtool
+	@pip3 install meson
 	@if not exist "$(pip show pre-commit)" (pip install pre-commit)
 	npm install -g nodemon
 	cd m1-panner && pre-commit install
@@ -341,9 +395,63 @@ endif
 
 dev-player:
 ifeq ($(detected_OS),Darwin)
-	cmake m1-player -Bm1-player/build-dev -G "Xcode"
+	@echo "Configuring m1-player (dev)..."
+	cmake m1-player -Bm1-player/build-dev -G "Xcode" -DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF || true
+	@if [ ! -f "m1-player/build-dev/vlc-install/lib/libvlc.dylib" ]; then \
+		echo ""; \
+		echo "VLC libraries not found. Building VLC from source..."; \
+		echo ""; \
+		cd m1-player && ./build_vlc.sh build-dev && \
+		echo "" && \
+		echo "VLC build complete! Reconfiguring CMake..." && \
+		echo "" && \
+		cd .. && cmake m1-player -Bm1-player/build-dev -G "Xcode" -DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF; \
+	fi
 else
-	cmake m1-player -Bm1-player/build-dev
+	@echo "Configuring m1-player (dev)..."
+	cmake m1-player -Bm1-player/build-dev -DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF || true
+	@if [ ! -f "m1-player/build-dev/vlc-install/lib/libvlc.lib" ] && [ ! -f "m1-player/build-dev/vlc-install/lib/libvlc.dll.a" ]; then \
+		echo ""; \
+		echo "VLC libraries not found. Building VLC from source..."; \
+		echo "This will take 20-40 minutes..."; \
+		echo ""; \
+		cd m1-player && ./build_vlc.sh build-dev && \
+		echo "" && \
+		echo "VLC build complete! Reconfiguring CMake..." && \
+		echo "" && \
+		cd .. && cmake m1-player -Bm1-player/build-dev -DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF; \
+	fi
+endif
+
+# Cross-compile m1-player for x86_64 on Apple Silicon (via Rosetta 2)
+# Requires x86_64 Homebrew installed at /usr/local with all VLC dependencies
+dev-player-x86:
+ifeq ($(detected_OS),Darwin)
+	@echo "Configuring m1-player for x86_64 (cross-compilation via Rosetta)..."
+	@if [ ! -d "/usr/local/bin" ]; then \
+		echo "ERROR: x86_64 Homebrew not found at /usr/local"; \
+		echo "Install it with:"; \
+		echo "  arch -x86_64 /bin/bash -c \"\$$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""; \
+		exit 1; \
+	fi
+	arch -x86_64 cmake m1-player -Bm1-player/build-dev-x86 -G "Xcode" \
+		-DCMAKE_OSX_ARCHITECTURES=x86_64 \
+		-DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF || true
+	@if [ ! -f "m1-player/build-dev-x86/vlc-install/lib/libvlc.dylib" ]; then \
+		echo ""; \
+		echo "VLC libraries not found. Building VLC for x86_64..."; \
+		echo ""; \
+		cd m1-player && arch -x86_64 ./build_vlc.sh build-dev-x86 && \
+		echo "" && \
+		echo "VLC build complete! Reconfiguring CMake..." && \
+		echo "" && \
+		cd .. && arch -x86_64 cmake m1-player -Bm1-player/build-dev-x86 -G "Xcode" \
+			-DCMAKE_OSX_ARCHITECTURES=x86_64 \
+			-DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF; \
+	fi
+else
+	@echo "ERROR: dev-player-x86 is only available on macOS"
+	@exit 1
 endif
 
 dev-orientationmanager:
@@ -392,17 +500,313 @@ endif
 overlay-debug:
 	cd m1-panner/Resources/overlay_debug && ./run_simulator.sh --title "Avid Video Engine"
 
-# run configure first
+# =============================================================================
+# Release Packaging
+# =============================================================================
+# Full local build: configure → build → sign → notarize → installer
 package: update-versions build docs-build codesign notarize installer-pkg
+
+# =============================================================================
+# Hybrid CI/CD Release (Recommended)
+# =============================================================================
+# Downloads pre-built artifacts from CI/CD, then signs AAX locally and creates installer.
+# This is the recommended workflow since AAX signing requires a physical USB iLok dongle.
+#
+# Usage:
+#   make package-from-ci VERSION=2.0.1           # By version tag
+#   make package-from-ci COMMIT=abc12345          # By commit SHA
+#
+# Prerequisites:
+#   - AWS CLI configured with access to mach1-build-artifacts bucket
+#   - USB iLok dongle connected for AAX signing
+#   - Apple Developer certificate in keychain for macOS
+#
+ARTIFACTS_BUCKET ?= mach1-build-artifacts
+CI_ARTIFACTS_DIR ?= ci-artifacts
+
+package-from-ci: download-ci-artifacts sign-aax-local installer-pkg-from-ci
+	@echo ""
+	@echo "========================================"
+	@echo "Release Complete!"
+	@echo "========================================"
+	@echo ""
+
+download-ci-artifacts:
+	@echo "========================================"
+	@echo "Downloading CI Build Artifacts"
+	@echo "========================================"
+ifeq ($(detected_OS),Darwin)
+	@if [ -z "$(VERSION)" ] && [ -z "$(COMMIT)" ]; then \
+		echo "ERROR: Specify VERSION or COMMIT"; \
+		echo "  make package-from-ci VERSION=2.0.1"; \
+		echo "  make package-from-ci COMMIT=abc12345"; \
+		exit 1; \
+	fi
+	@mkdir -p $(CI_ARTIFACTS_DIR)
+	@if [ -n "$(VERSION)" ]; then \
+		echo "Downloading version $(VERSION) artifacts..."; \
+		aws s3 cp "s3://$(ARTIFACTS_BUCKET)/builds/$(VERSION)/macos-arm64-builds.tar.gz" \
+			"$(CI_ARTIFACTS_DIR)/macos-arm64-builds.tar.gz" --region us-east-1 || \
+			(echo "ERROR: Artifacts not found for version $(VERSION)" && exit 1); \
+	elif [ -n "$(COMMIT)" ]; then \
+		echo "Downloading commit $(COMMIT) artifacts..."; \
+		aws s3 cp "s3://$(ARTIFACTS_BUCKET)/commits/$(COMMIT)/macos-arm64-builds.tar.gz" \
+			"$(CI_ARTIFACTS_DIR)/macos-arm64-builds.tar.gz" --region us-east-1 || \
+			(echo "ERROR: Artifacts not found for commit $(COMMIT)" && exit 1); \
+	fi
+	@echo "Extracting artifacts..."
+	@cd $(CI_ARTIFACTS_DIR) && tar -xzf macos-arm64-builds.tar.gz
+	@echo ""
+	@echo "Installing artifacts to build directories..."
+	@mkdir -p m1-monitor/build m1-panner/build m1-player/build
+	@mkdir -p m1-orientationmanager/build services/m1-system-helper/build
+	@cp -r $(CI_ARTIFACTS_DIR)/macos-arm64/M1-Monitor/* m1-monitor/build/ 2>/dev/null || true
+	@cp -r $(CI_ARTIFACTS_DIR)/macos-arm64/M1-Panner/* m1-panner/build/ 2>/dev/null || true
+	@cp -r $(CI_ARTIFACTS_DIR)/macos-arm64/M1-Player/* m1-player/build/ 2>/dev/null || true
+	@cp -r $(CI_ARTIFACTS_DIR)/macos-arm64/m1-orientationmanager/* m1-orientationmanager/build/ 2>/dev/null || true
+	@cp -r $(CI_ARTIFACTS_DIR)/macos-arm64/m1-system-helper/* services/m1-system-helper/build/ 2>/dev/null || true
+	@echo "Artifacts downloaded and installed"
+else ifeq ($(detected_OS),Windows)
+	@echo "Downloading Windows artifacts..."
+	@if not defined VERSION if not defined COMMIT ( \
+		echo ERROR: Specify VERSION or COMMIT && \
+		echo   make package-from-ci VERSION=2.0.1 && \
+		echo   make package-from-ci COMMIT=abc12345 && \
+		exit 1 \
+	)
+	@if not exist $(CI_ARTIFACTS_DIR) mkdir $(CI_ARTIFACTS_DIR)
+	@if defined VERSION ( \
+		aws s3 cp "s3://$(ARTIFACTS_BUCKET)/builds/$(VERSION)/windows-builds.zip" \
+			"$(CI_ARTIFACTS_DIR)\windows-builds.zip" --region us-east-1 \
+	) else ( \
+		aws s3 cp "s3://$(ARTIFACTS_BUCKET)/commits/$(COMMIT)/windows-builds.zip" \
+			"$(CI_ARTIFACTS_DIR)\windows-builds.zip" --region us-east-1 \
+	)
+	@7z x -y "$(CI_ARTIFACTS_DIR)\windows-builds.zip" -o"$(CI_ARTIFACTS_DIR)"
+	@echo Artifacts downloaded and extracted
+endif
+
+sign-aax-local:
+	@echo ""
+	@echo "========================================"
+	@echo "Signing AAX Plugins (USB iLok Required)"
+	@echo "========================================"
+ifeq ($(detected_OS),Darwin)
+	@echo "Ensure your USB iLok dongle is connected..."
+	@echo ""
+	@if [ -d "m1-monitor/build/M1-Monitor_artefacts/AAX" ] || [ -d "m1-monitor/build/AAX" ]; then \
+		echo "Signing M1-Monitor AAX..."; \
+		AAX_PATH=$$(find m1-monitor/build -name "M1-Monitor.aaxplugin" -type d | head -1); \
+		if [ -n "$$AAX_PATH" ]; then \
+			codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp "$$AAX_PATH"; \
+			$(WRAPTOOL) sign --verbose --account $(PACE_ACCOUNT) --wcguid "$(MONITOR_FREE_GUID)" \
+				--signid $(APPLE_CODESIGN_ID) --in "$$AAX_PATH" --out "$$AAX_PATH" --autoinstall on; \
+			echo "M1-Monitor AAX signed"; \
+		else \
+			echo "M1-Monitor.aaxplugin not found"; \
+		fi; \
+	fi
+	@if [ -d "m1-panner/build/M1-Panner_artefacts/AAX" ] || [ -d "m1-panner/build/AAX" ]; then \
+		echo "Signing M1-Panner AAX..."; \
+		AAX_PATH=$$(find m1-panner/build -name "M1-Panner.aaxplugin" -type d | head -1); \
+		if [ -n "$$AAX_PATH" ]; then \
+			codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp "$$AAX_PATH"; \
+			$(WRAPTOOL) sign --verbose --account $(PACE_ACCOUNT) --wcguid "$(PANNER_FREE_GUID)" \
+				--signid $(APPLE_CODESIGN_ID) --in "$$AAX_PATH" --out "$$AAX_PATH" --autoinstall on; \
+			echo "M1-Panner AAX signed"; \
+		else \
+			echo "M1-Panner.aaxplugin not found"; \
+		fi; \
+	fi
+	@echo ""
+	@echo "AAX signing complete!"
+else ifeq ($(detected_OS),Windows)
+	@echo "Signing AAX plugins on Windows..."
+	@echo "Ensure iLok License Manager is running..."
+	@if exist "m1-monitor\build\M1-Monitor_artefacts\Release\AAX\M1-Monitor.aaxplugin" ( \
+		set SIGNTOOL_PATH=$(WIN_SIGNTOOL_PATH) && \
+		set ACS_DLIB=$(AZURE_DLIB_PATH) && \
+		set ACS_JSON=$(AZURE_METADATA_PATH) && \
+		set AZURE_TENANT_ID=$(AZURE_TENANT_ID) && \
+		set AZURE_CLIENT_ID=$(AZURE_CLIENT_ID) && \
+		set AZURE_SECRET_ID=$(AZURE_CLIENT_SECRET) && \
+		$(WRAPTOOL) sign --signtool "$(CURDIR)/installer/win/aax-signtool.bat" --signid 1 --verbose \
+			--installedbinaries --account $(PACE_ACCOUNT) --wcguid "$(MONITOR_FREE_GUID)" \
+			--in m1-monitor\build\M1-Monitor_artefacts\Release\AAX\M1-Monitor.aaxplugin \
+			--out m1-monitor\build\M1-Monitor_artefacts\Release\AAX\M1-Monitor.aaxplugin \
+	)
+	@if exist "m1-panner\build\M1-Panner_artefacts\Release\AAX\M1-Panner.aaxplugin" ( \
+		set SIGNTOOL_PATH=$(WIN_SIGNTOOL_PATH) && \
+		set ACS_DLIB=$(AZURE_DLIB_PATH) && \
+		set ACS_JSON=$(AZURE_METADATA_PATH) && \
+		set AZURE_TENANT_ID=$(AZURE_TENANT_ID) && \
+		set AZURE_CLIENT_ID=$(AZURE_CLIENT_ID) && \
+		set AZURE_SECRET_ID=$(AZURE_CLIENT_SECRET) && \
+		$(WRAPTOOL) sign --signtool "$(CURDIR)/installer/win/aax-signtool.bat" --signid 1 --verbose \
+			--installedbinaries --account $(PACE_ACCOUNT) --wcguid "$(PANNER_FREE_GUID)" \
+			--in m1-panner\build\M1-Panner_artefacts\Release\AAX\M1-Panner.aaxplugin \
+			--out m1-panner\build\M1-Panner_artefacts\Release\AAX\M1-Panner.aaxplugin \
+	)
+endif
+
+installer-pkg-from-ci: sign-aax-local
+	@echo ""
+	@echo "========================================"
+	@echo "Creating Installer Package"
+	@echo "========================================"
+ifeq ($(detected_OS),Darwin)
+	@echo "Building and signing installer..."
+	packagesbuild -v installer/osx/Mach1\ Spatial\ System\ Installer.pkgproj
+	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp installer/osx/build/Mach1\ Spatial\ System\ Installer.pkg
+	mkdir -p installer/osx/build/signed
+	productsign --sign $(APPLE_CODESIGN_INSTALLER_ID) \
+		"installer/osx/build/Mach1 Spatial System Installer.pkg" \
+		"installer/osx/build/signed/Mach1 Spatial System Installer.pkg"
+	@echo ""
+	@echo "Notarizing installer..."
+	xcrun notarytool submit --wait --keychain-profile 'notarize-app' \
+		--apple-id $(APPLE_USERNAME) --password $(ALTOOL_APPPASS) --team-id $(APPLE_TEAM_CODE) \
+		"installer/osx/build/signed/Mach1 Spatial System Installer.pkg"
+	xcrun stapler staple installer/osx/build/signed/Mach1\ Spatial\ System\ Installer.pkg
+	@echo ""
+	@echo "Installer created at: installer/osx/build/signed/Mach1 Spatial System Installer.pkg"
+else ifeq ($(detected_OS),Windows)
+	@echo "Building Windows installer..."
+	$(WIN_INNO_PATH) "${CURDIR}/installer/win/installer.iss"
+	@echo "Signing installer..."
+	powershell -ExecutionPolicy Bypass -File installer\win\sign-file.ps1 \
+		-FilePath "installer\win\Output\Mach1 Spatial System Installer.exe"
+	@echo "Installer created at: installer\win\Output\Mach1 Spatial System Installer.exe"
+endif
+
+# List available CI builds
+list-ci-builds:
+	@echo "Available builds in S3:"
+	@echo ""
+	@echo "By Version:"
+	@aws s3 ls "s3://$(ARTIFACTS_BUCKET)/builds/" --region us-east-1 2>/dev/null || echo "  (none or access denied)"
+	@echo ""
+	@echo "By Commit (recent):"
+	@aws s3 ls "s3://$(ARTIFACTS_BUCKET)/commits/" --region us-east-1 2>/dev/null | tail -10 || echo "  (none or access denied)"
+
+# Clean CI artifacts
+clean-ci-artifacts:
+	@echo "Cleaning CI artifacts..."
+	rm -rf $(CI_ARTIFACTS_DIR)
+	@echo "CI artifacts cleaned"
+
+# =============================================================================
+# CI/CD Testing (Local Simulation)
+# =============================================================================
+# Simulates what CI/CD does, but runs locally. Useful for testing before push.
+#
+# Usage:
+#   make test-ci-build              - Simulate full CI build
+#   make test-ci-build-player-only  - Just build m1-player (fastest test)
+#
+test-ci-build:
+	@echo "========================================"
+	@echo "Simulating CI/CD Build Locally"
+	@echo "========================================"
+	@echo ""
+	@echo "This simulates what GitHub Actions does:"
+	@echo "  1. Clean build"
+	@echo "  2. Configure all projects"
+	@echo "  3. Build all projects"
+	@echo "  4. Sign non-AAX plugins"
+	@echo "  5. Package artifacts"
+	@echo ""
+	@echo "Press Ctrl+C to cancel, or wait 5 seconds..."
+	@sleep 5
+	@echo ""
+	$(MAKE) clean
+	$(MAKE) configure
+	$(MAKE) build
+	$(MAKE) codesign-vst3 || true
+	$(MAKE) codesign-au || true
+	$(MAKE) codesign-apps || true
+	@echo ""
+	@echo "========================================"
+	@echo "CI Build Simulation Complete!"
+	@echo "========================================"
+	@echo ""
+	@echo "Next steps to test full release flow:"
+	@echo "  1. Connect USB iLok"
+	@echo "  2. Run: make sign-aax-local"
+	@echo "  3. Run: make installer-pkg"
+
+test-ci-build-player-only:
+	@echo "========================================"
+	@echo "Testing m1-player Build (CI Simulation)"
+	@echo "========================================"
+	@echo ""
+	@echo "This tests the VLC build + m1-player compilation"
+	@echo "which is the most complex part of CI/CD."
+	@echo ""
+ifeq ($(detected_OS),Darwin)
+	rm -rf m1-player/build-test
+	cmake m1-player -Bm1-player/build-test -G "Xcode" \
+		-DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF || true
+	@if [ ! -f "m1-player/build-test/vlc-install/lib/libvlc.dylib" ]; then \
+		echo "Building VLC from source..."; \
+		cd m1-player && ./build_vlc.sh build-test && cd ..; \
+		cmake m1-player -Bm1-player/build-test -G "Xcode" \
+			-DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF; \
+	fi
+	cmake --build m1-player/build-test --config Release
+	@echo ""
+	@echo "m1-player build test complete!"
+	@echo "   Output: m1-player/build-test/M1-Player_artefacts/"
+else
+	@echo "This test is currently macOS-only"
+endif
+
+# Validate workflow YAML syntax
+test-ci-yaml:
+	@echo "Validating GitHub Actions workflow syntax..."
+	@if command -v actionlint >/dev/null 2>&1; then \
+		actionlint .github/workflows/*.yml; \
+		echo "Workflow YAML is valid"; \
+	elif command -v act >/dev/null 2>&1; then \
+		act -l > /dev/null 2>&1 && echo "Workflow YAML is valid (act)"; \
+	else \
+		echo "Install actionlint or act for YAML validation:"; \
+		echo "  brew install actionlint"; \
+		echo "  brew install act"; \
+	fi
 
 # clean and configure for release
 configure: clean update-versions
 	cmake m1-monitor -Bm1-monitor/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF
 	cmake m1-panner -Bm1-panner/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF
 ifeq ($(detected_OS),Darwin)
-	cmake m1-player -Bm1-player/build -G "Xcode"
+	@echo "Configuring m1-player (release)..."
+	cmake m1-player -Bm1-player/build -G "Xcode" -DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF || true
+	@if [ ! -f "m1-player/build/vlc-install/lib/libvlc.dylib" ]; then \
+		echo ""; \
+		echo "VLC libraries not found. Building VLC from source..."; \
+		echo "This will take 20-40 minutes..."; \
+		echo ""; \
+		cd m1-player && ./build_vlc.sh build && \
+		echo "" && \
+		echo "VLC build complete! Reconfiguring CMake..." && \
+		echo "" && \
+		cd .. && cmake m1-player -Bm1-player/build -G "Xcode" -DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF; \
+	fi
 else
-	cmake m1-player -Bm1-player/build
+	@echo "Configuring m1-player (release)..."
+	cmake m1-player -Bm1-player/build -DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF || true
+	@if [ ! -f "m1-player/build/vlc-install/lib/libvlc.lib" ] && [ ! -f "m1-player/build/vlc-install/lib/libvlc.dll.a" ]; then \
+		echo ""; \
+		echo "VLC libraries not found. Building VLC from source..."; \
+		echo "This will take 20-40 minutes..."; \
+		echo ""; \
+		cd m1-player && ./build_vlc.sh build && \
+		echo "" && \
+		echo "VLC build complete! Reconfiguring CMake..." && \
+		echo "" && \
+		cd .. && cmake m1-player -Bm1-player/build -DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF; \
+	fi
 endif
 	cmake m1-orientationmanager -Bm1-orientationmanager/build
 	cmake services/m1-system-helper -Bservices/m1-system-helper/build
@@ -421,6 +825,91 @@ build-panner:
 
 build-player:
 	cmake --build m1-player/build --config "Release"
+
+# Cross-compile release build for x86_64 on Apple Silicon
+build-player-x86:
+ifeq ($(detected_OS),Darwin)
+	arch -x86_64 cmake --build m1-player/build-x86 --config "Release"
+else
+	@echo "ERROR: build-player-x86 is only available on macOS"
+	@exit 1
+endif
+
+# Configure m1-player for x86_64 release (cross-compilation on Apple Silicon)
+configure-player-x86:
+ifeq ($(detected_OS),Darwin)
+	@echo "Configuring m1-player for x86_64 release (cross-compilation via Rosetta)..."
+	@if [ ! -d "/usr/local/bin" ]; then \
+		echo "ERROR: x86_64 Homebrew not found at /usr/local"; \
+		echo "Install it with:"; \
+		echo "  arch -x86_64 /bin/bash -c \"\$$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""; \
+		exit 1; \
+	fi
+	arch -x86_64 cmake m1-player -Bm1-player/build-x86 -G "Xcode" \
+		-DCMAKE_OSX_ARCHITECTURES=x86_64 \
+		-DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF || true
+	@if [ ! -f "m1-player/build-x86/vlc-install/lib/libvlc.dylib" ]; then \
+		echo ""; \
+		echo "VLC libraries not found. Building VLC for x86_64..."; \
+		echo "This will take 20-40 minutes..."; \
+		echo ""; \
+		cd m1-player && arch -x86_64 ./build_vlc.sh build-x86 && \
+		echo "" && \
+		echo "VLC build complete! Reconfiguring CMake..." && \
+		echo "" && \
+		cd .. && arch -x86_64 cmake m1-player -Bm1-player/build-x86 -G "Xcode" \
+			-DCMAKE_OSX_ARCHITECTURES=x86_64 \
+			-DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF; \
+	fi
+else
+	@echo "ERROR: configure-player-x86 is only available on macOS"
+	@exit 1
+endif
+
+# Build VLC from source (happens automatically as part of build-player)
+# Use this target if you want to build VLC separately first
+#
+# ARCHITECTURE NOTE:
+# VLC and m1-player are built for the HOST architecture only.
+# Universal binaries are NOT supported due to VLC/Homebrew dependencies.
+# For distribution:
+#   - Build on Apple Silicon Mac for ARM64 (.app for M1/M2/M3 Macs)
+#   - Build on Intel Mac for x86_64 (.app for older Intel Macs)
+# The installer should be built and deployed separately for each architecture.
+#
+# CROSS-COMPILATION (macOS only):
+# To build x86_64 on Apple Silicon, use the x86 targets:
+#   make dev-player-x86   (for development)
+#   make build-player-x86 (for release)
+# Requires x86_64 Homebrew installed at /usr/local
+build-vlc:
+	@echo "Building VLC from source..."
+ifeq ($(detected_OS),Darwin)
+	@if [ -d "m1-player/build-dev" ]; then \
+		echo "Using development build directory (build-dev)"; \
+		cd m1-player && ./build_vlc.sh build-dev; \
+	elif [ -d "m1-player/build" ]; then \
+		echo "Using release build directory (build)"; \
+		cd m1-player && ./build_vlc.sh build; \
+	else \
+		echo "Error: Neither m1-player/build nor m1-player/build-dev found."; \
+		echo "Run 'make configure' or 'make dev-player' first."; \
+		exit 1; \
+	fi
+else
+	@if [ -d "m1-player/build-dev" ]; then \
+		echo "Using development build directory (build-dev)"; \
+		cd m1-player && ./build_vlc.sh build-dev; \
+	elif [ -d "m1-player/build" ]; then \
+		echo "Using release build directory (build)"; \
+		cd m1-player && ./build_vlc.sh build; \
+	else \
+		echo "Error: Neither m1-player/build nor m1-player/build-dev found."; \
+		echo "Run 'make configure' or 'make dev-player' first."; \
+		exit 1; \
+	fi
+endif
+	@echo "VLC setup complete"
 
 build-orientationmanager:
 	cmake --build m1-orientationmanager/build --config "Release"
@@ -590,6 +1079,10 @@ endif
 codesign-apps:
 ifeq ($(detected_OS),Darwin)
 	@echo "Code signing applications..."
+	# Sign bundled libraries and plugins inside M1-Player.app first (required for notarization)
+	# This signs all dylibs in Contents (Frameworks and PlugIns) with the same identity
+	find m1-player/build/M1-Player_artefacts/Release/M1-Player.app/Contents -type f -name "*.dylib" -exec codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp -o runtime {} \;
+	
 	codesign -v --force -o runtime --entitlements m1-player/Resources/M1-Player.entitlements --sign $(APPLE_CODESIGN_CODE) --timestamp m1-player/build/M1-Player_artefacts/Release/M1-Player.app
 	codesign -v --force -o runtime --entitlements m1-orientationmanager/Resources/entitlements.mac.plist --sign $(APPLE_CODESIGN_CODE) --timestamp m1-orientationmanager/build/m1-orientationmanager_artefacts/m1-orientationmanager
 	codesign -v --force -o runtime --entitlements services/m1-system-helper/entitlements.mac.plist --sign $(APPLE_CODESIGN_CODE) --timestamp services/m1-system-helper/build/m1-system-helper_artefacts/m1-system-helper

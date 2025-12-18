@@ -1,0 +1,1218 @@
+name: Build and Release
+
+# This workflow builds all components and uploads artifacts.
+# AAX signing requires a physical USB iLok dongle and must be done locally.
+#
+# Workflow:
+# 1. CI/CD builds everything, signs non-AAX plugins, uploads to S3
+# 2. Local machine downloads artifacts, signs AAX, creates installer
+#
+# Use `make package-from-ci` locally to complete the release.
+
+on:
+  push:
+    tags:
+      - 'v*'
+      - 'test-cd'
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (e.g., 2.0.1) - leave empty to use commit SHA'
+        required: false
+        type: string
+      build_macos_arm64:
+        description: 'Build macOS ARM64'
+        required: false
+        default: true
+        type: boolean
+      build_macos_x86:
+        description: 'Build macOS x86_64'
+        required: false
+        default: true
+        type: boolean
+      build_windows:
+        description: 'Build Windows'
+        required: false
+        default: true
+        type: boolean
+
+env:
+  # Version - from tag, input, or commit SHA
+  VERSION: ${{ github.event.inputs.version || github.ref_name || github.sha }}
+  # S3 bucket for build artifacts
+  ARTIFACTS_BUCKET: mach1-build-artifacts
+
+jobs:
+  # =============================================================================
+  # macOS ARM64 Build (Apple Silicon)
+  # =============================================================================
+  build-macos-arm64:
+    if: ${{ github.event.inputs.build_macos_arm64 != 'false' }}
+    runs-on: macos-15  # ARM64 runner
+    timeout-minutes: 180
+    
+    env:
+      APPLE_TEAM_CODE: ${{ secrets.APPLE_TEAM_CODE }}
+      APPLE_CODESIGN_CODE: ${{ secrets.APPLE_CODESIGN_CODE }}
+      APPLE_CODESIGN_ID: ${{ secrets.APPLE_CODESIGN_ID }}
+      APPLE_CODESIGN_INSTALLER_ID: ${{ secrets.APPLE_CODESIGN_INSTALLER_ID }}
+      APPLE_USERNAME: ${{ secrets.APPLE_USERNAME }}
+      ALTOOL_APPPASS: ${{ secrets.ALTOOL_APPPASS }}
+      PANNER_FREE_GUID: ${{ secrets.PANNER_FREE_GUID }}
+      MONITOR_FREE_GUID: ${{ secrets.MONITOR_FREE_GUID }}
+      # Aliases for electron-builder notarization (m1-transcoder/scripts/notarize.js)
+      APPLEID: ${{ secrets.APPLE_USERNAME }}
+      APPLEIDPASS: ${{ secrets.ALTOOL_APPPASS }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_CODE }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: false  # Handle submodules manually for speed
+          fetch-depth: 0
+
+      # Initialize only build-required submodules (skip examples for faster builds)
+      - name: Initialize submodules
+        run: |
+          chmod +x .github/scripts/init-submodules.sh 2>/dev/null || true
+          .github/scripts/init-submodules.sh || {
+            # Fallback: recursive with depth
+            git submodule update --init --recursive --depth 1
+          }
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      # ===========================================
+      # Caching for faster builds
+      # ===========================================
+      # NOTE: Homebrew caching removed - symlinks don't cache properly
+      # VLC is cached in ~/.vlc-cache (outside build dir so `clean` doesn't delete it)
+      
+      - name: Cache VLC build
+        uses: actions/cache@v4
+        id: vlc-cache
+        with:
+          path: ~/.vlc-cache
+          key: vlc-macos-${{ runner.arch }}-${{ hashFiles('m1-player/build_vlc.sh', 'm1-player/CMakeLists.txt') }}
+          restore-keys: |
+            vlc-macos-${{ runner.arch }}-
+
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            m1-transcoder/node_modules
+            ~/.npm
+          key: npm-macos-${{ runner.arch }}-${{ hashFiles('m1-transcoder/package-lock.json') }}
+          restore-keys: |
+            npm-macos-${{ runner.arch }}-
+
+      - name: Cache Electron
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/electron
+            ~/Library/Caches/electron-builder
+          key: electron-macos-${{ runner.arch }}-${{ hashFiles('m1-transcoder/package-lock.json') }}
+          restore-keys: |
+            electron-macos-${{ runner.arch }}-
+
+      - name: Cache Python venv
+        uses: actions/cache@v4
+        with:
+          path: ~/.transcoder-venv
+          key: python-venv-macos-${{ runner.arch }}-pyinstaller
+          restore-keys: |
+            python-venv-macos-${{ runner.arch }}-
+
+      # ===========================================
+      # Install dependencies
+      # ===========================================
+
+      - name: Install Homebrew dependencies
+        run: |
+          brew update
+          brew install cmake ninja pkg-config autoconf automake libtool
+          brew install ffmpeg@6 && brew link ffmpeg@6 --force
+          brew install libass flac mpg123 libvpx x264 x265 dav1d aom
+          brew install opus libvorbis theora speex libogg libpng jpeg-turbo
+          brew install libssh2 srt libbluray aribb24
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Setup Python environment for m1-transcoder
+        run: |
+          # Create/reuse venv for Python packages
+          if [ ! -d "$HOME/.transcoder-venv" ]; then
+            python3 -m venv $HOME/.transcoder-venv
+          fi
+          source $HOME/.transcoder-venv/bin/activate
+          pip install --upgrade pip
+          pip install pyinstaller
+          echo "$HOME/.transcoder-venv/bin" >> $GITHUB_PATH
+          echo "Python venv ready with pyinstaller"
+
+      - name: Import Apple Developer Certificate
+        env:
+          APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
+          APPLE_CERTIFICATE_P12_PWD: ${{ secrets.APPLE_CERTIFICATE_P12_PWD }}
+          MACOS_CI_KEYCHAIN_PWD: ${{ secrets.MACOS_CI_KEYCHAIN_PWD }}
+        run: |
+          # Create a temporary keychain
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          security create-keychain -p "$MACOS_CI_KEYCHAIN_PWD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$MACOS_CI_KEYCHAIN_PWD" $KEYCHAIN_PATH
+          
+          # Import certificate
+          echo "$APPLE_CERTIFICATE_P12" | base64 --decode > $RUNNER_TEMP/certificate.p12
+          security import $RUNNER_TEMP/certificate.p12 -P "$APPLE_CERTIFICATE_P12_PWD" \
+            -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
+          
+          # Allow codesign to access the keychain
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$MACOS_CI_KEYCHAIN_PWD" $KEYCHAIN_PATH
+          
+          echo "Certificate imported successfully"
+
+      - name: Setup notarization credentials
+        run: |
+          xcrun notarytool store-credentials 'notarize-app' \
+            --apple-id "$APPLE_USERNAME" \
+            --team-id "$APPLE_TEAM_CODE" \
+            --password "$ALTOOL_APPPASS"
+
+      - name: Setup SDKs (VST2)
+        env:
+          VST2_SDK_URL: ${{ secrets.VST2_SDK_URL }}
+        run: |
+          mkdir -p SDKs
+          
+          # Download VST2 SDK if URL provided
+          if [ -n "$VST2_SDK_URL" ]; then
+            echo "Downloading VST2 SDK..."
+            curl -L "$VST2_SDK_URL" -o SDKs/vst2_sdk.zip
+            unzip -q SDKs/vst2_sdk.zip -d SDKs/
+            
+            # Handle different archive structures
+            if [ -d "SDKs/VST2_SDK" ]; then
+              echo "VST2 SDK extracted to SDKs/VST2_SDK"
+            elif [ -d "SDKs/vstsdk2.4" ]; then
+              mv SDKs/vstsdk2.4 SDKs/VST2_SDK
+              echo "VST2 SDK extracted and renamed"
+            elif [ -d "SDKs/pluginterfaces" ]; then
+              mkdir -p SDKs/VST2_SDK
+              mv SDKs/pluginterfaces SDKs/VST2_SDK/
+              echo "VST2 SDK headers extracted"
+            fi
+            
+            echo "BUILD_VST2=ON" >> $GITHUB_ENV
+            echo "VST2 SDK ready"
+          else
+            echo "VST2_SDK_URL not provided - VST2 builds will be skipped"
+            echo "BUILD_VST2=OFF" >> $GITHUB_ENV
+          fi
+
+      - name: Setup Makefile.variables
+        run: |
+          # Set VST2 path only if SDK exists
+          VST2_PATH_VALUE=""
+          if [ "$BUILD_VST2" = "ON" ] && [ -d "${{ github.workspace }}/SDKs/VST2_SDK" ]; then
+            VST2_PATH_VALUE="${{ github.workspace }}/SDKs/VST2_SDK"
+          fi
+          
+          cat > Makefile.variables << EOF
+          M1SDK_PATH=
+          VST2_PATH=$VST2_PATH_VALUE
+          APPLE_TEAM_CODE=${{ secrets.APPLE_TEAM_CODE }}
+          APPLE_CODESIGN_ID=${{ secrets.APPLE_CODESIGN_ID }}
+          APPLE_CODESIGN_CODE=${{ secrets.APPLE_CODESIGN_CODE }}
+          APPLE_CODESIGN_INSTALLER_ID=${{ secrets.APPLE_CODESIGN_INSTALLER_ID }}
+          PANNER_FREE_GUID=${{ secrets.PANNER_FREE_GUID }}
+          MONITOR_FREE_GUID=${{ secrets.MONITOR_FREE_GUID }}
+          M1_GLOBAL_GUID=${{ secrets.M1_GLOBAL_GUID }}
+          APPLE_USERNAME=${{ secrets.APPLE_USERNAME }}
+          ALTOOL_APPPASS=${{ secrets.ALTOOL_APPPASS }}
+          EOF
+          echo "Makefile.variables created (VST2: $BUILD_VST2)"
+
+      - name: Update version
+        run: |
+          VERSION_RAW="${VERSION#v}"
+          
+          # Check if version is valid numeric format (X.Y.Z or X.Y)
+          # CMake requires numeric-only versions
+          if [[ "$VERSION_RAW" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
+            VERSION_CLEAN="$VERSION_RAW"
+            echo "Release build, using version: $VERSION_CLEAN"
+          else
+            # For non-release builds (test-cd, feature branches, SHAs), use 0.0
+            # After generate_version.sh appends date, this becomes 0.0.YYYYMMDD (valid semver)
+            # Using 0.0.0 would result in 0.0.0.YYYYMMDD (4 parts - invalid for npm/electron-builder)
+            VERSION_CLEAN="0.0"
+            echo "CI_BUILD_TAG=$VERSION_RAW" >> $GITHUB_ENV
+            echo "Non-release build ($VERSION_RAW), using CMake version: $VERSION_CLEAN"
+          fi
+          
+          echo "$VERSION_CLEAN" > VERSION
+          
+          # Update component versions (may add date suffixes)
+          make update-versions || echo "Version update completed with warnings"
+          echo "Final VERSION file:"
+          cat VERSION
+
+      - name: Configure and build all components
+        run: |
+          echo "Configuring all components..."
+          
+          # Configure with or without VST2 based on SDK availability
+          if [ "$BUILD_VST2" = "ON" ]; then
+            echo "Building with VST2 support"
+            make configure
+          else
+            echo "Building without VST2 (SDK not available)"
+            # Configure each project manually without VST2
+            cmake m1-monitor -Bm1-monitor/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_AU=ON -DBUILD_VST=OFF -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF
+            cmake m1-panner -Bm1-panner/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_AU=ON -DBUILD_VST=OFF -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF
+            cmake m1-player -Bm1-player/build -G "Xcode" -DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF || true
+            cmake m1-orientationmanager -Bm1-orientationmanager/build
+            cmake services/m1-system-helper -Bservices/m1-system-helper/build
+          fi
+          
+          # Restore VLC from cache if available (cache is stored outside build dir)
+          if [ -d "$HOME/.vlc-cache/vlc-install" ]; then
+            echo "Restoring VLC from cache (saves 20-40 min)..."
+            mkdir -p m1-player/build
+            cp -r "$HOME/.vlc-cache/vlc-install" m1-player/build/
+            cp -r "$HOME/.vlc-cache/vlc-source" m1-player/build/ 2>/dev/null || true
+          fi
+          
+          # Build VLC if needed
+          if [ -f "m1-player/build/vlc-install/lib/libvlc.dylib" ]; then
+            echo "VLC available, skipping build"
+          else
+            echo "Building VLC from source (this takes 20-40 minutes)..."
+            cd m1-player && ./build_vlc.sh build && cd ..
+            # Save to cache for next run
+            mkdir -p "$HOME/.vlc-cache"
+            cp -r m1-player/build/vlc-install "$HOME/.vlc-cache/"
+            cp -r m1-player/build/vlc-source "$HOME/.vlc-cache/" 2>/dev/null || true
+          fi
+          
+          # Always reconfigure m1-player to pick up VLC
+          cmake m1-player -Bm1-player/build -G "Xcode" -DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF
+          
+          echo "Building all components..."
+          make build
+
+      - name: Code sign non-AAX binaries
+        run: |
+          echo "Code signing VST3, AU, and Apps..."
+          # Sign everything EXCEPT AAX (requires USB iLok)
+          if [ "$BUILD_VST2" = "ON" ]; then
+            make codesign-vst || true
+          fi
+          make codesign-vst3
+          make codesign-au
+          make codesign-apps
+
+      - name: Notarize applications
+        run: |
+          echo "Notarizing applications..."
+          make notarize
+
+      - name: Package build artifacts
+        run: |
+          echo "Packaging build artifacts..."
+          mkdir -p artifacts/macos-arm64
+          
+          # Copy plugin builds
+          cp -r m1-monitor/build/M1-Monitor_artefacts/ artifacts/macos-arm64/M1-Monitor/
+          cp -r m1-panner/build/M1-Panner_artefacts/ artifacts/macos-arm64/M1-Panner/
+          cp -r m1-player/build/M1-Player_artefacts/ artifacts/macos-arm64/M1-Player/
+          cp -r m1-orientationmanager/build/m1-orientationmanager_artefacts/ artifacts/macos-arm64/m1-orientationmanager/
+          cp -r services/m1-system-helper/build/m1-system-helper_artefacts/ artifacts/macos-arm64/m1-system-helper/
+          
+          # Create archive
+          cd artifacts && tar -czvf macos-arm64-builds.tar.gz macos-arm64/
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-arm64-builds
+          path: artifacts/macos-arm64-builds.tar.gz
+          retention-days: 30
+
+      - name: Upload to S3 artifacts bucket
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          VERSION_RAW="${VERSION#v}"
+          COMMIT_SHA="${{ github.sha }}"
+          SHORT_SHA="${COMMIT_SHA:0:8}"
+          
+          # Use original tag/branch name for S3 path (not the CMake-safe version)
+          S3_VERSION="$VERSION_RAW"
+          
+          echo "Uploading to S3..."
+          aws s3 cp artifacts/macos-arm64-builds.tar.gz \
+            "s3://$ARTIFACTS_BUCKET/builds/$S3_VERSION/macos-arm64-builds.tar.gz" \
+            --region us-east-1
+          
+          # Also upload with commit SHA for exact version matching
+          aws s3 cp artifacts/macos-arm64-builds.tar.gz \
+            "s3://$ARTIFACTS_BUCKET/commits/$SHORT_SHA/macos-arm64-builds.tar.gz" \
+            --region us-east-1
+          
+          echo "Artifacts uploaded to:"
+          echo "   s3://$ARTIFACTS_BUCKET/builds/$S3_VERSION/"
+          echo "   s3://$ARTIFACTS_BUCKET/commits/$SHORT_SHA/"
+
+  # =============================================================================
+  # macOS x86_64 Build (Intel) - for m1-player only
+  # =============================================================================
+  build-macos-x86:
+    if: ${{ github.event.inputs.build_macos_x86 != 'false' }}
+    runs-on: macos-15-intel  # Intel runner
+    timeout-minutes: 180
+    
+    env:
+      APPLE_TEAM_CODE: ${{ secrets.APPLE_TEAM_CODE }}
+      APPLE_CODESIGN_CODE: ${{ secrets.APPLE_CODESIGN_CODE }}
+      APPLE_CODESIGN_ID: ${{ secrets.APPLE_CODESIGN_ID }}
+      APPLE_CODESIGN_INSTALLER_ID: ${{ secrets.APPLE_CODESIGN_INSTALLER_ID }}
+      APPLE_USERNAME: ${{ secrets.APPLE_USERNAME }}
+      ALTOOL_APPPASS: ${{ secrets.ALTOOL_APPPASS }}
+      PANNER_FREE_GUID: ${{ secrets.PANNER_FREE_GUID }}
+      MONITOR_FREE_GUID: ${{ secrets.MONITOR_FREE_GUID }}
+      # Aliases for electron-builder notarization (m1-transcoder/scripts/notarize.js)
+      APPLEID: ${{ secrets.APPLE_USERNAME }}
+      APPLEIDPASS: ${{ secrets.ALTOOL_APPPASS }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_CODE }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: false  # Handle submodules manually for speed
+          fetch-depth: 0
+
+      # Initialize only build-required submodules (skip examples for faster builds)
+      - name: Initialize submodules
+        run: |
+          chmod +x .github/scripts/init-submodules.sh 2>/dev/null || true
+          .github/scripts/init-submodules.sh || {
+            # Fallback: recursive with depth
+            git submodule update --init --recursive --depth 1
+          }
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      # ===========================================
+      # Caching for faster builds
+      # ===========================================
+      # NOTE: Homebrew caching removed - symlinks don't cache properly
+      # VLC is cached in ~/.vlc-cache (outside build dir so `clean` doesn't delete it)
+      
+      - name: Cache VLC build
+        uses: actions/cache@v4
+        id: vlc-cache-x86
+        with:
+          path: ~/.vlc-cache
+          key: vlc-macos-${{ runner.arch }}-${{ hashFiles('m1-player/build_vlc.sh', 'm1-player/CMakeLists.txt') }}
+          restore-keys: |
+            vlc-macos-${{ runner.arch }}-
+
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            m1-transcoder/node_modules
+            ~/.npm
+          key: npm-macos-${{ runner.arch }}-${{ hashFiles('m1-transcoder/package-lock.json') }}
+          restore-keys: |
+            npm-macos-${{ runner.arch }}-
+
+      - name: Cache Electron
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/electron
+            ~/Library/Caches/electron-builder
+          key: electron-macos-${{ runner.arch }}-${{ hashFiles('m1-transcoder/package-lock.json') }}
+          restore-keys: |
+            electron-macos-${{ runner.arch }}-
+
+      - name: Cache Python venv
+        uses: actions/cache@v4
+        with:
+          path: ~/.transcoder-venv
+          key: python-venv-macos-${{ runner.arch }}-pyinstaller
+          restore-keys: |
+            python-venv-macos-${{ runner.arch }}-
+
+      # ===========================================
+      # Install dependencies
+      # ===========================================
+
+      - name: Install Homebrew dependencies
+        run: |
+          brew update
+          brew install cmake ninja pkg-config autoconf automake libtool
+          brew install ffmpeg@6 && brew link ffmpeg@6 --force
+          brew install libass flac mpg123 libvpx x264 x265 dav1d aom
+          brew install opus libvorbis theora speex libogg libpng jpeg-turbo
+          brew install libssh2 srt libbluray aribb24
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Setup Python environment for m1-transcoder
+        run: |
+          # Create/reuse venv for Python packages
+          if [ ! -d "$HOME/.transcoder-venv" ]; then
+            python3 -m venv $HOME/.transcoder-venv
+          fi
+          source $HOME/.transcoder-venv/bin/activate
+          pip install --upgrade pip
+          pip install pyinstaller
+          echo "$HOME/.transcoder-venv/bin" >> $GITHUB_PATH
+          echo "Python venv ready with pyinstaller"
+
+      - name: Import Apple Developer Certificate
+        env:
+          APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
+          APPLE_CERTIFICATE_P12_PWD: ${{ secrets.APPLE_CERTIFICATE_P12_PWD }}
+          MACOS_CI_KEYCHAIN_PWD: ${{ secrets.MACOS_CI_KEYCHAIN_PWD }}
+        run: |
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          security create-keychain -p "$MACOS_CI_KEYCHAIN_PWD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$MACOS_CI_KEYCHAIN_PWD" $KEYCHAIN_PATH
+          
+          echo "$APPLE_CERTIFICATE_P12" | base64 --decode > $RUNNER_TEMP/certificate.p12
+          security import $RUNNER_TEMP/certificate.p12 -P "$APPLE_CERTIFICATE_P12_PWD" \
+            -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$MACOS_CI_KEYCHAIN_PWD" $KEYCHAIN_PATH
+
+      - name: Setup notarization credentials
+        run: |
+          xcrun notarytool store-credentials 'notarize-app' \
+            --apple-id "$APPLE_USERNAME" \
+            --team-id "$APPLE_TEAM_CODE" \
+            --password "$ALTOOL_APPPASS"
+
+      - name: Setup SDKs (VST2)
+        env:
+          VST2_SDK_URL: ${{ secrets.VST2_SDK_URL }}
+        run: |
+          mkdir -p SDKs
+          
+          if [ -n "$VST2_SDK_URL" ]; then
+            echo "Downloading VST2 SDK..."
+            curl -L "$VST2_SDK_URL" -o SDKs/vst2_sdk.zip
+            unzip -q SDKs/vst2_sdk.zip -d SDKs/
+            
+            # Handle different archive structures
+            if [ -d "SDKs/VST2_SDK" ]; then
+              echo "VST2 SDK extracted"
+            elif [ -d "SDKs/vstsdk2.4" ]; then
+              mv SDKs/vstsdk2.4 SDKs/VST2_SDK
+            elif [ -d "SDKs/pluginterfaces" ]; then
+              mkdir -p SDKs/VST2_SDK
+              mv SDKs/pluginterfaces SDKs/VST2_SDK/
+            fi
+            
+            echo "BUILD_VST2=ON" >> $GITHUB_ENV
+          else
+            echo "VST2_SDK_URL not provided - VST2 builds will be skipped"
+            echo "BUILD_VST2=OFF" >> $GITHUB_ENV
+          fi
+
+      - name: Setup Makefile.variables
+        run: |
+          VST2_PATH_VALUE=""
+          if [ "$BUILD_VST2" = "ON" ] && [ -d "${{ github.workspace }}/SDKs/VST2_SDK" ]; then
+            VST2_PATH_VALUE="${{ github.workspace }}/SDKs/VST2_SDK"
+          fi
+          
+          cat > Makefile.variables << EOF
+          M1SDK_PATH=
+          VST2_PATH=$VST2_PATH_VALUE
+          APPLE_TEAM_CODE=${{ secrets.APPLE_TEAM_CODE }}
+          APPLE_CODESIGN_ID=${{ secrets.APPLE_CODESIGN_ID }}
+          APPLE_CODESIGN_CODE=${{ secrets.APPLE_CODESIGN_CODE }}
+          APPLE_CODESIGN_INSTALLER_ID=${{ secrets.APPLE_CODESIGN_INSTALLER_ID }}
+          PANNER_FREE_GUID=${{ secrets.PANNER_FREE_GUID }}
+          MONITOR_FREE_GUID=${{ secrets.MONITOR_FREE_GUID }}
+          M1_GLOBAL_GUID=${{ secrets.M1_GLOBAL_GUID }}
+          APPLE_USERNAME=${{ secrets.APPLE_USERNAME }}
+          ALTOOL_APPPASS=${{ secrets.ALTOOL_APPPASS }}
+          EOF
+
+      - name: Update version
+        run: |
+          VERSION_RAW="${VERSION#v}"
+          
+          # Check if version is valid numeric format (X.Y.Z or X.Y)
+          if [[ "$VERSION_RAW" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
+            VERSION_CLEAN="$VERSION_RAW"
+            echo "Release build, using version: $VERSION_CLEAN"
+          else
+            # Use 0.0 so after date append we get 0.0.YYYYMMDD (valid 3-part semver)
+            VERSION_CLEAN="0.0"
+            echo "CI_BUILD_TAG=$VERSION_RAW" >> $GITHUB_ENV
+            echo "Non-release build ($VERSION_RAW), using CMake version: $VERSION_CLEAN"
+          fi
+          
+          echo "$VERSION_CLEAN" > VERSION
+          make update-versions || echo "Version update completed with warnings"
+          cat VERSION
+
+      - name: Configure and build all components
+        run: |
+          # Configure with or without VST2 based on SDK availability
+          if [ "$BUILD_VST2" = "ON" ]; then
+            echo "Building with VST2 support"
+            make configure
+          else
+            echo "Building without VST2 (SDK not available)"
+            cmake m1-monitor -Bm1-monitor/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_AU=ON -DBUILD_VST=OFF -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF
+            cmake m1-panner -Bm1-panner/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_AU=ON -DBUILD_VST=OFF -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF
+            cmake m1-player -Bm1-player/build -G "Xcode" -DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF || true
+            cmake m1-orientationmanager -Bm1-orientationmanager/build
+            cmake services/m1-system-helper -Bservices/m1-system-helper/build
+          fi
+          
+          # Restore VLC from cache if available (cache is stored outside build dir)
+          if [ -d "$HOME/.vlc-cache/vlc-install" ]; then
+            echo "Restoring VLC from cache (saves 20-40 min)..."
+            mkdir -p m1-player/build
+            cp -r "$HOME/.vlc-cache/vlc-install" m1-player/build/
+            cp -r "$HOME/.vlc-cache/vlc-source" m1-player/build/ 2>/dev/null || true
+          fi
+          
+          # Build VLC if needed
+          if [ -f "m1-player/build/vlc-install/lib/libvlc.dylib" ]; then
+            echo "VLC available, skipping build"
+          else
+            echo "Building VLC from source (this takes 20-40 minutes)..."
+            cd m1-player && ./build_vlc.sh build && cd ..
+            # Save to cache for next run
+            mkdir -p "$HOME/.vlc-cache"
+            cp -r m1-player/build/vlc-install "$HOME/.vlc-cache/"
+            cp -r m1-player/build/vlc-source "$HOME/.vlc-cache/" 2>/dev/null || true
+          fi
+          
+          # Always reconfigure m1-player to pick up VLC
+          cmake m1-player -Bm1-player/build -G "Xcode" -DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF
+          
+          make build
+
+      - name: Code sign non-AAX binaries
+        run: |
+          # Sign everything EXCEPT AAX (requires USB iLok)
+          if [ "$BUILD_VST2" = "ON" ]; then
+            make codesign-vst || true
+          fi
+          make codesign-vst3
+          make codesign-au
+          make codesign-apps
+
+      - name: Notarize applications
+        run: |
+          make notarize
+
+      - name: Package build artifacts
+        run: |
+          mkdir -p artifacts/macos-x86
+          cp -r m1-monitor/build/M1-Monitor_artefacts/ artifacts/macos-x86/M1-Monitor/
+          cp -r m1-panner/build/M1-Panner_artefacts/ artifacts/macos-x86/M1-Panner/
+          cp -r m1-player/build/M1-Player_artefacts/ artifacts/macos-x86/M1-Player/
+          cp -r m1-orientationmanager/build/m1-orientationmanager_artefacts/ artifacts/macos-x86/m1-orientationmanager/
+          cp -r services/m1-system-helper/build/m1-system-helper_artefacts/ artifacts/macos-x86/m1-system-helper/
+          cd artifacts && tar -czvf macos-x86-builds.tar.gz macos-x86/
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-x86-builds
+          path: artifacts/macos-x86-builds.tar.gz
+          retention-days: 30
+
+      - name: Upload to S3 artifacts bucket
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          VERSION_RAW="${VERSION#v}"
+          COMMIT_SHA="${{ github.sha }}"
+          SHORT_SHA="${COMMIT_SHA:0:8}"
+          
+          aws s3 cp artifacts/macos-x86-builds.tar.gz \
+            "s3://$ARTIFACTS_BUCKET/builds/$VERSION_RAW/macos-x86-builds.tar.gz" \
+            --region us-east-1
+          
+          aws s3 cp artifacts/macos-x86-builds.tar.gz \
+            "s3://$ARTIFACTS_BUCKET/commits/$SHORT_SHA/macos-x86-builds.tar.gz" \
+            --region us-east-1
+
+  # =============================================================================
+  # Windows Build
+  # =============================================================================
+  build-windows:
+    if: ${{ github.event.inputs.build_windows != 'false' }}
+    runs-on: windows-latest
+    timeout-minutes: 180
+    
+    env:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_SECRET_ID }}
+    
+    steps:
+      # Enable long paths on Windows to handle deeply nested submodules
+      - name: Enable long paths
+        run: |
+          git config --system core.longpaths true
+          # Also set via registry for good measure
+          New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" -Name "LongPathsEnabled" -Value 1 -PropertyType DWORD -Force | Out-Null
+        shell: pwsh
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: false  # We'll handle submodules manually
+          fetch-depth: 0
+
+      # Initialize submodules with depth limit to avoid deep nesting issues
+      - name: Initialize submodules (with depth limit)
+        run: |
+          # Use the shared script (works on Windows via Git Bash)
+          bash .github/scripts/init-submodules.sh
+        shell: bash
+        continue-on-error: false
+
+      - name: Setup MSVC
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Setup CMake
+        uses: lukka/get-cmake@latest
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      # ===========================================
+      # Caching for faster builds
+      # ===========================================
+
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            m1-transcoder/node_modules
+            ~\AppData\Local\npm-cache
+          key: npm-windows-${{ hashFiles('m1-transcoder/package-lock.json') }}
+          restore-keys: |
+            npm-windows-
+
+      - name: Cache Electron
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~\AppData\Local\electron\Cache
+            ~\AppData\Local\electron-builder\Cache
+          key: electron-windows-${{ hashFiles('m1-transcoder/package-lock.json') }}
+          restore-keys: |
+            electron-windows-
+
+      - name: Cache Python venv
+        uses: actions/cache@v4
+        with:
+          path: ~\.transcoder-venv
+          key: python-venv-windows-pyinstaller
+          restore-keys: |
+            python-venv-windows-
+
+      # ===========================================
+      # Install dependencies
+      # ===========================================
+
+      - name: Setup Python environment for m1-transcoder
+        run: |
+          if (-not (Test-Path "$env:USERPROFILE\.transcoder-venv")) {
+            python -m venv $env:USERPROFILE\.transcoder-venv
+          }
+          & $env:USERPROFILE\.transcoder-venv\Scripts\Activate.ps1
+          pip install --upgrade pip
+          pip install pyinstaller
+          echo "$env:USERPROFILE\.transcoder-venv\Scripts" >> $env:GITHUB_PATH
+          echo "Python venv ready with pyinstaller"
+
+      - name: Install dependencies
+        run: |
+          choco install innosetup -y
+          choco install 7zip -y
+
+      - name: Setup Azure Trusted Signing
+        run: |
+          # Download Microsoft Trusted Signing Client (contains the Dlib for signtool)
+          # This is the same approach used locally via aax-signtool.bat
+          
+          $packageName = "Microsoft.Trusted.Signing.Client"
+          $outputDir = "trusted-signing-client"
+          
+          # Use nuget to download the package
+          nuget install $packageName -OutputDirectory $outputDir -Source https://api.nuget.org/v3/index.json
+          
+          # Find the Dlib DLL
+          $dlibPath = Get-ChildItem -Path $outputDir -Recurse -Filter "Azure.CodeSigning.Dlib.dll" | 
+                      Where-Object { $_.FullName -like "*x64*" } | 
+                      Select-Object -First 1
+          
+          if (-not $dlibPath) {
+            # Fallback: try any location
+            $dlibPath = Get-ChildItem -Path $outputDir -Recurse -Filter "Azure.CodeSigning.Dlib.dll" | 
+                        Select-Object -First 1
+          }
+          
+          if ($dlibPath) {
+            echo "Found Azure.CodeSigning.Dlib.dll at: $($dlibPath.FullName)"
+            echo "ACS_DLIB=$($dlibPath.FullName)" >> $env:GITHUB_ENV
+          } else {
+            echo "ERROR: Could not find Azure.CodeSigning.Dlib.dll"
+            Get-ChildItem -Path $outputDir -Recurse | ForEach-Object { echo $_.FullName }
+            exit 1
+          }
+          
+          # Set other required paths
+          echo "ACS_JSON=${{ github.workspace }}\signing-metadata.json" >> $env:GITHUB_ENV
+          
+          # Find signtool.exe from Windows SDK
+          $signtoolPaths = @(
+            "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe",
+            "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22000.0\x64\signtool.exe",
+            "C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x64\signtool.exe"
+          )
+          
+          $signtool = $signtoolPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
+          
+          if (-not $signtool) {
+            # Find any signtool
+            $signtool = Get-ChildItem -Path "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter "signtool.exe" | 
+                        Where-Object { $_.FullName -like "*x64*" } | 
+                        Select-Object -First 1 -ExpandProperty FullName
+          }
+          
+          if ($signtool) {
+            echo "Found signtool at: $signtool"
+            echo "SIGNTOOL_PATH=$signtool" >> $env:GITHUB_ENV
+          } else {
+            echo "ERROR: Could not find signtool.exe"
+            exit 1
+          }
+          
+          echo "Azure Trusted Signing setup complete"
+
+      - name: Setup SDKs (VST2)
+        env:
+          VST2_SDK_URL: ${{ secrets.VST2_SDK_URL }}
+        run: |
+          New-Item -ItemType Directory -Force -Path SDKs
+          
+          if ($env:VST2_SDK_URL) {
+            echo "Downloading VST2 SDK..."
+            Invoke-WebRequest -Uri $env:VST2_SDK_URL -OutFile SDKs\vst2_sdk.zip
+            Expand-Archive -Path SDKs\vst2_sdk.zip -DestinationPath SDKs
+            
+            # Handle different archive structures
+            if (Test-Path "SDKs\VST2_SDK") {
+              echo "VST2 SDK extracted"
+            } elseif (Test-Path "SDKs\vstsdk2.4") {
+              Rename-Item "SDKs\vstsdk2.4" "SDKs\VST2_SDK"
+            } elseif (Test-Path "SDKs\pluginterfaces") {
+              New-Item -ItemType Directory -Force -Path "SDKs\VST2_SDK"
+              Move-Item "SDKs\pluginterfaces" "SDKs\VST2_SDK\"
+            }
+            
+            echo "BUILD_VST2=ON" >> $env:GITHUB_ENV
+          } else {
+            echo "VST2_SDK_URL not provided - VST2 builds will be skipped"
+            echo "BUILD_VST2=OFF" >> $env:GITHUB_ENV
+          }
+
+      - name: Create signing metadata
+        run: |
+          @"
+          {
+            "Endpoint": "https://eus.codesigning.azure.net/",
+            "CodeSigningAccountName": "Mach1",
+            "CertificateProfileName": "mach1-cert"
+          }
+          "@ | Out-File -FilePath signing-metadata.json -Encoding UTF8
+
+      - name: Setup Makefile.variables
+        shell: bash
+        run: |
+          # Set VST2 path only if SDK exists
+          VST2_PATH_VALUE=""
+          if [ "$BUILD_VST2" = "ON" ] && [ -d "SDKs/VST2_SDK" ]; then
+            VST2_PATH_VALUE="${{ github.workspace }}/SDKs/VST2_SDK"
+          fi
+          
+          cat > Makefile.variables << EOF
+          M1SDK_PATH=
+          VST2_PATH=$VST2_PATH_VALUE
+          WIN_INNO_PATH=C:\Program Files (x86)\Inno Setup 6\ISCC.exe
+          WIN_SIGNTOOL_PATH=C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe
+          AZURE_DLIB_PATH=${{ github.workspace }}\azure-codesigning\lib\net8.0\any\Azure.CodeSigning.Dlib.dll
+          AZURE_METADATA_PATH=${{ github.workspace }}\signing-metadata.json
+          AZURE_TIMESTAMP_URL=http://timestamp.acs.microsoft.com
+          AZURE_CLIENT_ID=${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID=${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_SECRET=${{ secrets.AZURE_SECRET_ID }}
+          PANNER_FREE_GUID=${{ secrets.PANNER_FREE_GUID }}
+          MONITOR_FREE_GUID=${{ secrets.MONITOR_FREE_GUID }}
+          M1_GLOBAL_GUID=${{ secrets.M1_GLOBAL_GUID }}
+          EOF
+          echo "Makefile.variables created (VST2: $BUILD_VST2)"
+
+      - name: Update version
+        shell: bash
+        run: |
+          VERSION_RAW="${VERSION#v}"
+          
+          # Check if version is valid numeric format (X.Y.Z or X.Y)
+          if [[ "$VERSION_RAW" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
+            VERSION_CLEAN="$VERSION_RAW"
+            echo "Release build, using version: $VERSION_CLEAN"
+          else
+            # Use 0.0 so after date append we get 0.0.YYYYMMDD (valid 3-part semver)
+            VERSION_CLEAN="0.0"
+            echo "CI_BUILD_TAG=$VERSION_RAW" >> $GITHUB_ENV
+            echo "Non-release build ($VERSION_RAW), using CMake version: $VERSION_CLEAN"
+          fi
+          
+          echo "$VERSION_CLEAN" > VERSION
+          
+          # Update component versions (propagates to package.json for electron-builder)
+          # Note: make update-versions skips Windows in Makefile, so run script directly
+          chmod +x ./installer/generate_version.sh
+          ./installer/generate_version.sh || echo "Version update completed with warnings"
+          echo "Final versions:"
+          cat VERSION
+          cat m1-transcoder/VERSION 2>/dev/null || true
+
+      - name: Download VLC SDK for Windows
+        id: vlc-download
+        run: |
+          cd m1-player
+          call build_vlc.bat build
+          if exist "build\vlc-install\lib\libvlc.lib" (
+            echo VLC SDK downloaded successfully
+            echo vlc_available=true >> %GITHUB_OUTPUT%
+          ) else (
+            echo WARNING: VLC SDK download may have failed
+            echo vlc_available=false >> %GITHUB_OUTPUT%
+          )
+        shell: cmd
+        continue-on-error: true
+
+      - name: Configure projects
+        shell: bash
+        run: |
+          cmake m1-monitor -Bm1-monitor/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF
+          cmake m1-panner -Bm1-panner/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF
+          
+          # Only configure m1-player if VLC is available
+          if [ -f "m1-player/build/vlc-install/lib/libvlc.lib" ]; then
+            echo "VLC SDK found, configuring m1-player..."
+            cmake m1-player -Bm1-player/build -DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF
+          else
+            echo "WARNING: VLC SDK not found, skipping m1-player configuration"
+          fi
+          
+          cmake m1-orientationmanager -Bm1-orientationmanager/build
+          cmake services/m1-system-helper -Bservices/m1-system-helper/build
+
+      - name: Build projects
+        shell: bash
+        run: |
+          cmake --build m1-monitor/build --config Release
+          cmake --build m1-panner/build --config Release
+          
+          # Only build m1-player if it was configured
+          if [ -d "m1-player/build" ] && [ -f "m1-player/build/vlc-install/lib/libvlc.lib" ]; then
+            echo "Building m1-player..."
+            cmake --build m1-player/build --config Release
+          else
+            echo "WARNING: Skipping m1-player build (VLC SDK not available)"
+          fi
+          
+          cmake --build m1-orientationmanager/build --config Release
+          cmake --build services/m1-system-helper/build --config Release
+
+      - name: Build Transcoder
+        run: |
+          cd m1-transcoder
+          npm install
+          npm run package-win
+
+      - name: Code sign Windows binaries with Azure Trusted Signing
+        timeout-minutes: 10
+        env:
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_SECRET_ID }}
+        run: |
+          # Sign binaries using signtool + Azure Trusted Signing Dlib
+          # This matches the local aax-signtool.bat approach
+          
+          # Skip if secrets not configured
+          if ([string]::IsNullOrEmpty($env:AZURE_CLIENT_ID)) {
+            echo "Azure Trusted Signing not configured, skipping code signing"
+            exit 0
+          }
+          
+          # Verify Azure credentials are set
+          if ([string]::IsNullOrEmpty($env:AZURE_CLIENT_SECRET)) {
+            echo "WARNING: AZURE_CLIENT_SECRET (from AZURE_SECRET_ID) is empty"
+            echo "Code signing may fail - check org secrets"
+          }
+          
+          # Verify required files exist
+          if (-not (Test-Path $env:SIGNTOOL_PATH)) {
+            echo "ERROR: signtool.exe not found at $env:SIGNTOOL_PATH"
+            exit 1
+          }
+          if (-not (Test-Path $env:ACS_DLIB)) {
+            echo "ERROR: Azure.CodeSigning.Dlib.dll not found at $env:ACS_DLIB"
+            exit 1
+          }
+          if (-not (Test-Path $env:ACS_JSON)) {
+            echo "ERROR: signing-metadata.json not found at $env:ACS_JSON"
+            exit 1
+          }
+          
+          # Collect files to sign
+          $filesToSign = @()
+          
+          # Find VST3 plugins (the actual .vst3 DLL inside the bundle)
+          Get-ChildItem -Path "m1-monitor/build" -Recurse -Filter "*.vst3" -File | ForEach-Object { $filesToSign += $_.FullName }
+          Get-ChildItem -Path "m1-panner/build" -Recurse -Filter "*.vst3" -File | ForEach-Object { $filesToSign += $_.FullName }
+          
+          # Find executables
+          @(
+            "m1-player/build/M1-Player_artefacts/Release/M1-Player.exe",
+            "m1-orientationmanager/build/m1-orientationmanager_artefacts/Release/m1-orientationmanager.exe",
+            "services/m1-system-helper/build/m1-system-helper_artefacts/Release/m1-system-helper.exe"
+          ) | ForEach-Object {
+            if (Test-Path $_) { $filesToSign += $_ }
+          }
+          
+          echo "Files to sign: $($filesToSign.Count)"
+          echo "Using signtool: $env:SIGNTOOL_PATH"
+          echo "Using Dlib: $env:ACS_DLIB"
+          echo "Using metadata: $env:ACS_JSON"
+          
+          $successCount = 0
+          $failCount = 0
+          
+          foreach ($file in $filesToSign) {
+            echo ""
+            echo "Signing: $file"
+            
+            # Use the same command as aax-signtool.bat
+            & $env:SIGNTOOL_PATH sign /v /fd SHA256 `
+              /tr "http://timestamp.acs.microsoft.com" /td SHA256 `
+              /dlib $env:ACS_DLIB `
+              /dmdf $env:ACS_JSON `
+              $file
+            
+            if ($LASTEXITCODE -eq 0) {
+              echo "SUCCESS: Signed $file"
+              $successCount++
+            } else {
+              echo "WARNING: Failed to sign $file (exit code: $LASTEXITCODE)"
+              $failCount++
+            }
+          }
+          
+          echo ""
+          echo "=========================================="
+          echo "Signing complete: $successCount succeeded, $failCount failed"
+          echo "=========================================="
+        shell: pwsh
+        continue-on-error: true
+
+      - name: Package build artifacts
+        run: |
+          mkdir -p artifacts/windows
+          
+          # Copy each artifact, handling missing ones gracefully
+          if [ -d "m1-monitor/build/M1-Monitor_artefacts/Release" ]; then
+            cp -r m1-monitor/build/M1-Monitor_artefacts/Release/ artifacts/windows/M1-Monitor/
+            echo "Packaged: M1-Monitor"
+          else
+            echo "WARNING: M1-Monitor artifacts not found"
+          fi
+          
+          if [ -d "m1-panner/build/M1-Panner_artefacts/Release" ]; then
+            cp -r m1-panner/build/M1-Panner_artefacts/Release/ artifacts/windows/M1-Panner/
+            echo "Packaged: M1-Panner"
+          else
+            echo "WARNING: M1-Panner artifacts not found"
+          fi
+          
+          if [ -d "m1-player/build/M1-Player_artefacts/Release" ]; then
+            cp -r m1-player/build/M1-Player_artefacts/Release/ artifacts/windows/M1-Player/
+            echo "Packaged: M1-Player"
+          else
+            echo "WARNING: M1-Player artifacts not found (VLC SDK may have failed to download)"
+          fi
+          
+          if [ -d "m1-orientationmanager/build/m1-orientationmanager_artefacts/Release" ]; then
+            cp -r m1-orientationmanager/build/m1-orientationmanager_artefacts/Release/ artifacts/windows/m1-orientationmanager/
+            echo "Packaged: m1-orientationmanager"
+          else
+            echo "WARNING: m1-orientationmanager artifacts not found"
+          fi
+          
+          if [ -d "services/m1-system-helper/build/m1-system-helper_artefacts/Release" ]; then
+            cp -r services/m1-system-helper/build/m1-system-helper_artefacts/Release/ artifacts/windows/m1-system-helper/
+            echo "Packaged: m1-system-helper"
+          else
+            echo "WARNING: m1-system-helper artifacts not found"
+          fi
+          
+          echo ""
+          echo "Artifacts packaged:"
+          ls -la artifacts/windows/ || true
+        shell: bash
+
+      - name: Create artifacts archive
+        run: |
+          cd artifacts
+          7z a -tzip windows-builds.zip windows/
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-builds
+          path: artifacts/windows-builds.zip
+          retention-days: 30
+
+      - name: Upload to S3 artifacts bucket
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          $VersionRaw = "$env:VERSION" -replace '^v', ''
+          $CommitSha = "${{ github.sha }}"
+          $ShortSha = $CommitSha.Substring(0, 8)
+          
+          aws s3 cp artifacts/windows-builds.zip `
+            "s3://$env:ARTIFACTS_BUCKET/builds/$VersionRaw/windows-builds.zip" `
+            --region us-east-1
+          
+          aws s3 cp artifacts/windows-builds.zip `
+            "s3://$env:ARTIFACTS_BUCKET/commits/$ShortSha/windows-builds.zip" `
+            --region us-east-1
+
+  # =============================================================================
+  # Create Build Summary
+  # =============================================================================
+  summary:
+    needs: [build-macos-arm64, build-macos-x86, build-windows]
+    if: always()
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Determine version info
+        id: version
+        run: |
+          VERSION="${{ github.event.inputs.version || github.ref_name }}"
+          VERSION="${VERSION#v}"
+          COMMIT_SHA="${{ github.sha }}"
+          SHORT_SHA="${COMMIT_SHA:0:8}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
+
+      - name: Create build summary
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          SHORT_SHA="${{ steps.version.outputs.short_sha }}"
+          
+          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** $VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** $SHORT_SHA" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### Build Status" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.build-macos-arm64.result }}" == "success" ]; then
+            echo "- macOS ARM64 (Apple Silicon)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- macOS ARM64 (Apple Silicon) - ${{ needs.build-macos-arm64.result }}" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ needs.build-macos-x86.result }}" == "success" ]; then
+            echo "- macOS x86_64 (Intel)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- macOS x86_64 (Intel) - ${{ needs.build-macos-x86.result }}" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ needs.build-windows.result }}" == "success" ]; then
+            echo "- Windows x64" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- Windows x64 - ${{ needs.build-windows.result }}" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Download Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Artifacts uploaded to S3:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "s3://mach1-build-artifacts/builds/$VERSION/" >> $GITHUB_STEP_SUMMARY
+          echo "s3://mach1-build-artifacts/commits/$SHORT_SHA/" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### Complete Release Locally" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "AAX signing requires a physical USB iLok dongle. Run locally:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "# Download CI artifacts and complete the release" >> $GITHUB_STEP_SUMMARY
+          echo "make package-from-ci VERSION=$VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "# Or by commit SHA" >> $GITHUB_STEP_SUMMARY
+          echo "make package-from-ci COMMIT=$SHORT_SHA" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
