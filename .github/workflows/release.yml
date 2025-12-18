@@ -687,7 +687,7 @@ jobs:
     env:
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_SECRET_ID }}
     
     steps:
       # Enable long paths on Windows to handle deeply nested submodules
@@ -891,7 +891,7 @@ jobs:
           AZURE_TIMESTAMP_URL=http://timestamp.acs.microsoft.com
           AZURE_CLIENT_ID=${{ secrets.AZURE_CLIENT_ID }}
           AZURE_TENANT_ID=${{ secrets.AZURE_TENANT_ID }}
-          AZURE_CLIENT_SECRET=${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_CLIENT_SECRET=${{ secrets.AZURE_SECRET_ID }}
           PANNER_FREE_GUID=${{ secrets.PANNER_FREE_GUID }}
           MONITOR_FREE_GUID=${{ secrets.MONITOR_FREE_GUID }}
           M1_GLOBAL_GUID=${{ secrets.M1_GLOBAL_GUID }}
@@ -954,10 +954,11 @@ jobs:
           npm run package-win
 
       - name: Code sign Windows binaries with Azure Trusted Signing
+        timeout-minutes: 10
         env:
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_SECRET_ID }}
         run: |
           # Sign binaries using signtool + Azure Trusted Signing Dlib
           # This matches the local aax-signtool.bat approach
@@ -966,6 +967,12 @@ jobs:
           if ([string]::IsNullOrEmpty($env:AZURE_CLIENT_ID)) {
             echo "Azure Trusted Signing not configured, skipping code signing"
             exit 0
+          }
+          
+          # Verify Azure credentials are set
+          if ([string]::IsNullOrEmpty($env:AZURE_CLIENT_SECRET)) {
+            echo "WARNING: AZURE_CLIENT_SECRET (from AZURE_SECRET_ID) is empty"
+            echo "Code signing may fail - check org secrets"
           }
           
           # Verify required files exist
