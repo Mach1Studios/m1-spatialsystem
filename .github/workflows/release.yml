@@ -96,25 +96,14 @@ jobs:
       # ===========================================
       # Caching for faster builds
       # ===========================================
+      # NOTE: Homebrew caching removed - symlinks don't cache properly
+      # VLC is cached in ~/.vlc-cache (outside build dir so `clean` doesn't delete it)
       
-      - name: Cache Homebrew packages
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/Library/Caches/Homebrew
-            /opt/homebrew/Cellar
-            /opt/homebrew/opt
-          key: homebrew-macos-${{ runner.arch }}-${{ hashFiles('.github/workflows/release.yml') }}
-          restore-keys: |
-            homebrew-macos-${{ runner.arch }}-
-
       - name: Cache VLC build
         uses: actions/cache@v4
         id: vlc-cache
         with:
-          path: |
-            m1-player/build/vlc-install
-            m1-player/build/vlc-source
+          path: ~/.vlc-cache
           key: vlc-macos-${{ runner.arch }}-${{ hashFiles('m1-player/build_vlc.sh', 'm1-player/CMakeLists.txt') }}
           restore-keys: |
             vlc-macos-${{ runner.arch }}-
@@ -154,11 +143,11 @@ jobs:
       - name: Install Homebrew dependencies
         run: |
           brew update
-          brew install cmake ninja pkg-config autoconf automake libtool || true
-          brew install ffmpeg@6 && brew link ffmpeg@6 --force || true
-          brew install libass flac mpg123 libvpx x264 x265 dav1d aom || true
-          brew install opus libvorbis theora speex libogg libpng jpeg-turbo || true
-          brew install libssh2 srt libbluray aribb24 || true
+          brew install cmake ninja pkg-config autoconf automake libtool
+          brew install ffmpeg@6 && brew link ffmpeg@6 --force
+          brew install libass flac mpg123 libvpx x264 x265 dav1d aom
+          brew install opus libvorbis theora speex libogg libpng jpeg-turbo
+          brew install libssh2 srt libbluray aribb24
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -305,13 +294,26 @@ jobs:
             cmake services/m1-system-helper -Bservices/m1-system-helper/build
           fi
           
-          # Build VLC if needed (skip if restored from cache)
+          # Restore VLC from cache if available (cache is stored outside build dir)
+          if [ -d "$HOME/.vlc-cache/vlc-install" ]; then
+            echo "Restoring VLC from cache (saves 20-40 min)..."
+            mkdir -p m1-player/build
+            cp -r "$HOME/.vlc-cache/vlc-install" m1-player/build/
+            cp -r "$HOME/.vlc-cache/vlc-source" m1-player/build/ 2>/dev/null || true
+          fi
+          
+          # Build VLC if needed
           if [ -f "m1-player/build/vlc-install/lib/libvlc.dylib" ]; then
-            echo "VLC restored from cache, skipping build (saves 20-40 min)"
+            echo "VLC available, skipping build"
           else
             echo "Building VLC from source (this takes 20-40 minutes)..."
             cd m1-player && ./build_vlc.sh build && cd ..
+            # Save to cache for next run
+            mkdir -p "$HOME/.vlc-cache"
+            cp -r m1-player/build/vlc-install "$HOME/.vlc-cache/"
+            cp -r m1-player/build/vlc-source "$HOME/.vlc-cache/" 2>/dev/null || true
           fi
+          
           # Always reconfigure m1-player to pick up VLC
           cmake m1-player -Bm1-player/build -G "Xcode" -DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF
           
@@ -428,25 +430,14 @@ jobs:
       # ===========================================
       # Caching for faster builds
       # ===========================================
+      # NOTE: Homebrew caching removed - symlinks don't cache properly
+      # VLC is cached in ~/.vlc-cache (outside build dir so `clean` doesn't delete it)
       
-      - name: Cache Homebrew packages
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/Library/Caches/Homebrew
-            /usr/local/Cellar
-            /usr/local/opt
-          key: homebrew-macos-${{ runner.arch }}-${{ hashFiles('.github/workflows/release.yml') }}
-          restore-keys: |
-            homebrew-macos-${{ runner.arch }}-
-
       - name: Cache VLC build
         uses: actions/cache@v4
         id: vlc-cache-x86
         with:
-          path: |
-            m1-player/build/vlc-install
-            m1-player/build/vlc-source
+          path: ~/.vlc-cache
           key: vlc-macos-${{ runner.arch }}-${{ hashFiles('m1-player/build_vlc.sh', 'm1-player/CMakeLists.txt') }}
           restore-keys: |
             vlc-macos-${{ runner.arch }}-
@@ -486,11 +477,11 @@ jobs:
       - name: Install Homebrew dependencies
         run: |
           brew update
-          brew install cmake ninja pkg-config autoconf automake libtool || true
-          brew install ffmpeg@6 && brew link ffmpeg@6 --force || true
-          brew install libass flac mpg123 libvpx x264 x265 dav1d aom || true
-          brew install opus libvorbis theora speex libogg libpng jpeg-turbo || true
-          brew install libssh2 srt libbluray aribb24 || true
+          brew install cmake ninja pkg-config autoconf automake libtool
+          brew install ffmpeg@6 && brew link ffmpeg@6 --force
+          brew install libass flac mpg123 libvpx x264 x265 dav1d aom
+          brew install opus libvorbis theora speex libogg libpng jpeg-turbo
+          brew install libssh2 srt libbluray aribb24
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -616,13 +607,26 @@ jobs:
             cmake services/m1-system-helper -Bservices/m1-system-helper/build
           fi
           
-          # Build VLC if needed (skip if restored from cache)
+          # Restore VLC from cache if available (cache is stored outside build dir)
+          if [ -d "$HOME/.vlc-cache/vlc-install" ]; then
+            echo "Restoring VLC from cache (saves 20-40 min)..."
+            mkdir -p m1-player/build
+            cp -r "$HOME/.vlc-cache/vlc-install" m1-player/build/
+            cp -r "$HOME/.vlc-cache/vlc-source" m1-player/build/ 2>/dev/null || true
+          fi
+          
+          # Build VLC if needed
           if [ -f "m1-player/build/vlc-install/lib/libvlc.dylib" ]; then
-            echo "VLC restored from cache, skipping build (saves 20-40 min)"
+            echo "VLC available, skipping build"
           else
             echo "Building VLC from source (this takes 20-40 minutes)..."
             cd m1-player && ./build_vlc.sh build && cd ..
+            # Save to cache for next run
+            mkdir -p "$HOME/.vlc-cache"
+            cp -r m1-player/build/vlc-install "$HOME/.vlc-cache/"
+            cp -r m1-player/build/vlc-source "$HOME/.vlc-cache/" 2>/dev/null || true
           fi
+          
           # Always reconfigure m1-player to pick up VLC
           cmake m1-player -Bm1-player/build -G "Xcode" -DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF
           
