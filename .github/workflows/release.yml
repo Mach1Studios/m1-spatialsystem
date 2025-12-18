@@ -14,13 +14,6 @@ on:
     tags:
       - 'v*'
       - 'test-cd'
-    branches:
-      - main
-      - master
-  pull_request:
-    branches:
-      - main
-      - master
   workflow_dispatch:
     inputs:
       version:
