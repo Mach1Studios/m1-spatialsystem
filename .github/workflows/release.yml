@@ -93,19 +93,41 @@ jobs:
         with:
           xcode-version: latest-stable
 
-      - name: Install Homebrew dependencies
-        run: |
-          brew update
-          brew install cmake ninja pkg-config autoconf automake libtool
-          brew install ffmpeg@6 && brew link ffmpeg@6 --force
-          brew install libass flac mpg123 libvpx x264 x265 dav1d aom
-          brew install opus libvorbis theora speex libogg libpng jpeg-turbo
-          brew install libssh2 srt libbluray aribb24
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      # ===========================================
+      # Caching for faster builds
+      # ===========================================
+      
+      - name: Cache Homebrew packages
+        uses: actions/cache@v4
         with:
-          node-version: '18'
+          path: |
+            ~/Library/Caches/Homebrew
+            /opt/homebrew/Cellar
+            /opt/homebrew/opt
+          key: homebrew-macos-${{ runner.arch }}-${{ hashFiles('.github/workflows/release.yml') }}
+          restore-keys: |
+            homebrew-macos-${{ runner.arch }}-
+
+      - name: Cache VLC build
+        uses: actions/cache@v4
+        id: vlc-cache
+        with:
+          path: |
+            m1-player/build/vlc-install
+            m1-player/build/vlc-source
+          key: vlc-macos-${{ runner.arch }}-${{ hashFiles('m1-player/build_vlc.sh', 'm1-player/CMakeLists.txt') }}
+          restore-keys: |
+            vlc-macos-${{ runner.arch }}-
+
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            m1-transcoder/node_modules
+            ~/.npm
+          key: npm-macos-${{ runner.arch }}-${{ hashFiles('m1-transcoder/package-lock.json') }}
+          restore-keys: |
+            npm-macos-${{ runner.arch }}-
 
       - name: Cache Electron
         uses: actions/cache@v4
@@ -113,14 +135,42 @@ jobs:
           path: |
             ~/Library/Caches/electron
             ~/Library/Caches/electron-builder
-          key: electron-cache-macos-${{ runner.arch }}-${{ hashFiles('m1-transcoder/package-lock.json') }}
+          key: electron-macos-${{ runner.arch }}-${{ hashFiles('m1-transcoder/package-lock.json') }}
           restore-keys: |
-            electron-cache-macos-${{ runner.arch }}-
+            electron-macos-${{ runner.arch }}-
+
+      - name: Cache Python venv
+        uses: actions/cache@v4
+        with:
+          path: ~/.transcoder-venv
+          key: python-venv-macos-${{ runner.arch }}-pyinstaller
+          restore-keys: |
+            python-venv-macos-${{ runner.arch }}-
+
+      # ===========================================
+      # Install dependencies
+      # ===========================================
+
+      - name: Install Homebrew dependencies
+        run: |
+          brew update
+          brew install cmake ninja pkg-config autoconf automake libtool || true
+          brew install ffmpeg@6 && brew link ffmpeg@6 --force || true
+          brew install libass flac mpg123 libvpx x264 x265 dav1d aom || true
+          brew install opus libvorbis theora speex libogg libpng jpeg-turbo || true
+          brew install libssh2 srt libbluray aribb24 || true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
 
       - name: Setup Python environment for m1-transcoder
         run: |
-          # Create a virtual environment for Python packages (required for PEP 668 compliance)
-          python3 -m venv $HOME/.transcoder-venv
+          # Create/reuse venv for Python packages
+          if [ ! -d "$HOME/.transcoder-venv" ]; then
+            python3 -m venv $HOME/.transcoder-venv
+          fi
           source $HOME/.transcoder-venv/bin/activate
           pip install --upgrade pip
           pip install pyinstaller
@@ -255,13 +305,15 @@ jobs:
             cmake services/m1-system-helper -Bservices/m1-system-helper/build
           fi
           
-          # Build VLC if needed (for m1-player)
-          if [ ! -f "m1-player/build/vlc-install/lib/libvlc.dylib" ]; then
-            echo "Building VLC from source..."
+          # Build VLC if needed (skip if restored from cache)
+          if [ -f "m1-player/build/vlc-install/lib/libvlc.dylib" ]; then
+            echo "VLC restored from cache, skipping build (saves 20-40 min)"
+          else
+            echo "Building VLC from source (this takes 20-40 minutes)..."
             cd m1-player && ./build_vlc.sh build && cd ..
-            # Reconfigure m1-player after VLC build
-            cmake m1-player -Bm1-player/build -G "Xcode" -DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF
           fi
+          # Always reconfigure m1-player to pick up VLC
+          cmake m1-player -Bm1-player/build -G "Xcode" -DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF
           
           echo "Building all components..."
           make build
@@ -373,19 +425,41 @@ jobs:
         with:
           xcode-version: latest-stable
 
-      - name: Install Homebrew dependencies
-        run: |
-          brew update
-          brew install cmake ninja pkg-config autoconf automake libtool
-          brew install ffmpeg@6 && brew link ffmpeg@6 --force
-          brew install libass flac mpg123 libvpx x264 x265 dav1d aom
-          brew install opus libvorbis theora speex libogg libpng jpeg-turbo
-          brew install libssh2 srt libbluray aribb24
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      # ===========================================
+      # Caching for faster builds
+      # ===========================================
+      
+      - name: Cache Homebrew packages
+        uses: actions/cache@v4
         with:
-          node-version: '18'
+          path: |
+            ~/Library/Caches/Homebrew
+            /usr/local/Cellar
+            /usr/local/opt
+          key: homebrew-macos-${{ runner.arch }}-${{ hashFiles('.github/workflows/release.yml') }}
+          restore-keys: |
+            homebrew-macos-${{ runner.arch }}-
+
+      - name: Cache VLC build
+        uses: actions/cache@v4
+        id: vlc-cache-x86
+        with:
+          path: |
+            m1-player/build/vlc-install
+            m1-player/build/vlc-source
+          key: vlc-macos-${{ runner.arch }}-${{ hashFiles('m1-player/build_vlc.sh', 'm1-player/CMakeLists.txt') }}
+          restore-keys: |
+            vlc-macos-${{ runner.arch }}-
+
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            m1-transcoder/node_modules
+            ~/.npm
+          key: npm-macos-${{ runner.arch }}-${{ hashFiles('m1-transcoder/package-lock.json') }}
+          restore-keys: |
+            npm-macos-${{ runner.arch }}-
 
       - name: Cache Electron
         uses: actions/cache@v4
@@ -393,13 +467,42 @@ jobs:
           path: |
             ~/Library/Caches/electron
             ~/Library/Caches/electron-builder
-          key: electron-cache-macos-${{ runner.arch }}-${{ hashFiles('m1-transcoder/package-lock.json') }}
+          key: electron-macos-${{ runner.arch }}-${{ hashFiles('m1-transcoder/package-lock.json') }}
           restore-keys: |
-            electron-cache-macos-${{ runner.arch }}-
+            electron-macos-${{ runner.arch }}-
+
+      - name: Cache Python venv
+        uses: actions/cache@v4
+        with:
+          path: ~/.transcoder-venv
+          key: python-venv-macos-${{ runner.arch }}-pyinstaller
+          restore-keys: |
+            python-venv-macos-${{ runner.arch }}-
+
+      # ===========================================
+      # Install dependencies
+      # ===========================================
+
+      - name: Install Homebrew dependencies
+        run: |
+          brew update
+          brew install cmake ninja pkg-config autoconf automake libtool || true
+          brew install ffmpeg@6 && brew link ffmpeg@6 --force || true
+          brew install libass flac mpg123 libvpx x264 x265 dav1d aom || true
+          brew install opus libvorbis theora speex libogg libpng jpeg-turbo || true
+          brew install libssh2 srt libbluray aribb24 || true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
 
       - name: Setup Python environment for m1-transcoder
         run: |
-          python3 -m venv $HOME/.transcoder-venv
+          # Create/reuse venv for Python packages
+          if [ ! -d "$HOME/.transcoder-venv" ]; then
+            python3 -m venv $HOME/.transcoder-venv
+          fi
           source $HOME/.transcoder-venv/bin/activate
           pip install --upgrade pip
           pip install pyinstaller
@@ -513,12 +616,15 @@ jobs:
             cmake services/m1-system-helper -Bservices/m1-system-helper/build
           fi
           
-          # Build VLC if needed
-          if [ ! -f "m1-player/build/vlc-install/lib/libvlc.dylib" ]; then
-            echo "Building VLC from source..."
+          # Build VLC if needed (skip if restored from cache)
+          if [ -f "m1-player/build/vlc-install/lib/libvlc.dylib" ]; then
+            echo "VLC restored from cache, skipping build (saves 20-40 min)"
+          else
+            echo "Building VLC from source (this takes 20-40 minutes)..."
             cd m1-player && ./build_vlc.sh build && cd ..
-            cmake m1-player -Bm1-player/build -G "Xcode" -DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF
           fi
+          # Always reconfigure m1-player to pick up VLC
+          cmake m1-player -Bm1-player/build -G "Xcode" -DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF
           
           make build
 
@@ -617,19 +723,47 @@ jobs:
         with:
           node-version: '18'
 
+      # ===========================================
+      # Caching for faster builds
+      # ===========================================
+
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            m1-transcoder/node_modules
+            ~\AppData\Local\npm-cache
+          key: npm-windows-${{ hashFiles('m1-transcoder/package-lock.json') }}
+          restore-keys: |
+            npm-windows-
+
       - name: Cache Electron
         uses: actions/cache@v4
         with:
           path: |
             ~\AppData\Local\electron\Cache
             ~\AppData\Local\electron-builder\Cache
-          key: electron-cache-windows-${{ hashFiles('m1-transcoder/package-lock.json') }}
+          key: electron-windows-${{ hashFiles('m1-transcoder/package-lock.json') }}
           restore-keys: |
-            electron-cache-windows-
+            electron-windows-
+
+      - name: Cache Python venv
+        uses: actions/cache@v4
+        with:
+          path: ~\.transcoder-venv
+          key: python-venv-windows-pyinstaller
+          restore-keys: |
+            python-venv-windows-
+
+      # ===========================================
+      # Install dependencies
+      # ===========================================
 
       - name: Setup Python environment for m1-transcoder
         run: |
-          python -m venv $env:USERPROFILE\.transcoder-venv
+          if (-not (Test-Path "$env:USERPROFILE\.transcoder-venv")) {
+            python -m venv $env:USERPROFILE\.transcoder-venv
+          }
           & $env:USERPROFILE\.transcoder-venv\Scripts\Activate.ps1
           pip install --upgrade pip
           pip install pyinstaller
