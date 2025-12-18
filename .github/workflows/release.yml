@@ -929,9 +929,18 @@ jobs:
           cat m1-transcoder/VERSION 2>/dev/null || true
 
       - name: Download VLC SDK for Windows
+        id: vlc-download
         run: |
           cd m1-player
-          powershell -ExecutionPolicy Bypass -File build_vlc.ps1 -BuildDir build
+          call build_vlc.bat build
+          if exist "build\vlc-install\lib\libvlc.lib" (
+            echo VLC SDK downloaded successfully
+            echo vlc_available=true >> %GITHUB_OUTPUT%
+          ) else (
+            echo WARNING: VLC SDK download may have failed
+            echo vlc_available=false >> %GITHUB_OUTPUT%
+          )
+        shell: cmd
         continue-on-error: true
 
       - name: Configure projects
@@ -939,15 +948,32 @@ jobs:
         run: |
           cmake m1-monitor -Bm1-monitor/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF
           cmake m1-panner -Bm1-panner/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF
-          cmake m1-player -Bm1-player/build -DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF || true
+          
+          # Only configure m1-player if VLC is available
+          if [ -f "m1-player/build/vlc-install/lib/libvlc.lib" ]; then
+            echo "VLC SDK found, configuring m1-player..."
+            cmake m1-player -Bm1-player/build -DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF
+          else
+            echo "WARNING: VLC SDK not found, skipping m1-player configuration"
+          fi
+          
           cmake m1-orientationmanager -Bm1-orientationmanager/build
           cmake services/m1-system-helper -Bservices/m1-system-helper/build
 
       - name: Build projects
+        shell: bash
         run: |
           cmake --build m1-monitor/build --config Release
           cmake --build m1-panner/build --config Release
-          cmake --build m1-player/build --config Release
+          
+          # Only build m1-player if it was configured
+          if [ -d "m1-player/build" ] && [ -f "m1-player/build/vlc-install/lib/libvlc.lib" ]; then
+            echo "Building m1-player..."
+            cmake --build m1-player/build --config Release
+          else
+            echo "WARNING: Skipping m1-player build (VLC SDK not available)"
+          fi
+          
           cmake --build m1-orientationmanager/build --config Release
           cmake --build services/m1-system-helper/build --config Release
 
@@ -1047,11 +1073,46 @@ jobs:
       - name: Package build artifacts
         run: |
           mkdir -p artifacts/windows
-          cp -r m1-monitor/build/M1-Monitor_artefacts/Release/ artifacts/windows/M1-Monitor/
-          cp -r m1-panner/build/M1-Panner_artefacts/Release/ artifacts/windows/M1-Panner/
-          cp -r m1-player/build/M1-Player_artefacts/Release/ artifacts/windows/M1-Player/
-          cp -r m1-orientationmanager/build/m1-orientationmanager_artefacts/Release/ artifacts/windows/m1-orientationmanager/
-          cp -r services/m1-system-helper/build/m1-system-helper_artefacts/Release/ artifacts/windows/m1-system-helper/
+          
+          # Copy each artifact, handling missing ones gracefully
+          if [ -d "m1-monitor/build/M1-Monitor_artefacts/Release" ]; then
+            cp -r m1-monitor/build/M1-Monitor_artefacts/Release/ artifacts/windows/M1-Monitor/
+            echo "Packaged: M1-Monitor"
+          else
+            echo "WARNING: M1-Monitor artifacts not found"
+          fi
+          
+          if [ -d "m1-panner/build/M1-Panner_artefacts/Release" ]; then
+            cp -r m1-panner/build/M1-Panner_artefacts/Release/ artifacts/windows/M1-Panner/
+            echo "Packaged: M1-Panner"
+          else
+            echo "WARNING: M1-Panner artifacts not found"
+          fi
+          
+          if [ -d "m1-player/build/M1-Player_artefacts/Release" ]; then
+            cp -r m1-player/build/M1-Player_artefacts/Release/ artifacts/windows/M1-Player/
+            echo "Packaged: M1-Player"
+          else
+            echo "WARNING: M1-Player artifacts not found (VLC SDK may have failed to download)"
+          fi
+          
+          if [ -d "m1-orientationmanager/build/m1-orientationmanager_artefacts/Release" ]; then
+            cp -r m1-orientationmanager/build/m1-orientationmanager_artefacts/Release/ artifacts/windows/m1-orientationmanager/
+            echo "Packaged: m1-orientationmanager"
+          else
+            echo "WARNING: m1-orientationmanager artifacts not found"
+          fi
+          
+          if [ -d "services/m1-system-helper/build/m1-system-helper_artefacts/Release" ]; then
+            cp -r services/m1-system-helper/build/m1-system-helper_artefacts/Release/ artifacts/windows/m1-system-helper/
+            echo "Packaged: m1-system-helper"
+          else
+            echo "WARNING: m1-system-helper artifacts not found"
+          fi
+          
+          echo ""
+          echo "Artifacts packaged:"
+          ls -la artifacts/windows/ || true
         shell: bash
 
       - name: Create artifacts archive
