@@ -3,10 +3,11 @@
 
 namespace Mach1 {
 
-OSCHandler::OSCHandler(ClientManager* clientManager, PluginManager* pluginManager, ServiceManager* serviceManager)
+OSCHandler::OSCHandler(ClientManager* clientManager, PluginManager* pluginManager, ServiceManager* serviceManager, PannerTrackingManager* pannerTrackingManager)
     : clientManager(clientManager)
     , pluginManager(pluginManager)
     , serviceManager(serviceManager)
+    , pannerTrackingManager(pannerTrackingManager)
 {
     setupMessageHandlers();
     startTimer(20);
@@ -56,8 +57,7 @@ void OSCHandler::setupMessageHandlers() {
         {"/setMonitorActiveReq", [this](const auto& m) { handleSetMonitorActiveRequest(m); }},
         {"/setPlayerFrameRate", [this](const auto& m) { handleSetPlayerFrameRate(m); }},
         {"/setPlayerPosition", [this](const auto& m) { handleSetPlayerPosition(m); }},
-        {"/setPlayerIsPlaying", [this](const auto& m) { handleSetPlayerIsPlaying(m); }},
-        {"/request-current-channel-config", [this](const auto& m) { handleRequestCurrentChannelConfig(m); }}
+        {"/setPlayerIsPlaying", [this](const auto& m) { handleSetPlayerIsPlaying(m); }}
     };
 }
 
@@ -197,6 +197,12 @@ void OSCHandler::handleRegisterPlugin(const juce::OSCMessage& message) {
         plugin.time = juce::Time::currentTimeMillis();
         pluginManager->registerPlugin(plugin);
         pluginManager->sendMonitorSettings(masterMode, masterYaw, masterPitch, masterRoll);
+        
+        // Also register with the panner tracking manager for unified tracking
+        if (pannerTrackingManager) {
+            pannerTrackingManager->registerOSCPanner(plugin);
+            DBG("[OSCHandler] Registered panner plugin on port " + juce::String(plugin.port) + " with tracking manager");
+        }
     }
 }
 
@@ -351,36 +357,6 @@ void OSCHandler::handleSetPlayerIsPlaying(const juce::OSCMessage& message) {
         forwardMsg.addInt32(playerIsPlaying ? 1 : 0);
         
         clientManager->sendToClientsOfType(forwardMsg, ClientType::Player);
-    }
-}
-
-void OSCHandler::handleRequestCurrentChannelConfig(const juce::OSCMessage& message) {
-    if (message.size() >= 1) {
-        int requestingPannerPort = message[0].getInt32();
-        DBG("[OSCHandler] Panner on port " + std::to_string(requestingPannerPort) + 
-            " requesting current channel config. Last known config: " + std::to_string(lastSystemChannelCount));
-        
-        // Respond immediately with the last known channel configuration
-        if (lastSystemChannelCount > 0) {
-            juce::OSCMessage responseMsg("/m1-channel-config");
-            responseMsg.addInt32(lastSystemChannelCount);
-            
-            // Send directly to the requesting panner
-            juce::OSCSender sender;
-            if (sender.connect("127.0.0.1", requestingPannerPort)) {
-                if (sender.send(responseMsg)) {
-                    DBG("[OSCHandler] Sent current channel config (" + std::to_string(lastSystemChannelCount) + 
-                        ") to panner on port: " + std::to_string(requestingPannerPort));
-                } else {
-                    DBG("[OSCHandler] Failed to send channel config to panner on port: " + 
-                        std::to_string(requestingPannerPort));
-                }
-            }
-        } else {
-            DBG("[OSCHandler] No channel configuration available yet");
-        }
-    } else {
-        DBG("[OSCHandler] Invalid request-current-channel-config message: insufficient parameters");
     }
 }
 

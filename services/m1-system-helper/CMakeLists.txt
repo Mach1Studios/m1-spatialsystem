@@ -33,9 +33,16 @@ set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 # (Please ensure this is added before the `m1_orientation_client` JUCE module)
 add_subdirectory(../../m1-orientationmanager/Modules/m1_orientation_client/libs/m1-mathematics "${CMAKE_CURRENT_BINARY_DIR}/m1-mathematics_build")
 
-# add JUCE and other custom modules
-add_subdirectory(../../m1-orientationmanager/JUCE "${CMAKE_CURRENT_BINARY_DIR}/JUCE_build")
+# add JUCE
+add_subdirectory(../../m1-player/JUCE "${CMAKE_CURRENT_BINARY_DIR}/JUCE_build")
 add_subdirectory(../../m1-orientationmanager/Modules "${CMAKE_CURRENT_BINARY_DIR}/Modules_build")
+
+# Mach1 Spatial SDK
+# Use these options to block dependencies we do not need
+set(BUILD_M1DECODEPOSITIONAL OFF)
+set(BUILD_MACH1SPATIAL_COMBINED_LIB OFF) # We do not need the combined lib
+list(INSERT CMAKE_MODULE_PATH 0 ${CMAKE_SOURCE_DIR}/../../m1-player/Modules/m1-sdk/cmake) # Prepend the global CMake modules directory
+add_subdirectory(../../m1-player/Modules/m1-sdk/libmach1spatial "${CMAKE_CURRENT_BINARY_DIR}/m1sdk_build")
 
 # PLUGIN/APP NAME & ID  (for dynamic naming schemes)
 set(CUSTOM_BUNDLE_ID "com.mach1.spatial.helper")
@@ -74,6 +81,23 @@ set_target_properties(${project_targets} PROPERTIES CXX_EXTENSIONS OFF)
 # add the sources
 add_subdirectory(Source)
 
+# Configure source groups for Xcode organization to match folder structure
+get_target_property(target_sources ${CMAKE_PROJECT_NAME} SOURCES)
+foreach(source_file ${target_sources})
+    if(source_file MATCHES "^${CMAKE_CURRENT_SOURCE_DIR}/Source/")
+        # Get relative path from Source directory
+        file(RELATIVE_PATH relative_path "${CMAKE_CURRENT_SOURCE_DIR}/Source" "${source_file}")
+        get_filename_component(dir_path "${relative_path}" DIRECTORY)
+        if(dir_path)
+            # Replace forward slashes with backslashes for Xcode groups
+            string(REPLACE "/" "\\\\" group_name "${dir_path}")
+            source_group("Source Files\\\\${group_name}" FILES "${source_file}")
+        else()
+            source_group("Source Files" FILES "${source_file}")
+        endif()
+    endif()
+endforeach()
+
 # definitions to replace the `JucePluginDefines.h`
 set(JucePlugin_Name ${CMAKE_PROJECT_NAME})
 set(JucePlugin_Desc ${CMAKE_PROJECT_NAME})
@@ -87,24 +111,34 @@ target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE
         juce::juce_events
         juce::juce_graphics
         juce::juce_gui_basics
+        juce::juce_opengl
+        juce::juce_audio_basics
+        juce::juce_audio_formats
+        juce::juce_audio_devices
+        juce::juce_audio_processors
+        juce::juce_audio_utils
         juce::juce_osc
         m1_orientation_client
         m1_mathematics
         )
 
+# link m1-sdk
+target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE M1Encode M1Decode M1Transcode)
+target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ../../m1-player/Modules/m1-sdk/libmach1spatial/api_common/include ../../m1-player/Modules/m1-sdk/libmach1spatial/api_decode/include ../../m1-player/Modules/m1-sdk/libmach1spatial/api_encode/include ../../m1-player/Modules/m1-sdk/libmach1spatial/api_transcode/include ../../m1-player/Modules/m1-sdk/libmach1spatial/deps)
+
 ### setup info.plist and entitlements for macos
 if(APPLE)
     set_target_properties("${CMAKE_PROJECT_NAME}" PROPERTIES
-        MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info.plist"
+        MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Resources/macos/Info.plist"
         MACOSX_BUNDLE_BUNDLE_NAME ${CMAKE_PROJECT_NAME}
         MACOSX_FRAMEWORK_IDENTIFIER ${CUSTOM_BUNDLE_ID}
         XCODE_ATTRIBUTE_ENABLE_HARDENED_RUNTIME YES
-        XCODE_ATTRIBUTE_CODE_SIGN_ENTITLEMENTS "${CMAKE_CURRENT_SOURCE_DIR}/entitlements.mac.plist"
+        XCODE_ATTRIBUTE_CODE_SIGN_ENTITLEMENTS "${CMAKE_CURRENT_SOURCE_DIR}/Resources/macos/entitlements.mac.plist"
         XCODE_ATTRIBUTE_INFOPLIST_KEY_LSApplicationCategoryType "public.app-category.utilities"
     )
-    message(STATUS "Attaching Info.plist found at ${CMAKE_CURRENT_SOURCE_DIR}/Info.plist")
+    message(STATUS "Attaching Info.plist found at ${CMAKE_CURRENT_SOURCE_DIR}/Resources/macos/Info.plist")
     set_target_properties(${CMAKE_PROJECT_NAME} PROPERTIES LINK_FLAGS 
-        "-sectcreate __TEXT __info_plist ${CMAKE_CURRENT_SOURCE_DIR}/Info.plist"
+        "-sectcreate __TEXT __info_plist ${CMAKE_CURRENT_SOURCE_DIR}/Resources/macos/Info.plist"
     )
 endif()
 
@@ -124,8 +158,7 @@ source_group("JUCE Library Code" FILES "${juce_header}")
 source_group("JUCE Library Code/CMake Rules" FILES "${juce_header}.rule")
 
 #   Generate source groups that follow the organisation of source file directories.
-source_group("" FILES ${project_sources})
-source_group(TREE ${CMAKE_CURRENT_LIST_DIR} PREFIX "" FILES SOURCES)
+#   Note: Source groups are configured in Source/CMakeLists.txt for better organization
 
 #   Place Binary Data related source files into the root of their target folder.
 if(TARGET Resources)

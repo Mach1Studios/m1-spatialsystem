@@ -4,6 +4,7 @@
 #include "../Managers/ClientManager.h"
 #include "../Managers/PluginManager.h"
 #include "../Managers/ServiceManager.h"
+#include "../Managers/PannerTrackingManager.h"
 
 namespace Mach1 {
 
@@ -11,7 +12,7 @@ class OSCHandler : public juce::OSCReceiver::Listener<juce::OSCReceiver::Realtim
                   public juce::Timer  // Add Timer
 {
 public:
-    OSCHandler(ClientManager* clientManager, PluginManager* pluginManager, ServiceManager* serviceManager);
+    OSCHandler(ClientManager* clientManager, PluginManager* pluginManager, ServiceManager* serviceManager, PannerTrackingManager* pannerTrackingManager);
     ~OSCHandler() override;
 
     bool startListening(int port);
@@ -41,11 +42,11 @@ private:
     void handleSetPlayerFrameRate(const juce::OSCMessage& message);
     void handleSetPlayerPosition(const juce::OSCMessage& message);
     void handleSetPlayerIsPlaying(const juce::OSCMessage& message);
-    void handleRequestCurrentChannelConfig(const juce::OSCMessage& message);
 
     ClientManager* clientManager;
     PluginManager* pluginManager;
     ServiceManager* serviceManager;
+    PannerTrackingManager* pannerTrackingManager;
     
     juce::OSCReceiver receiver;
     using MessageHandler = std::function<void(const juce::OSCMessage&)>;
