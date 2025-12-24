@@ -141,6 +141,7 @@ endif
 .PHONY: verify-aax-signing diagnose-aax
 .PHONY: test-ci-build test-ci-build-player-only test-ci-yaml
 .PHONY: test-ci-act-arm
+.PHONY: package-from-ci download-ci-artifacts install-arch-artifacts sign-aax-local installer-pkg-from-ci
 
 pull:
 	git pull --recurse-submodules
@@ -529,6 +530,11 @@ package-from-ci: download-ci-artifacts sign-aax-local installer-pkg-from-ci
 	@echo "========================================"
 	@echo "Release Complete!"
 	@echo "========================================"
+ifeq ($(detected_OS),Darwin)
+	@echo ""
+	@echo "macOS installers ready:"
+	@ls -la installer/osx/build/signed/*.pkg
+endif
 	@echo ""
 
 download-ci-artifacts:
@@ -543,29 +549,40 @@ ifeq ($(detected_OS),Darwin)
 		exit 1; \
 	fi
 	@mkdir -p $(CI_ARTIFACTS_DIR)
+	@# Download BOTH macOS architectures
 	@if [ -n "$(VERSION)" ]; then \
-		echo "Downloading version $(VERSION) artifacts..."; \
+		echo "Downloading version $(VERSION) artifacts (both architectures)..."; \
+		echo ""; \
+		echo "Downloading ARM64 (Apple Silicon) builds..."; \
 		aws s3 cp "s3://$(ARTIFACTS_BUCKET)/builds/$(VERSION)/macos-arm64-builds.tar.gz" \
 			"$(CI_ARTIFACTS_DIR)/macos-arm64-builds.tar.gz" --region us-east-1 || \
-			(echo "ERROR: Artifacts not found for version $(VERSION)" && exit 1); \
+			(echo "ERROR: ARM64 artifacts not found for version $(VERSION)" && exit 1); \
+		echo ""; \
+		echo "Downloading x86_64 (Intel) builds..."; \
+		aws s3 cp "s3://$(ARTIFACTS_BUCKET)/builds/$(VERSION)/macos-x86-builds.tar.gz" \
+			"$(CI_ARTIFACTS_DIR)/macos-x86-builds.tar.gz" --region us-east-1 || \
+			(echo "ERROR: x86_64 artifacts not found for version $(VERSION)" && exit 1); \
 	elif [ -n "$(COMMIT)" ]; then \
-		echo "Downloading commit $(COMMIT) artifacts..."; \
+		echo "Downloading commit $(COMMIT) artifacts (both architectures)..."; \
+		echo ""; \
+		echo "Downloading ARM64 (Apple Silicon) builds..."; \
 		aws s3 cp "s3://$(ARTIFACTS_BUCKET)/commits/$(COMMIT)/macos-arm64-builds.tar.gz" \
 			"$(CI_ARTIFACTS_DIR)/macos-arm64-builds.tar.gz" --region us-east-1 || \
-			(echo "ERROR: Artifacts not found for commit $(COMMIT)" && exit 1); \
+			(echo "ERROR: ARM64 artifacts not found for commit $(COMMIT)" && exit 1); \
+		echo ""; \
+		echo "Downloading x86_64 (Intel) builds..."; \
+		aws s3 cp "s3://$(ARTIFACTS_BUCKET)/commits/$(COMMIT)/macos-x86-builds.tar.gz" \
+			"$(CI_ARTIFACTS_DIR)/macos-x86-builds.tar.gz" --region us-east-1 || \
+			(echo "ERROR: x86_64 artifacts not found for commit $(COMMIT)" && exit 1); \
 	fi
+	@echo ""
 	@echo "Extracting artifacts..."
 	@cd $(CI_ARTIFACTS_DIR) && tar -xzf macos-arm64-builds.tar.gz
+	@cd $(CI_ARTIFACTS_DIR) && tar -xzf macos-x86-builds.tar.gz
 	@echo ""
-	@echo "Installing artifacts to build directories..."
-	@mkdir -p m1-monitor/build m1-panner/build m1-player/build
-	@mkdir -p m1-orientationmanager/build services/m1-system-helper/build
-	@cp -r $(CI_ARTIFACTS_DIR)/macos-arm64/M1-Monitor/* m1-monitor/build/ 2>/dev/null || true
-	@cp -r $(CI_ARTIFACTS_DIR)/macos-arm64/M1-Panner/* m1-panner/build/ 2>/dev/null || true
-	@cp -r $(CI_ARTIFACTS_DIR)/macos-arm64/M1-Player/* m1-player/build/ 2>/dev/null || true
-	@cp -r $(CI_ARTIFACTS_DIR)/macos-arm64/m1-orientationmanager/* m1-orientationmanager/build/ 2>/dev/null || true
-	@cp -r $(CI_ARTIFACTS_DIR)/macos-arm64/m1-system-helper/* services/m1-system-helper/build/ 2>/dev/null || true
-	@echo "Artifacts downloaded and installed"
+	@echo "Both architectures downloaded:"
+	@echo "  - $(CI_ARTIFACTS_DIR)/macos-arm64/"
+	@echo "  - $(CI_ARTIFACTS_DIR)/macos-x86/"
 else ifeq ($(detected_OS),Windows)
 	@echo "Downloading Windows artifacts..."
 	@if not defined VERSION if not defined COMMIT ( \
@@ -584,6 +601,36 @@ else ifeq ($(detected_OS),Windows)
 	)
 	@7z x -y "$(CI_ARTIFACTS_DIR)\windows-builds.zip" -o"$(CI_ARTIFACTS_DIR)"
 	@echo Artifacts downloaded and extracted
+endif
+
+# Helper to install artifacts for a specific architecture
+# Usage: make install-arch-artifacts ARCH=arm64
+# Note: CI packages artifacts without the _artefacts suffix, but installer expects it
+install-arch-artifacts:
+ifeq ($(detected_OS),Darwin)
+	@if [ -z "$(ARCH)" ]; then \
+		echo "ERROR: Specify ARCH (arm64 or x86)"; \
+		exit 1; \
+	fi
+	@if [ "$(ARCH)" = "arm64" ]; then \
+		ARCH_DIR="macos-arm64"; \
+	else \
+		ARCH_DIR="macos-x86"; \
+	fi; \
+	echo "Installing $$ARCH_DIR artifacts to build directories..."; \
+	rm -rf m1-monitor/build m1-panner/build m1-player/build; \
+	rm -rf m1-orientationmanager/build services/m1-system-helper/build; \
+	mkdir -p m1-monitor/build/M1-Monitor_artefacts; \
+	mkdir -p m1-panner/build/M1-Panner_artefacts; \
+	mkdir -p m1-player/build/M1-Player_artefacts; \
+	mkdir -p m1-orientationmanager/build/m1-orientationmanager_artefacts; \
+	mkdir -p services/m1-system-helper/build/m1-system-helper_artefacts; \
+	cp -r $(CI_ARTIFACTS_DIR)/$$ARCH_DIR/M1-Monitor/* m1-monitor/build/M1-Monitor_artefacts/ 2>/dev/null || true; \
+	cp -r $(CI_ARTIFACTS_DIR)/$$ARCH_DIR/M1-Panner/* m1-panner/build/M1-Panner_artefacts/ 2>/dev/null || true; \
+	cp -r $(CI_ARTIFACTS_DIR)/$$ARCH_DIR/M1-Player/* m1-player/build/M1-Player_artefacts/ 2>/dev/null || true; \
+	cp -r $(CI_ARTIFACTS_DIR)/$$ARCH_DIR/m1-orientationmanager/* m1-orientationmanager/build/m1-orientationmanager_artefacts/ 2>/dev/null || true; \
+	cp -r $(CI_ARTIFACTS_DIR)/$$ARCH_DIR/m1-system-helper/* services/m1-system-helper/build/m1-system-helper_artefacts/ 2>/dev/null || true; \
+	echo "Artifacts installed for $$ARCH_DIR"
 endif
 
 sign-aax-local:
@@ -652,24 +699,62 @@ endif
 installer-pkg-from-ci: sign-aax-local
 	@echo ""
 	@echo "========================================"
-	@echo "Creating Installer Package"
+	@echo "Creating Installer Packages"
 	@echo "========================================"
 ifeq ($(detected_OS),Darwin)
-	@echo "Building and signing installer..."
+	@echo "Building installers for BOTH macOS architectures..."
+	@echo ""
+	@# === ARM64 (Apple Silicon) ===
+	@echo "========================================"
+	@echo "Building ARM64 (Apple Silicon) Installer"
+	@echo "========================================"
+	@$(MAKE) install-arch-artifacts ARCH=arm64
+	@$(MAKE) sign-aax-local
+	@echo "Building installer package..."
 	packagesbuild -v installer/osx/Mach1\ Spatial\ System\ Installer.pkgproj
 	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp installer/osx/build/Mach1\ Spatial\ System\ Installer.pkg
 	mkdir -p installer/osx/build/signed
 	productsign --sign $(APPLE_CODESIGN_INSTALLER_ID) \
 		"installer/osx/build/Mach1 Spatial System Installer.pkg" \
 		"installer/osx/build/signed/Mach1 Spatial System Installer.pkg"
-	@echo ""
-	@echo "Notarizing installer..."
+	@echo "Notarizing ARM64 installer..."
 	xcrun notarytool submit --wait --keychain-profile 'notarize-app' \
 		--apple-id $(APPLE_USERNAME) --password $(ALTOOL_APPPASS) --team-id $(APPLE_TEAM_CODE) \
 		"installer/osx/build/signed/Mach1 Spatial System Installer.pkg"
 	xcrun stapler staple installer/osx/build/signed/Mach1\ Spatial\ System\ Installer.pkg
+	@# Rename to include architecture
+	mv "installer/osx/build/signed/Mach1 Spatial System Installer.pkg" \
+		"installer/osx/build/signed/Mach1 Spatial System Installer-arm64.pkg"
+	@echo "ARM64 installer complete!"
 	@echo ""
-	@echo "Installer created at: installer/osx/build/signed/Mach1 Spatial System Installer.pkg"
+	@# === x86_64 (Intel) ===
+	@echo "========================================"
+	@echo "Building x86_64 (Intel) Installer"
+	@echo "========================================"
+	@rm -rf installer/osx/build/Mach1\ Spatial\ System\ Installer.pkg
+	@$(MAKE) install-arch-artifacts ARCH=x86
+	@$(MAKE) sign-aax-local
+	@echo "Building installer package..."
+	packagesbuild -v installer/osx/Mach1\ Spatial\ System\ Installer.pkgproj
+	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp installer/osx/build/Mach1\ Spatial\ System\ Installer.pkg
+	productsign --sign $(APPLE_CODESIGN_INSTALLER_ID) \
+		"installer/osx/build/Mach1 Spatial System Installer.pkg" \
+		"installer/osx/build/signed/Mach1 Spatial System Installer.pkg"
+	@echo "Notarizing x86_64 installer..."
+	xcrun notarytool submit --wait --keychain-profile 'notarize-app' \
+		--apple-id $(APPLE_USERNAME) --password $(ALTOOL_APPPASS) --team-id $(APPLE_TEAM_CODE) \
+		"installer/osx/build/signed/Mach1 Spatial System Installer.pkg"
+	xcrun stapler staple installer/osx/build/signed/Mach1\ Spatial\ System\ Installer.pkg
+	@# Rename to include architecture
+	mv "installer/osx/build/signed/Mach1 Spatial System Installer.pkg" \
+		"installer/osx/build/signed/Mach1 Spatial System Installer-x86_64.pkg"
+	@echo "x86_64 installer complete!"
+	@echo ""
+	@echo "========================================"
+	@echo "Both installers created:"
+	@echo "  - installer/osx/build/signed/Mach1 Spatial System Installer-arm64.pkg"
+	@echo "  - installer/osx/build/signed/Mach1 Spatial System Installer-x86_64.pkg"
+	@echo "========================================"
 else ifeq ($(detected_OS),Windows)
 	@echo "Building Windows installer..."
 	$(WIN_INNO_PATH) "${CURDIR}/installer/win/installer.iss"
@@ -1417,12 +1502,28 @@ endif
 
 installer-pkg:
 ifeq ($(detected_OS),Darwin)
-	packagesbuild -v installer/osx/Mach1\ Spatial\ System\ Installer.pkgproj
-	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp installer/osx/build/Mach1\ Spatial\ System\ Installer.pkg
-	mkdir -p installer/osx/build/signed
-	productsign --sign $(APPLE_CODESIGN_INSTALLER_ID) "installer/osx/build/Mach1 Spatial System Installer.pkg" "installer/osx/build/signed/Mach1 Spatial System Installer.pkg"
-	xcrun notarytool submit --wait --keychain-profile 'notarize-app' --apple-id $(APPLE_USERNAME) --password $(ALTOOL_APPPASS) --team-id $(APPLE_TEAM_CODE) "installer/osx/build/signed/Mach1 Spatial System Installer.pkg"
-	xcrun stapler staple installer/osx/build/signed/Mach1\ Spatial\ System\ Installer.pkg
+	@# Detect host architecture for naming
+	@if [ "$$(uname -m)" = "arm64" ]; then \
+		ARCH_SUFFIX="arm64"; \
+	else \
+		ARCH_SUFFIX="x86_64"; \
+	fi; \
+	echo "Building installer for $$ARCH_SUFFIX..."; \
+	packagesbuild -v installer/osx/Mach1\ Spatial\ System\ Installer.pkgproj; \
+	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp installer/osx/build/Mach1\ Spatial\ System\ Installer.pkg; \
+	mkdir -p installer/osx/build/signed; \
+	productsign --sign $(APPLE_CODESIGN_INSTALLER_ID) \
+		"installer/osx/build/Mach1 Spatial System Installer.pkg" \
+		"installer/osx/build/signed/Mach1 Spatial System Installer.pkg"; \
+	echo "Notarizing installer..."; \
+	xcrun notarytool submit --wait --keychain-profile 'notarize-app' \
+		--apple-id $(APPLE_USERNAME) --password $(ALTOOL_APPPASS) --team-id $(APPLE_TEAM_CODE) \
+		"installer/osx/build/signed/Mach1 Spatial System Installer.pkg"; \
+	xcrun stapler staple "installer/osx/build/signed/Mach1 Spatial System Installer.pkg"; \
+	mv "installer/osx/build/signed/Mach1 Spatial System Installer.pkg" \
+		"installer/osx/build/signed/Mach1 Spatial System Installer-$$ARCH_SUFFIX.pkg"; \
+	echo ""; \
+	echo "Installer created: installer/osx/build/signed/Mach1 Spatial System Installer-$$ARCH_SUFFIX.pkg"
 else ifeq ($(detected_OS),Windows)
 	@echo "Building Windows installer..."
 	$(WIN_INNO_PATH) "${CURDIR}/installer/win/installer.iss"
@@ -1438,11 +1539,7 @@ endif
 
 deploy-installer:
 ifeq ($(detected_OS),Darwin)
-	@echo "### DEPLOYING TO S3 ###"
-	@if [ ! -f "installer/osx/build/signed/Mach1 Spatial System Installer.pkg" ]; then \
-		echo "Installer not found. Please run 'make installer-pkg' first."; \
-		exit 1; \
-	fi
+	@echo "### DEPLOYING macOS INSTALLERS TO S3 ###"
 	@current_version=$$(cat VERSION); \
 	suggested_version=$$(find . -maxdepth 2 -name "VERSION" -not -path "./VERSION" -exec cat {} \; | sort -V | tail -1); \
 	echo "Current central version: $$current_version"; \
@@ -1450,11 +1547,36 @@ ifeq ($(detected_OS),Darwin)
 	if [ -z "$$version" ]; then \
 		version=$$suggested_version; \
 	fi; \
-	aws s3 cp "installer/osx/build/signed/Mach1 Spatial System Installer.pkg" \
-		"s3://mach1-releases/$$version/Mach1 Spatial System Installer.pkg" \
-		--profile mach1 \
-		--content-disposition "Mach1 Spatial System Installer.pkg"; \
-	echo "Installer deployed to s3://mach1-releases/$$version/"; \
+	echo ""; \
+	ARM64_PKG="installer/osx/build/signed/Mach1 Spatial System Installer-arm64.pkg"; \
+	X86_PKG="installer/osx/build/signed/Mach1 Spatial System Installer-x86_64.pkg"; \
+	UPLOADED=0; \
+	if [ -f "$$ARM64_PKG" ]; then \
+		echo "Uploading ARM64 (Apple Silicon) installer..."; \
+		aws s3 cp "$$ARM64_PKG" \
+			"s3://mach1-releases/$$version/Mach1 Spatial System Installer-arm64.pkg" \
+			--profile mach1 \
+			--content-disposition "Mach1 Spatial System Installer-arm64.pkg"; \
+		UPLOADED=$$((UPLOADED + 1)); \
+	else \
+		echo "NOTE: ARM64 installer not found, skipping"; \
+	fi; \
+	if [ -f "$$X86_PKG" ]; then \
+		echo "Uploading x86_64 (Intel) installer..."; \
+		aws s3 cp "$$X86_PKG" \
+			"s3://mach1-releases/$$version/Mach1 Spatial System Installer-x86_64.pkg" \
+			--profile mach1 \
+			--content-disposition "Mach1 Spatial System Installer-x86_64.pkg"; \
+		UPLOADED=$$((UPLOADED + 1)); \
+	else \
+		echo "NOTE: x86_64 installer not found, skipping"; \
+	fi; \
+	if [ $$UPLOADED -eq 0 ]; then \
+		echo "ERROR: No installers found. Run 'make package-from-ci VERSION=x.x' first."; \
+		exit 1; \
+	fi; \
+	echo ""; \
+	echo "Deployed $$UPLOADED installer(s) to s3://mach1-releases/$$version/"; \
 	echo "REMINDER: Update the Avid Store Submission per version update!"
 else ifeq ($(detected_OS),Windows)
 	@echo "### DEPLOYING TO S3 ###"
