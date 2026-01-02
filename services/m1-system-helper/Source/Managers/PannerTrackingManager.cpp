@@ -15,6 +15,14 @@
 #include "OSCPannerTracker.h"
 #include "../Common/TypesForDataExchange.h"
 
+// Platform-specific includes for process checking
+#ifdef JUCE_MAC
+    #include <signal.h>
+    #include <sys/types.h>
+#elif JUCE_WINDOWS
+    #include <windows.h>
+#endif
+
 namespace Mach1 {
 
 PannerTrackingManager::PannerTrackingManager(std::shared_ptr<EventSystem> events)
@@ -200,52 +208,115 @@ void PannerTrackingManager::updateTrackingMethod() {
 void PannerTrackingManager::mergeTrackingResults() {
     const juce::ScopedLock lock(pannersMutex);
     
-    // Clear previous results
-    activePanners.clear();
+    // IMPORTANT: Don't clear activePanners - update existing entries and add new ones
+    // This prevents flickering when a read temporarily fails
     
-    // Add M1MemoryShare panners (higher priority)
+    // Build a map of what we found this scan
+    std::vector<PannerInfo> foundPanners;
+    
+    // Collect M1MemoryShare panners (higher priority)
     if (usingMemoryShare && memoryShareTracker) {
         const auto& memoryPanners = memoryShareTracker->getActivePanners();
         for (const auto& memoryPanner : memoryPanners) {
-            activePanners.push_back(convertFromMemoryShare(memoryPanner));
+            foundPanners.push_back(convertFromMemoryShare(memoryPanner));
         }
     }
     
-    // Add OSC panners (fallback)
+    // Collect OSC panners (fallback)
     if (usingOSC && oscTracker) {
         const auto& oscPanners = oscTracker->getActivePanners();
         for (const auto& oscPanner : oscPanners) {
-            // Only add if not already covered by M1MemoryShare
-            bool alreadyExists = false;
             auto oscPannerInfo = convertFromOSC(oscPanner);
             
-            for (const auto& existing : activePanners) {
-                // Primary: Match by process ID (most reliable)
-                // Secondary: Match by port (for cases where process ID isn't available)
-                // Tertiary: Match by name (as additional verification)
+            // Only add if not already covered by M1MemoryShare
+            bool alreadyExists = false;
+            for (const auto& existing : foundPanners) {
                 if ((existing.processId != 0 && oscPannerInfo.processId != 0 && 
                      existing.processId == oscPannerInfo.processId) ||
                     (existing.port != 0 && oscPannerInfo.port != 0 && 
-                     existing.port == oscPannerInfo.port) ||
-                    (!existing.name.empty() && !oscPannerInfo.name.empty() && 
-                     existing.name == oscPannerInfo.name)) {
-                    
+                     existing.port == oscPannerInfo.port)) {
                     alreadyExists = true;
-                    DBG("[PannerTrackingManager] Skipping OSC panner (already tracked via MemoryShare): " <<
-                        "PID=" + std::to_string(oscPannerInfo.processId) <<
-                        ", Port=" + std::to_string(oscPannerInfo.port) <<
-                        ", Name=" + oscPannerInfo.name);
                     break;
                 }
             }
             
             if (!alreadyExists) {
-                activePanners.push_back(oscPannerInfo);
-                DBG("[PannerTrackingManager] Added OSC panner: " <<
-                    "PID=" + std::to_string(oscPannerInfo.processId) <<
-                    ", Port=" + std::to_string(oscPannerInfo.port) <<
-                    ", Name=" + oscPannerInfo.name);
+                foundPanners.push_back(oscPannerInfo);
             }
+        }
+    }
+    
+    // Now merge: update existing panners, add new ones, mark missing ones
+    auto currentTime = juce::Time::currentTimeMillis();
+    
+    // Update existing panners with new data
+    for (auto& existingPanner : activePanners) {
+        bool stillExists = false;
+        
+        for (const auto& foundPanner : foundPanners) {
+            // Match by process ID (for MemoryShare) or port (for OSC)
+            bool matches = false;
+            if (existingPanner.isMemoryShareBased && foundPanner.isMemoryShareBased) {
+                matches = (existingPanner.processId == foundPanner.processId);
+            } else if (!existingPanner.isMemoryShareBased && !foundPanner.isMemoryShareBased) {
+                matches = (existingPanner.port == foundPanner.port);
+            }
+            
+            if (matches) {
+                // Update with latest data (preserve identity, update parameters)
+                existingPanner.azimuth = foundPanner.azimuth;
+                existingPanner.elevation = foundPanner.elevation;
+                existingPanner.diverge = foundPanner.diverge;
+                existingPanner.gain = foundPanner.gain;
+                existingPanner.stereoOrbitAzimuth = foundPanner.stereoOrbitAzimuth;
+                existingPanner.stereoSpread = foundPanner.stereoSpread;
+                existingPanner.stereoInputBalance = foundPanner.stereoInputBalance;
+                existingPanner.dawTimestamp = foundPanner.dawTimestamp;
+                existingPanner.playheadPositionInSeconds = foundPanner.playheadPositionInSeconds;
+                existingPanner.isPlaying = foundPanner.isPlaying;
+                existingPanner.currentBufferId = foundPanner.currentBufferId;
+                existingPanner.inputMode = foundPanner.inputMode;
+                existingPanner.autoOrbit = foundPanner.autoOrbit;
+                existingPanner.state = foundPanner.state;
+                existingPanner.lastUpdateTime = currentTime;
+                existingPanner.isActive = true;
+                stillExists = true;
+                break;
+            }
+        }
+        
+        // If not found this scan but process is still running, keep it (grace period)
+        if (!stillExists && existingPanner.isMemoryShareBased) {
+            // Check if process is still running - don't remove immediately
+            // Let cleanupInactivePanners handle removal after timeout
+        }
+    }
+    
+    // Add new panners that weren't in activePanners
+    for (const auto& foundPanner : foundPanners) {
+        bool isNew = true;
+        
+        for (const auto& existingPanner : activePanners) {
+            bool matches = false;
+            if (existingPanner.isMemoryShareBased && foundPanner.isMemoryShareBased) {
+                matches = (existingPanner.processId == foundPanner.processId);
+            } else if (!existingPanner.isMemoryShareBased && !foundPanner.isMemoryShareBased) {
+                matches = (existingPanner.port == foundPanner.port);
+            }
+            
+            if (matches) {
+                isNew = false;
+                break;
+            }
+        }
+        
+        if (isNew) {
+            PannerInfo newPanner = foundPanner;
+            newPanner.lastUpdateTime = currentTime;
+            activePanners.push_back(newPanner);
+            publishPannerAdded(newPanner);
+            DBG("[PannerTrackingManager] Added new panner: " + newPanner.name + 
+                " (PID: " + std::to_string(newPanner.processId) + ")");
         }
     }
     
@@ -352,9 +423,9 @@ bool PannerTrackingManager::unregisterAsConsumer(uint32_t consumerId) {
 PannerInfo PannerTrackingManager::convertFromMemoryShare(const MemorySharePannerInfo& info) {
     PannerInfo panner;
     
-    // Identity
-    panner.port = 0;  // M1MemoryShare doesn't use ports
-    panner.name = info.name;
+    // Identity - use display name from parameters if available
+    panner.port = info.getPort();
+    panner.name = info.getDisplayName();  // Uses DISPLAY_NAME parameter, falls back to info.name
     panner.processId = info.processId;
     
     // State
@@ -466,13 +537,48 @@ void PannerTrackingManager::cleanupInactivePanners() {
     
     auto currentTime = juce::Time::currentTimeMillis();
     
-    activePanners.erase(
-        std::remove_if(activePanners.begin(), activePanners.end(), 
-            [currentTime](const PannerInfo& panner) {
-                return (currentTime - panner.lastUpdateTime) > PANNER_TIMEOUT_MS;
-            }),
-        activePanners.end()
-    );
+    auto it = activePanners.begin();
+    while (it != activePanners.end()) {
+        bool shouldRemove = false;
+        
+        // Only consider removal if timed out
+        if ((currentTime - it->lastUpdateTime) > PANNER_TIMEOUT_MS) {
+            // For memory-share based panners, check if process is still running
+            if (it->isMemoryShareBased && it->processId != 0) {
+                if (!isProcessRunning(it->processId)) {
+                    shouldRemove = true;
+                    DBG("[PannerTrackingManager] Removing panner (process dead): " + it->name);
+                }
+                // If process is running, keep it even if "timed out"
+            } else {
+                // For OSC panners, use timeout-based removal
+                shouldRemove = true;
+                DBG("[PannerTrackingManager] Removing OSC panner (timed out): " + it->name);
+            }
+        }
+        
+        if (shouldRemove) {
+            publishPannerRemoved(*it);
+            it = activePanners.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
+bool PannerTrackingManager::isProcessRunning(uint32_t processId) const {
+#ifdef JUCE_MAC
+    return (kill(static_cast<pid_t>(processId), 0) == 0);
+#elif JUCE_WINDOWS
+    HANDLE processHandle = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, processId);
+    if (processHandle != NULL) {
+        CloseHandle(processHandle);
+        return true;
+    }
+    return false;
+#else
+    return true; // Assume running on other platforms
+#endif
 }
 
 // =============================================================================

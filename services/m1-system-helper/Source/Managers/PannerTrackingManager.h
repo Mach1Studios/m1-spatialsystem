@@ -104,6 +104,9 @@ public:
     bool isUsingOSC() const { return usingOSC; }
     juce::String getTrackingStatus() const;
     
+    // Direct access to trackers (for audio processing)
+    M1MemoryShareTracker* getMemoryShareTracker() { return memoryShareTracker.get(); }
+    
     // Send commands to panners
     void sendToAllPanners(const juce::OSCMessage& message);
     void sendToPanner(const PannerInfo& panner, const juce::OSCMessage& message);
@@ -170,8 +173,11 @@ private:
     
     // Configuration
     static constexpr int SCAN_INTERVAL_MS = 1000;  // Scan every 1 second
-    static constexpr int PANNER_TIMEOUT_MS = 5000;  // Consider inactive after 5 seconds
+    static constexpr int PANNER_TIMEOUT_MS = 30000; // Consider inactive after 30 seconds
     static constexpr uint32_t CONSUMER_ID = 9001;   // Our consumer ID for M1MemoryShare
+    
+    // Process checking helper
+    bool isProcessRunning(uint32_t processId) const;
     
     juce::int64 lastScanTime = 0;
     

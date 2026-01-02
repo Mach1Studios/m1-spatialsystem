@@ -1,4 +1,5 @@
 #include "M1MemoryShare.h"
+#include "SharedPathUtils.h"
 #include <iostream>
 #include <cstring>
 #include <chrono>
@@ -10,7 +11,8 @@ M1MemoryShare::M1MemoryShare(const std::string& memoryName,
                              size_t totalSize,
                              uint32_t maxQueueSize,
                              bool persistent,
-                             bool createMode)
+                             bool createMode,
+                             const std::string& explicitFilePath)
     : m_memoryName(memoryName)
     , m_totalSize(totalSize)
     , m_maxQueueSize(maxQueueSize)
@@ -21,6 +23,7 @@ M1MemoryShare::M1MemoryShare(const std::string& memoryName,
     , m_dataBufferSize(0)
     , m_queuedBuffers(nullptr)
     , m_queuedBuffersSize(0)
+    , m_explicitFilePath(explicitFilePath)
 {
     // Ensure minimum size for header and queue
     size_t minSize = sizeof(SharedMemoryHeader) + 
@@ -70,9 +73,21 @@ M1MemoryShare::~M1MemoryShare()
 //==============================================================================
 bool M1MemoryShare::createSharedMemoryFile()
 {
-    // Use JUCE temporary directory
-    juce::File tempDir = juce::File::getSpecialLocation(juce::File::tempDirectory);
-    m_tempFile = tempDir.getChildFile("M1SpatialSystem_" + m_memoryName + ".mem");
+    // Use SharedPathUtils to get the shared memory directory (App Group or fallback)
+    std::string sharedDir = Mach1::SharedPathUtils::getSharedMemoryDirectory();
+    if (sharedDir.empty()) {
+        // Fallback to temp directory
+        sharedDir = juce::File::getSpecialLocation(juce::File::tempDirectory).getFullPathName().toStdString();
+    }
+    
+    juce::File memDir(sharedDir);
+    if (!memDir.exists()) {
+        memDir.createDirectory();
+    }
+    
+    // Memory name already includes the full filename (e.g., M1SpatialSystem_M1Panner_...)
+    // so we just append the extension
+    m_tempFile = memDir.getChildFile(m_memoryName + ".mem");
     
     std::cout << "[M1MemoryShare] Attempting to create file: " << m_tempFile.getFullPathName() << std::endl;
     
@@ -128,26 +143,65 @@ bool M1MemoryShare::createSharedMemoryFile()
 
 bool M1MemoryShare::openSharedMemoryFile()
 {
-    // Try to open existing file using JUCE
-    juce::File tempDir = juce::File::getSpecialLocation(juce::File::tempDirectory);
-    m_tempFile = tempDir.getChildFile("M1SpatialSystem_" + m_memoryName + ".mem");
-
-    if (!m_tempFile.exists())
+    // If explicit file path provided, use it directly
+    if (!m_explicitFilePath.empty())
     {
-        std::cerr << "[M1MemoryShare] Shared memory file does not exist: " << m_tempFile.getFullPathName() << std::endl;
+        m_tempFile = juce::File(m_explicitFilePath);
+        if (m_tempFile.exists())
+        {
+            std::cout << "[M1MemoryShare] Opening explicit file path: " << m_tempFile.getFullPathName() << std::endl;
+            
+            m_mappedFile = std::make_unique<juce::MemoryMappedFile>(m_tempFile, juce::MemoryMappedFile::readWrite);
+            if (m_mappedFile->getData())
+            {
+                setupMemoryPointers();
+                return true;
+            }
+            else
+            {
+                std::cerr << "[M1MemoryShare] Failed to memory map explicit file: " << m_tempFile.getFullPathName() << std::endl;
+            }
+        }
+        else
+        {
+            std::cerr << "[M1MemoryShare] Explicit file path does not exist: " << m_explicitFilePath << std::endl;
+        }
         return false;
     }
-
-    // Create memory mapped file
-    m_mappedFile = std::make_unique<juce::MemoryMappedFile>(m_tempFile, juce::MemoryMappedFile::readWrite);
-    if (!m_mappedFile->getData())
+    
+    // Otherwise search all possible directories for the file
+    // Memory name already includes the full filename (e.g., M1SpatialSystem_M1Panner_...)
+    auto directories = Mach1::SharedPathUtils::getAllSharedDirectories();
+    
+    // Also add temp directory as last resort
+    directories.push_back(juce::File::getSpecialLocation(juce::File::tempDirectory).getFullPathName().toStdString());
+    
+    for (const auto& dirPath : directories)
     {
-        std::cerr << "[M1MemoryShare] Failed to memory map file: " << m_tempFile.getFullPathName() << std::endl;
-        return false;
+        juce::File dir(dirPath);
+        juce::File candidate = dir.getChildFile(m_memoryName + ".mem");
+        
+        if (candidate.exists())
+        {
+            m_tempFile = candidate;
+            std::cout << "[M1MemoryShare] Found memory file at: " << m_tempFile.getFullPathName() << std::endl;
+            
+            // Create memory mapped file
+            m_mappedFile = std::make_unique<juce::MemoryMappedFile>(m_tempFile, juce::MemoryMappedFile::readWrite);
+            if (m_mappedFile->getData())
+            {
+                setupMemoryPointers();
+                return true;
+            }
+            else
+            {
+                std::cerr << "[M1MemoryShare] Failed to memory map file: " << m_tempFile.getFullPathName() << std::endl;
+            }
+        }
     }
 
-    setupMemoryPointers();
-    return true;
+    std::cerr << "[M1MemoryShare] Shared memory file not found in any directory: " << m_memoryName << ".mem" << std::endl;
+    return false;
 }
 
 void M1MemoryShare::setupMemoryPointers()
@@ -159,15 +213,31 @@ void M1MemoryShare::setupMemoryPointers()
     
     uint8_t* basePtr = static_cast<uint8_t*>(m_mappedFile->getData());
     
-    // Set up header
+    // Set up header first (always at offset 0)
     m_header = reinterpret_cast<SharedMemoryHeader*>(basePtr);
     
-    // Set up data buffer (after header)
-    m_dataBuffer = basePtr + sizeof(SharedMemoryHeader);
-    m_dataBufferSize = m_totalSize - sizeof(SharedMemoryHeader) - m_queuedBuffersSize;
+    // When opening an existing file (not creating), read maxQueueSize from the header
+    // This ensures we use the same layout as the panner that created the file
+    if (!m_createMode && m_header->maxQueueSize > 0)
+    {
+        m_maxQueueSize = m_header->maxQueueSize;
+    }
     
-    // Set up queued buffers area (at the end)
-    m_queuedBuffers = reinterpret_cast<QueuedBuffer*>(basePtr + sizeof(SharedMemoryHeader) + m_dataBufferSize);
+    // Memory layout (must match panner's M1MemoryShare):
+    // 1. SharedMemoryHeader (200 bytes)
+    // 2. QueuedBuffer array (maxQueueSize * sizeof(QueuedBuffer))
+    // 3. Data buffer (remaining space)
+    
+    // Set up queued buffers pointer (AFTER header)
+    m_queuedBuffers = reinterpret_cast<QueuedBuffer*>(basePtr + sizeof(SharedMemoryHeader));
+    m_queuedBuffersSize = m_maxQueueSize * sizeof(QueuedBuffer);
+    
+    // Set up data buffer pointer (AFTER header AND queued buffers)
+    m_dataBuffer = basePtr + sizeof(SharedMemoryHeader) + m_queuedBuffersSize;
+    
+    // Calculate actual data buffer size from file size
+    size_t actualFileSize = m_mappedFile->getSize();
+    m_dataBufferSize = actualFileSize - sizeof(SharedMemoryHeader) - m_queuedBuffersSize;
 }
 
 //==============================================================================
@@ -417,15 +487,24 @@ uint32_t M1MemoryShare::getUnconsumedBufferCount() const
 //==============================================================================
 bool M1MemoryShare::deleteSharedMemory(const juce::String& memoryName)
 {
-    juce::File tempDir = juce::File::getSpecialLocation(juce::File::tempDirectory);
-    juce::File memoryFile = tempDir.getChildFile("M1SpatialSystem_" + memoryName + ".mem");
-
-    if (memoryFile.exists())
+    // Search all possible directories for the file
+    auto directories = Mach1::SharedPathUtils::getAllSharedDirectories();
+    directories.push_back(juce::File::getSpecialLocation(juce::File::tempDirectory).getFullPathName().toStdString());
+    
+    bool deleted = false;
+    for (const auto& dirPath : directories)
     {
-        return memoryFile.deleteFile();
+        juce::File dir(dirPath);
+        // Memory name may or may not already include the prefix
+        juce::File memoryFile = dir.getChildFile(memoryName + ".mem");
+
+        if (memoryFile.exists())
+        {
+            deleted = memoryFile.deleteFile() || deleted;
+        }
     }
 
-    return true; // File doesn't exist, consider it deleted
+    return deleted || true; // Consider it deleted if not found
 }
 
 bool M1MemoryShare::readAudioBufferWithGenericParameters(juce::AudioBuffer<float>& audioBuffer,
@@ -443,74 +522,97 @@ bool M1MemoryShare::readAudioBufferWithGenericParameters(juce::AudioBuffer<float
 
     std::lock_guard<std::mutex> lock(m_queueMutex);
 
-    // Check if there are any queued buffers
-    if (m_header->queueSize == 0)
+    // Read the GenericAudioBufferHeader from the data buffer
+    // The panner writes: GenericAudioBufferHeader + GenericParameter entries + Audio data
+    if (m_header->dataSize < sizeof(GenericAudioBufferHeader))
     {
         return false;
     }
-
-    // Get the oldest buffer from the queue
-    uint32_t readIndex = m_header->readIndex % m_maxQueueSize;
-    const QueuedBuffer& queuedBuffer = m_queuedBuffers[readIndex];
-
-    // For now, assume stereo 2-channel, 512 samples (this would need to be encoded in the data format)
-    int numChannels = 2;
-    int numSamples = 512;
     
-    // Calculate expected audio data size
-    uint32_t expectedAudioSize = numChannels * numSamples * sizeof(float);
+    const uint8_t* readPtr = m_dataBuffer;
+    const GenericAudioBufferHeader* header = reinterpret_cast<const GenericAudioBufferHeader*>(readPtr);
     
-    // Set the audio buffer size 
-    audioBuffer.setSize(numChannels, numSamples);
-
-    // Copy audio data if available
-    if (queuedBuffer.dataSize >= expectedAudioSize && queuedBuffer.dataOffset < m_dataBufferSize)
+    // Validate header
+    if (header->version != 1 || header->headerSize < sizeof(GenericAudioBufferHeader))
     {
-        const float* sourceData = reinterpret_cast<const float*>(m_dataBuffer + queuedBuffer.dataOffset);
+        return false;
+    }
+    
+    // Extract header fields
+    int numChannels = static_cast<int>(header->channels);
+    int numSamples = static_cast<int>(header->samples);
+    dawTimestamp = header->dawTimestamp;
+    playheadPositionInSeconds = header->playheadPositionInSeconds;
+    isPlaying = (header->isPlaying != 0);
+    bufferId = header->bufferId;
+    updateSource = header->updateSource;
+    
+    // Clear existing parameters
+    parameters.clear();
+    
+    // Parse parameters from the buffer
+    readPtr += sizeof(GenericAudioBufferHeader);
+    uint32_t paramCount = header->parameterCount;
+    
+    for (uint32_t i = 0; i < paramCount && (readPtr - m_dataBuffer) < m_header->dataSize; ++i)
+    {
+        const GenericParameter* param = reinterpret_cast<const GenericParameter*>(readPtr);
+        readPtr += sizeof(GenericParameter);
         
-        for (int channel = 0; channel < numChannels; ++channel)
+        // Make sure we don't read past buffer
+        if ((readPtr - m_dataBuffer) + param->dataSize > m_header->dataSize)
         {
-            if (channel < audioBuffer.getNumChannels())
+            break;
+        }
+        
+        switch (param->parameterType)
+        {
+            case ParameterType::FLOAT:
+                parameters.addFloat(param->parameterID, *reinterpret_cast<const float*>(readPtr));
+                break;
+            case ParameterType::INT:
+                parameters.addInt(param->parameterID, *reinterpret_cast<const int32_t*>(readPtr));
+                break;
+            case ParameterType::BOOL:
+                parameters.addBool(param->parameterID, *reinterpret_cast<const bool*>(readPtr));
+                break;
+            case ParameterType::STRING:
+                parameters.addString(param->parameterID, std::string(reinterpret_cast<const char*>(readPtr)));
+                break;
+            case ParameterType::DOUBLE:
+                parameters.addDouble(param->parameterID, *reinterpret_cast<const double*>(readPtr));
+                break;
+            case ParameterType::UINT32:
+                parameters.addUInt32(param->parameterID, *reinterpret_cast<const uint32_t*>(readPtr));
+                break;
+            case ParameterType::UINT64:
+                parameters.addUInt64(param->parameterID, *reinterpret_cast<const uint64_t*>(readPtr));
+                break;
+        }
+        
+        readPtr += param->dataSize;
+    }
+    
+    // Set the audio buffer size and copy audio data
+    if (numChannels > 0 && numSamples > 0)
+    {
+        audioBuffer.setSize(numChannels, numSamples);
+        
+        // Audio data follows the header (readPtr should now point to audio data)
+        const float* audioDataPtr = reinterpret_cast<const float*>(readPtr);
+        
+        // Copy interleaved audio data to JUCE buffer (deinterleave)
+        for (int sample = 0; sample < numSamples; ++sample)
+        {
+            for (int channel = 0; channel < numChannels; ++channel)
             {
-                audioBuffer.copyFrom(channel, 0, 
-                                   sourceData + (channel * numSamples), 
-                                   numSamples);
+                audioBuffer.setSample(channel, sample, audioDataPtr[sample * numChannels + channel]);
             }
         }
     }
     else
     {
-        // Clear buffer if no data available
         audioBuffer.clear();
-    }
-
-    // Clear and set basic parameters
-    parameters.floatParams.clear();
-    parameters.intParams.clear();
-    parameters.boolParams.clear();
-    parameters.stringParams.clear();
-    parameters.doubleParams.clear();
-    parameters.uint32Params.clear();
-    parameters.uint64Params.clear();
-    
-    // Add some basic parameters using the available fields
-    parameters.addFloat(M1SystemHelperParameterIDs::GAIN, 1.0f);
-    parameters.addUInt64(M1SystemHelperParameterIDs::BUFFER_ID, queuedBuffer.bufferId);
-    parameters.addUInt32(M1SystemHelperParameterIDs::BUFFER_SEQUENCE, queuedBuffer.sequenceNumber);
-    parameters.addUInt64(M1SystemHelperParameterIDs::BUFFER_TIMESTAMP, queuedBuffer.timestamp);
-
-    // Set output parameters - using available fields
-    dawTimestamp = queuedBuffer.timestamp;  // Use timestamp field
-    playheadPositionInSeconds = 0.0;        // Default value 
-    isPlaying = true;                       // Default value
-    bufferId = queuedBuffer.bufferId;
-    updateSource = 1; // Indicate MemoryShare as source
-
-    // Move to next buffer
-    m_header->readIndex = (m_header->readIndex + 1) % m_maxQueueSize;
-    if (m_header->queueSize > 0)
-    {
-        m_header->queueSize--;
     }
 
     return true;

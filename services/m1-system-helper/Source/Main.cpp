@@ -193,7 +193,6 @@ public:
                 auto& service = Mach1::M1SystemHelperService::getInstance();
                 service.shutdown();
                 service.stopTimer();
-                service = nullptr;
                 
                 // Ensure MessageManager cleanup
                 if (auto* mm = juce::MessageManager::getInstanceWithoutCreating()) {

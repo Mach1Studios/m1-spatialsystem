@@ -35,6 +35,7 @@ struct MemorySharePannerInfo {
     
     // Connection
     std::string memorySegmentName;
+    std::string memoryFilePath;  // Full file path for direct opening
     std::unique_ptr<M1MemoryShare> memoryShare;
     bool isConnected = false;
     
@@ -86,6 +87,12 @@ struct MemorySharePannerInfo {
     int getInputMode() const;
     int getOutputMode() const;
     int getState() const;
+    int getPort() const;
+    std::string getDisplayName() const;
+    int getColorR() const;
+    int getColorG() const;
+    int getColorB() const;
+    int getColorA() const;
     
     bool operator==(const MemorySharePannerInfo& other) const {
         return processId == other.processId && memoryAddress == other.memoryAddress;
@@ -168,9 +175,9 @@ private:
     
     // Timing
     juce::int64 lastScanTime = 0;
-    static constexpr int SCAN_INTERVAL_MS = 1000;    // Scan every 1 second
+    static constexpr int SCAN_INTERVAL_MS = 1000;    // Scan for new panners every 1 second
     static constexpr int UPDATE_INTERVAL_MS = 100;   // Update existing panners every 100ms
-    static constexpr int PANNER_TIMEOUT_MS = 5000;   // Consider inactive after 5 seconds
+    static constexpr int PANNER_TIMEOUT_MS = 30000;  // Consider inactive after 30 seconds (process-based check is more reliable)
     
     // Search paths for M1MemoryShare files
     static const std::vector<std::string> MEMORY_SEARCH_PATHS;

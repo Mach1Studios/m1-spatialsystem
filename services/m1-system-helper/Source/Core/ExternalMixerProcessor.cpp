@@ -1,4 +1,6 @@
 #include "ExternalMixerProcessor.h"
+#include "../Managers/M1MemoryShareTracker.h"
+#include "../Common/TypesForDataExchange.h"
 
 namespace Mach1 {
 
@@ -11,11 +13,10 @@ ExternalMixerProcessor::ExternalMixerProcessor()
     , masterPitch(0.0f) 
     , masterRoll(0.0f)
     , recording(false) {
-    // Constructor implementation
 }
 
 ExternalMixerProcessor::~ExternalMixerProcessor() {
-    // Destructor implementation - unique_ptrs will clean up automatically
+    // unique_ptrs will clean up automatically
     if (recording) {
         stopRecording();
     }
@@ -36,12 +37,20 @@ void ExternalMixerProcessor::initialize(double sampleRate, int maxBlockSize) {
         tempBuffer[ch].resize(maxBlockSize, 0.0f);
     }
     
+    // Initialize streaming read buffer
+    streamingReadBuffer.setSize(maxChannels, maxBlockSize);
+    
     // Initialize metering
     outputLevelSmoothers.resize(maxChannels, 0.0f);
     currentOutputLevels.resize(maxChannels, 0.0f);
     
     // Initialize Mach1 objects
     m1Decode = std::make_unique<Mach1Decode<float>>();
+}
+
+void ExternalMixerProcessor::setPannerTrackingManager(PannerTrackingManager* manager) {
+    pannerTrackingManager = manager;
+    DBG("[ExternalMixerProcessor] Panner tracking manager set");
 }
 
 void ExternalMixerProcessor::processAudioBlock(float* const* outputChannels, int numChannels, int numSamples) {
@@ -54,7 +63,15 @@ void ExternalMixerProcessor::processAudioBlock(float* const* outputChannels, int
         }
     }
     
-    // Process each active track
+    // Clear spatial mix buffer for this block
+    for (int ch = 0; ch < maxChannels; ++ch) {
+        std::fill(spatialMixBuffer[ch].begin(), spatialMixBuffer[ch].begin() + numSamples, 0.0f);
+    }
+    
+    // Process memory-share panners and mix into spatialMixBuffer
+    processMemorySharePanners(numSamples);
+    
+    // Process each active OSC track
     juce::ScopedLock lock(tracksMutex);
     for (auto& [pluginPort, track] : trackMap) {
         if (track.active && !track.muted) {
@@ -234,6 +251,76 @@ void ExternalMixerProcessor::applyMasterDecoding(float* const* channels, int num
     if (m1Decode) {
         // Example of how this would work:
         // m1Decode->decode(spatialMixBuffer, channels, numSamples);
+    }
+}
+
+void ExternalMixerProcessor::processMemorySharePanners(int numSamples) {
+    if (!pannerTrackingManager) {
+        return;
+    }
+    
+    auto* memShareTracker = pannerTrackingManager->getMemoryShareTracker();
+    if (!memShareTracker) {
+        return;
+    }
+    
+    // Get all active memory-share panners directly from the tracker
+    const auto& panners = memShareTracker->getActivePanners();
+    
+    if (panners.empty()) {
+        return;
+    }
+    
+    // Ensure streaming read buffer is large enough
+    if (streamingReadBuffer.getNumChannels() < maxChannels || 
+        streamingReadBuffer.getNumSamples() < numSamples) {
+        streamingReadBuffer.setSize(maxChannels, numSamples, false, true, false);
+    }
+    
+    // Process each connected panner
+    for (const auto& pannerInfo : panners) {
+        if (!pannerInfo.isConnected || !pannerInfo.memoryShare || !pannerInfo.memoryShare->isValid()) {
+            continue;
+        }
+        
+        // Clear read buffer for this panner
+        streamingReadBuffer.clear();
+        
+        // Try to read audio and parameters from this panner's M1MemoryShare
+        ParameterMap currentParams;
+        uint64_t dawTimestamp = 0;
+        double playheadPosition = 0.0;
+        bool isPlaying = false;
+        uint64_t bufferId = 0;
+        uint32_t updateSource = 0;
+
+        bool readSuccess = pannerInfo.memoryShare->readAudioBufferWithGenericParameters(
+            streamingReadBuffer, currentParams, dawTimestamp, playheadPosition, isPlaying, bufferId, updateSource
+        );
+        
+        if (!readSuccess) {
+            continue;
+        }
+        
+        // Mix this panner's audio into the spatial mix buffer
+        // The audio should already be Mach1-encoded by the panner
+        const int channelsToMix = juce::jmin(maxChannels, streamingReadBuffer.getNumChannels());
+        const int samplesToMix = juce::jmin(numSamples, streamingReadBuffer.getNumSamples());
+        
+        for (int ch = 0; ch < channelsToMix; ++ch) {
+            const float* srcData = streamingReadBuffer.getReadPointer(ch);
+            for (int i = 0; i < samplesToMix; ++i) {
+                spatialMixBuffer[ch][i] += srcData[i];
+            }
+        }
+        
+        // Log parameter updates for debugging (remove for release builds)
+        float azimuth = currentParams.getFloat(M1SystemHelperParameterIDs::AZIMUTH, 0.0f);
+        float elevation = currentParams.getFloat(M1SystemHelperParameterIDs::ELEVATION, 0.0f);
+        DBG("[ExternalMixerProcessor] Processed panner: " + juce::String(pannerInfo.name) + 
+            " (PID: " + juce::String(pannerInfo.processId) + 
+            ", azimuth: " + juce::String(azimuth) +
+            ", elevation: " + juce::String(elevation) + ")");
     }
 }
 

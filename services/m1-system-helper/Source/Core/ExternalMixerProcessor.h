@@ -2,6 +2,7 @@
 
 #include <JuceHeader.h>
 #include "../Common/Common.h"
+#include "../Managers/PannerTrackingManager.h"
 #include <memory>
 #include <vector>
 #include <unordered_map>
@@ -10,6 +11,9 @@
 #include <Mach1Decode.h>
 
 namespace Mach1 {
+
+// Forward declaration
+class PannerTrackingManager;
 
 struct MixerTrackInfo {
     int pluginPort = 0;
@@ -47,8 +51,14 @@ public:
     // Initialize the processor
     void initialize(double sampleRate, int maxBlockSize);
     
+    // Set panner tracking manager for memory-share based streaming
+    void setPannerTrackingManager(PannerTrackingManager* manager);
+    
     // Audio processing
     void processAudioBlock(float* const* outputChannels, int numChannels, int numSamples);
+    
+    // Process memory-share panners - mix all registered memory-share panners into output
+    void processMemorySharePanners(int numSamples);
     
     // Track management  
     void addTrack(int pluginPort, const juce::String& trackName);
@@ -110,6 +120,12 @@ private:
     // Recording
     bool recording = false;
     juce::File recordingFile;
+    
+    // Panner tracking manager (not owned)
+    PannerTrackingManager* pannerTrackingManager = nullptr;
+    
+    // Streaming audio buffer for reading from panners
+    juce::AudioBuffer<float> streamingReadBuffer;
     
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ExternalMixerProcessor)
 };

@@ -56,6 +56,9 @@ M1SystemHelperService::M1SystemHelperService() {
     externalMixer = std::make_unique<ExternalMixerProcessor>();
     externalMixer->initialize(44100.0, 512); // Default sample rate and block size
     
+    // Connect external mixer to panner tracking manager for memory-share streaming
+    externalMixer->setPannerTrackingManager(pannerTrackingManager.get());
+    
     // Register service for dependency injection
     Mach1::ServiceLocator::getInstance().registerService(eventSystem);
     

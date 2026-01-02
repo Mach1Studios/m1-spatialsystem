@@ -58,6 +58,30 @@ int MemorySharePannerInfo::getState() const {
     return parameters.getInt(M1SystemHelperParameterIDs::STATE, 0);
 }
 
+int MemorySharePannerInfo::getPort() const {
+    return parameters.getInt(M1SystemHelperParameterIDs::PORT, 0);
+}
+
+std::string MemorySharePannerInfo::getDisplayName() const {
+    return parameters.getString(M1SystemHelperParameterIDs::DISPLAY_NAME, name);
+}
+
+int MemorySharePannerInfo::getColorR() const {
+    return parameters.getInt(M1SystemHelperParameterIDs::COLOR_R, 0);
+}
+
+int MemorySharePannerInfo::getColorG() const {
+    return parameters.getInt(M1SystemHelperParameterIDs::COLOR_G, 0);
+}
+
+int MemorySharePannerInfo::getColorB() const {
+    return parameters.getInt(M1SystemHelperParameterIDs::COLOR_B, 0);
+}
+
+int MemorySharePannerInfo::getColorA() const {
+    return parameters.getInt(M1SystemHelperParameterIDs::COLOR_A, 0);
+}
+
 // M1MemoryShareTracker implementation stubs
 M1MemoryShareTracker::M1MemoryShareTracker(uint32_t consumerId) : consumerId(consumerId) {
 }
@@ -133,18 +157,21 @@ bool M1MemoryShareTracker::isAvailable() const {
 }
 
 bool M1MemoryShareTracker::connectToPanner(MemorySharePannerInfo& panner) {
-    if (panner.isConnected || panner.memorySegmentName.empty()) {
+    if (panner.isConnected || panner.memoryFilePath.empty()) {
         return panner.isConnected;
     }
     
     try {
-        // Create M1MemoryShare instance to connect to existing segment
+        DBG("[M1MemoryShareTracker] Connecting to panner at: " + juce::String(panner.memoryFilePath));
+        
+        // Create M1MemoryShare instance with explicit file path
         panner.memoryShare = std::make_unique<M1MemoryShare>(
             panner.memorySegmentName, 
             1024 * 1024, // 1MB default size
             8,           // maxQueueSize
             true,        // persistent
-            false        // createMode = false (open existing)
+            false,       // createMode = false (open existing)
+            panner.memoryFilePath  // Explicit file path (std::string)
         );
         
         if (panner.memoryShare->isValid()) {
@@ -152,11 +179,15 @@ bool M1MemoryShareTracker::connectToPanner(MemorySharePannerInfo& panner) {
             if (panner.memoryShare->registerConsumer(consumerId)) {
                 panner.isConnected = true;
                 panner.lastUpdateTime = juce::Time::currentTimeMillis();
+                DBG("[M1MemoryShareTracker] Successfully connected to panner: " + juce::String(panner.name));
                 return true;
             }
         }
+        
+        DBG("[M1MemoryShareTracker] Failed to validate or register with panner");
     } catch (const std::exception& e) {
         // Connection failed
+        DBG("[M1MemoryShareTracker] Exception connecting to panner: " + juce::String(e.what()));
         panner.memoryShare.reset();
     }
     
@@ -193,7 +224,14 @@ bool M1MemoryShareTracker::updatePannerData(MemorySharePannerInfo& panner) {
 }
 
 void M1MemoryShareTracker::extractParametersFromBuffer(MemorySharePannerInfo& panner) {
-    // TODO: Extract parameters from shared memory buffer
+    // Extract display name from parameters (if available)
+    std::string displayName = panner.parameters.getString(M1SystemHelperParameterIDs::DISPLAY_NAME, "");
+    if (!displayName.empty()) {
+        panner.name = displayName;
+    }
+    
+    // Note: Other parameters (azimuth, elevation, etc.) are accessed via the getter methods
+    // which read directly from panner.parameters
 }
 
 bool M1MemoryShareTracker::readAudioBufferData(MemorySharePannerInfo& panner) {
@@ -220,6 +258,15 @@ bool M1MemoryShareTracker::readAudioBufferData(MemorySharePannerInfo& panner) {
         panner.isPlaying = isPlaying;
         panner.currentBufferId = bufferId;
         
+        // Update audio format info from the buffer
+        if (audioBuffer.getNumChannels() > 0) {
+            panner.channels = static_cast<uint32_t>(audioBuffer.getNumChannels());
+        }
+        if (audioBuffer.getNumSamples() > 0) {
+            panner.samplesPerBlock = static_cast<uint32_t>(audioBuffer.getNumSamples());
+        }
+        
+        // Extract display name and other parameters
         extractParametersFromBuffer(panner);
         return true;
     }
@@ -329,58 +376,70 @@ void M1MemoryShareTracker::scanForMemorySegments()
             
             if (parsePannerSegmentName(filename, name, processId, memoryAddress, timestamp))
             {
-                DBG("[M1MemoryShareTracker] Extracted timestamp: " + juce::String(timestamp));
-                DBG("[M1MemoryShareTracker] File creation timestamp: " + juce::String(timestamp));
+                DBG("[M1MemoryShareTracker] Parsed panner: " + juce::String(name) + " (PID: " + juce::String(processId) + ")");
                 
-                // Get file modification time
+                // PRIMARY CHECK: Is the process still running?
+                // This is more reliable than file modification time
+                bool processAlive = isProcessRunning(processId);
+                
+                if (!processAlive) {
+                    DBG("[M1MemoryShareTracker] Process " + juce::String(processId) + " is not running, skipping");
+                    continue;
+                }
+                
+                // SECONDARY CHECK: File modification time (only as a sanity check for very old files)
                 auto fileModTime = file.getLastModificationTime().toMilliseconds();
-                DBG("[M1MemoryShareTracker] File modification time: " + juce::String(fileModTime));
-                
-                // Check if file is recent enough (check modification time, not creation time)
                 auto currentTime = juce::Time::currentTimeMillis();
                 auto fileAge = currentTime - fileModTime;
                 
-                DBG("[M1MemoryShareTracker] File age since modification: " + juce::String(fileAge) + "ms (current: " + juce::String(currentTime) + ", modified: " + juce::String(fileModTime) + ")");
+                // Only reject if file is VERY old (1 hour) AND process check passed
+                // This catches orphaned files from crashed processes
+                const int64_t MAX_FILE_AGE_MS = 3600000; // 1 hour
+                bool isValid = (fileAge < MAX_FILE_AGE_MS);
                 
-                                 // Reasonable threshold for active panner detection  
-                 const int64_t FRESHNESS_THRESHOLD_MS = 120000; // 2 minutes
-                bool isRecent = fileAge < FRESHNESS_THRESHOLD_MS;
+                if (!isValid) {
+                    DBG("[M1MemoryShareTracker] File too old (" + juce::String(fileAge / 60000) + " minutes), skipping");
+                    continue;
+                }
                 
-                DBG("[M1MemoryShareTracker] File is recent (< " + juce::String(FRESHNESS_THRESHOLD_MS) + "ms): " + juce::String(isRecent ? "true" : "false"));
+                DBG("[M1MemoryShareTracker] Process alive and file valid, processing panner");
                 
-                if (isRecent)
+                // Check if we already have this panner
+                auto existing = findPanner(processId, memoryAddress);
+                if (!existing)
                 {
-                    // Check if we already have this panner
-                    auto existing = findPanner(processId, memoryAddress);
-                    if (!existing)
+                    // Create new panner info
+                    MemorySharePannerInfo newPanner;
+                    newPanner.name = name;
+                    newPanner.processId = processId;
+                    newPanner.memoryAddress = memoryAddress;
+                    newPanner.creationTimestamp = timestamp;
+                    newPanner.memorySegmentName = filename;
+                    newPanner.memoryFilePath = file.getFullPathName().toStdString();  // Store full path!
+                    newPanner.isActive = true;
+                    
+                    DBG("[M1MemoryShareTracker] Creating panner with path: " + file.getFullPathName());
+                    
+                    // Try to connect
+                    if (connectToPanner(newPanner))
                     {
-                        // Create new panner info
-                        MemorySharePannerInfo newPanner;
-                        newPanner.name = name;
-                        newPanner.processId = processId;
-                        newPanner.memoryAddress = memoryAddress;
-                        newPanner.creationTimestamp = timestamp;
-                        newPanner.memorySegmentName = filename;
-                        newPanner.isActive = true;
-                        
-                        // Try to connect
-                        if (connectToPanner(newPanner))
-                        {
-                            activePanners.emplace_back(std::move(newPanner));
-                            totalActivePanners++;
-                            foundActiveFiles = true;
-                            DBG("[M1MemoryShareTracker] Connected to new panner: " + name + " (PID: " + std::to_string(processId) + ")");
-                        }
-                    }
-                    else
-                    {
-                        // Update existing panner's last seen time
-                        existing->lastUpdateTime = currentTime;
+                        activePanners.emplace_back(std::move(newPanner));
                         totalActivePanners++;
                         foundActiveFiles = true;
+                        DBG("[M1MemoryShareTracker] Connected to new panner: " + name + " (PID: " + std::to_string(processId) + ")");
                     }
-                } else {
-                    DBG("[M1MemoryShareTracker] File is too old (" + juce::String(fileAge) + "ms), ignoring");
+                }
+                else
+                {
+                    // Update existing panner's last seen time
+                    existing->lastUpdateTime = currentTime;
+                    totalActivePanners++;
+                    foundActiveFiles = true;
+                    
+                    // Also try to read latest data
+                    if (existing->isConnected) {
+                        updatePannerData(*existing);
+                    }
                 }
             }
         }
@@ -412,7 +471,7 @@ bool M1MemoryShareTracker::parsePannerSegmentName(const std::string& filename,
     if (prefixPos == std::string::npos) return false;
     
     std::string pannerPart = filename.substr(prefixPos + 16); // 16 = length of "M1SpatialSystem_"
-    name = pannerPart;
+    // Note: We'll set a human-readable name after parsing the PID
     
     // Parse PID
     size_t pidPos = pannerPart.find("_PID");
@@ -465,6 +524,9 @@ bool M1MemoryShareTracker::parsePannerSegmentName(const std::string& filename,
         return false;
     }
     
+    // Set human-readable name: "M1-Panner (PID 12345)"
+    name = "M1-Panner (PID " + std::to_string(processId) + ")";
+    
     return true;
 }
 
@@ -481,13 +543,32 @@ void M1MemoryShareTracker::cleanupInactivePanners() {
     
     auto it = activePanners.begin();
     while (it != activePanners.end()) {
-        if (!it->isConnected || 
-            (currentTime - it->lastUpdateTime > PANNER_TIMEOUT_MS)) {
-            
+        bool shouldRemove = false;
+        std::string reason;
+        
+        // Check if not connected
+        if (!it->isConnected) {
+            shouldRemove = true;
+            reason = "not connected";
+        }
+        // Check if timed out AND process is no longer running
+        else if (currentTime - it->lastUpdateTime > PANNER_TIMEOUT_MS) {
+            // Only remove if the process is actually dead
+            if (!isProcessRunning(it->processId)) {
+                shouldRemove = true;
+                reason = "process " + std::to_string(it->processId) + " no longer running";
+            } else {
+                // Process still running - just mark as stale but keep tracking
+                // The panner might just not be playing audio
+                it->isActive = false;
+            }
+        }
+        
+        if (shouldRemove) {
+            DBG("[M1MemoryShareTracker] Removing panner: " + juce::String(it->name) + " (" + reason + ")");
             if (it->isConnected) {
                 disconnectFromPanner(*it);
             }
-            
             it = activePanners.erase(it);
         } else {
             ++it;

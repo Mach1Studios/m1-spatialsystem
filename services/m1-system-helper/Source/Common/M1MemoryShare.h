@@ -102,12 +102,14 @@ public:
      * @param maxQueueSize Maximum number of buffers to queue (default: 8)
      * @param persistent If true, memory persists until manually deleted; if false, cleaned up when process exits
      * @param createMode If true, creates new segment; if false, opens existing segment
+     * @param explicitFilePath Optional full path to the memory file (bypasses directory search)
      */
     M1MemoryShare(const std::string& memoryName,
                   size_t totalSize,
                   uint32_t maxQueueSize = 8,
                   bool persistent = true,
-                  bool createMode = true);
+                  bool createMode = true,
+                  const std::string& explicitFilePath = "");
 
     ~M1MemoryShare();
 
@@ -345,6 +347,9 @@ private:
     int findConsumerIndex(uint32_t consumerId) const;
     bool isConsumerRegistered(uint32_t consumerId) const;
 
+    // Explicit file path (if provided, bypasses search)
+    std::string m_explicitFilePath;
+    
     // Prevent copying
     M1MemoryShare(const M1MemoryShare&) = delete;
     M1MemoryShare& operator=(const M1MemoryShare&) = delete;
