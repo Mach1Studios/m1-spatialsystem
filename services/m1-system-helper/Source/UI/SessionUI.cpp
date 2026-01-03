@@ -12,14 +12,15 @@ namespace Mach1 {
 // SessionMainComponent
 //==============================================================================
 
-SessionMainComponent::SessionMainComponent(PannerTrackingManager& manager)
+SessionMainComponent::SessionMainComponent(PannerTrackingManager& manager, bool debugFakeBlocks)
     : pannerManager(manager)
+    , m_debugFakeBlocks(debugFakeBlocks)
 {
     // Create components
     inputPanelContainer = std::make_unique<InputPanelContainer>();
     view3DComponent = std::make_unique<Panner3DViewPanel>();
     monitorComponent = std::make_unique<MonitorPanel>();
-    timelineComponent = std::make_unique<TimelineComponent>();
+    captureTimelinePanel = std::make_unique<CaptureTimelinePanel>();
     
     // Set up callbacks
     inputPanelContainer->onSelectionChanged = [this](int index) {
@@ -32,14 +33,27 @@ SessionMainComponent::SessionMainComponent(PannerTrackingManager& manager)
         inputPanelContainer->setSelectedPanner(index);
     };
     
+    // Set up capture timeline callbacks
+    captureTimelinePanel->onResetClicked = [this]() {
+        DBG("[SessionMainComponent] Timeline reset clicked");
+    };
+    
+    captureTimelinePanel->onExportClicked = [this]() {
+        DBG("[SessionMainComponent] Timeline export clicked");
+        // TODO: Implement export
+    };
+    
     // Add as visible children
     addAndMakeVisible(inputPanelContainer.get());
     addAndMakeVisible(view3DComponent.get());
     addAndMakeVisible(monitorComponent.get());
-    addAndMakeVisible(timelineComponent.get());
+    addAndMakeVisible(captureTimelinePanel.get());
     
     // Set up layout
     setupLayout();
+    
+    // Set up capture engine
+    setupCaptureEngine(debugFakeBlocks);
     
     // Initial data update
     updateFromManager();
@@ -51,6 +65,62 @@ SessionMainComponent::SessionMainComponent(PannerTrackingManager& manager)
 SessionMainComponent::~SessionMainComponent()
 {
     stopTimer();
+    
+    // Stop capture engine
+    if (captureEngine)
+    {
+        captureEngine->stopCapture();
+    }
+}
+
+void SessionMainComponent::setupCaptureEngine(bool debugFakeBlocks)
+{
+    captureEngine = std::make_unique<CaptureEngine>(pannerManager);
+    
+    // Enable debug mode if requested
+    if (debugFakeBlocks)
+    {
+        captureEngine->setDebugFakeBlocks(true);
+        DBG("[SessionMainComponent] Debug fake blocks mode enabled");
+    }
+    
+    // Connect to capture timeline panel
+    captureTimelinePanel->setCaptureEngine(captureEngine.get());
+    
+    // Auto-start capture with default session
+    startCapture();
+}
+
+bool SessionMainComponent::startCapture(const juce::String& sessionId)
+{
+    if (!captureEngine)
+        return false;
+    
+    // Generate session ID if not provided
+    juce::String actualSessionId = sessionId;
+    if (actualSessionId.isEmpty())
+    {
+        actualSessionId = "Session_" + juce::Time::getCurrentTime().formatted("%Y%m%d_%H%M%S");
+    }
+    
+    // Use temp directory for capture storage
+    juce::File captureRoot = juce::File::getSpecialLocation(juce::File::tempDirectory)
+        .getChildFile("M1SpatialSystem_Captures");
+    
+    return captureEngine->startCapture(actualSessionId, captureRoot);
+}
+
+void SessionMainComponent::stopCapture()
+{
+    if (captureEngine)
+    {
+        captureEngine->stopCapture();
+    }
+}
+
+bool SessionMainComponent::isCapturing() const
+{
+    return captureEngine && captureEngine->isCapturing();
 }
 
 void SessionMainComponent::setupLayout()
@@ -92,7 +162,7 @@ void SessionMainComponent::resized()
     auto bounds = getLocalBounds();
     
     // Vertical layout for main content vs timeline
-    juce::Component* verticalComps[] = { nullptr, mainTimelineResizer.get(), timelineComponent.get() };
+    juce::Component* verticalComps[] = { nullptr, mainTimelineResizer.get(), captureTimelinePanel.get() };
     verticalLayout.layOutComponents(verticalComps, 3, 
                                     bounds.getX(), bounds.getY(), 
                                     bounds.getWidth(), bounds.getHeight(),
@@ -137,7 +207,7 @@ void SessionMainComponent::updateFromManager()
     
     inputPanelContainer->updatePannerData(panners);
     view3DComponent->updatePannerData(panners);
-    timelineComponent->updateBufferEvents(panners);
+    // Note: CaptureTimelinePanel updates itself via CaptureEngine's ChangeBroadcaster
 }
 
 //==============================================================================
@@ -161,12 +231,13 @@ SessionUI::MyMenuBarModel::~MyMenuBarModel()
 // SessionUI
 //==============================================================================
 
-SessionUI::SessionUI(PannerTrackingManager& manager)
+SessionUI::SessionUI(PannerTrackingManager& manager, bool debugFakeBlocks)
     : pannerManager(manager),
       lastPannerCount(-1),
       lastMemoryShareStatus(false),
       lastOSCStatus(false),
-      isMenuTimer(false)
+      isMenuTimer(false),
+      m_debugFakeBlocks(debugFakeBlocks)
 {
     DBG("[SessionUI] Constructor started - using timer-based system tray");
     
@@ -314,8 +385,8 @@ void SessionUI::showSessionWindow()
     
     if (!sessionWindow)
     {
-        // Create the main component
-        mainComponent = std::make_unique<SessionMainComponent>(pannerManager);
+        // Create the main component with debug flag
+        mainComponent = std::make_unique<SessionMainComponent>(pannerManager, m_debugFakeBlocks);
         
         // Create the window
         sessionWindow = std::make_unique<SessionDocumentWindow>(

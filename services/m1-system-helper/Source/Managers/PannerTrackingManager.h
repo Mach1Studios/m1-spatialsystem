@@ -25,6 +25,15 @@
 namespace Mach1 {
 
 /**
+ * Connection status for panner instances
+ */
+enum class PannerConnectionStatus {
+    Active,       // Recently updated, actively streaming
+    Stale,        // Timed out but process still running (not playing audio)
+    Disconnected  // Process no longer running or connection lost
+};
+
+/**
  * Unified panner information structure
  * Normalizes data from both M1MemoryShare and OSC sources
  */
@@ -38,6 +47,7 @@ struct PannerInfo {
     bool isActive = false;
     bool isMemoryShareBased = false;  // true = M1MemoryShare, false = OSC
     juce::int64 lastUpdateTime = 0;
+    PannerConnectionStatus connectionStatus = PannerConnectionStatus::Active;
     
     // Audio info
     uint32_t sampleRate = 44100;
@@ -52,6 +62,7 @@ struct PannerInfo {
     float stereoOrbitAzimuth = 0.0f;
     float stereoSpread = 50.0f;
     float stereoInputBalance = 0.0f;
+    bool autoOrbit = true;
     
     // DAW integration
     uint64_t dawTimestamp = 0;
@@ -69,8 +80,8 @@ struct PannerInfo {
     
     // Modes
     int inputMode = 0;
+    int outputMode = 0;
     int pannerMode = 0;
-    bool autoOrbit = false;
     
     bool operator==(const PannerInfo& other) const {
         return port == other.port && processId == other.processId;

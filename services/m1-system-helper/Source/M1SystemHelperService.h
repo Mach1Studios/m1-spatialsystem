@@ -23,6 +23,10 @@ public:
     void initialise();
     void shutdown();
     
+    // Debug mode control
+    void setDebugFakeBlocks(bool enabled) { debugFakeBlocks = enabled; }
+    bool isDebugFakeBlocks() const { return debugFakeBlocks; }
+    
     // Accessors for managers
     ClientManager& getClientManager() { return *clientManager; }
     PluginManager& getPluginManager() { return *pluginManager; }
@@ -63,6 +67,7 @@ private:
     // UI component
     std::unique_ptr<SessionUI> sessionUI;
     bool showSessionUI = true;  // Default to showing UI for debugging
+    bool debugFakeBlocks = false;  // Debug mode for fake capture blocks
     
     juce::int64 timeWhenHelperLastSeenAClient = 0;
     

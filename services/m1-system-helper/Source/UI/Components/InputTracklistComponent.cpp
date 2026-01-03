@@ -147,6 +147,8 @@ void InputTracklistComponent::paintCell(juce::Graphics& g, int rowNumber, int co
             g.setColour(streamingColour);
         else if (statusText.containsIgnoreCase("native") || statusText.containsIgnoreCase("active"))
             g.setColour(nativeColour);
+        else if (statusText.containsIgnoreCase("stale"))
+            g.setColour(staleColour);
         else if (statusText.containsIgnoreCase("offline"))
             g.setColour(offlineColour);
         else if (statusText.containsIgnoreCase("expired"))
@@ -291,7 +293,21 @@ juce::String InputTracklistComponent::getColumnText(int rowNumber, int columnId)
 
 juce::String InputTracklistComponent::getModeStatusText(const PannerInfo& panner) const
 {
-    // Determine status based on panner state
+    // Use the connection status enum if available
+    switch (panner.connectionStatus)
+    {
+        case PannerConnectionStatus::Stale:
+            return "Stale";
+            
+        case PannerConnectionStatus::Disconnected:
+            return "Disconnected";
+            
+        case PannerConnectionStatus::Active:
+        default:
+            break;
+    }
+    
+    // Determine status based on panner state for Active connection
     if (!panner.isActive)
     {
         return "Expired";

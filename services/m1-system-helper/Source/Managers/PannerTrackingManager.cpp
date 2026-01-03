@@ -484,6 +484,15 @@ PannerInfo PannerTrackingManager::convertFromMemoryShare(const MemorySharePanner
     panner.isMemoryShareBased = true;
     panner.lastUpdateTime = info.lastUpdateTime;
     
+    // Connection status - infer from isStale flag
+    if (info.isStale) {
+        panner.connectionStatus = PannerConnectionStatus::Stale;
+    } else if (info.isActive) {
+        panner.connectionStatus = PannerConnectionStatus::Active;
+    } else {
+        panner.connectionStatus = PannerConnectionStatus::Disconnected;
+    }
+    
     // Audio info
     panner.sampleRate = info.sampleRate;
     panner.channels = info.channels;
@@ -591,21 +600,30 @@ void PannerTrackingManager::cleanupInactivePanners() {
     auto it = activePanners.begin();
     while (it != activePanners.end()) {
         bool shouldRemove = false;
+        auto timeSinceUpdate = currentTime - it->lastUpdateTime;
         
         // Only consider removal if timed out
-        if ((currentTime - it->lastUpdateTime) > PANNER_TIMEOUT_MS) {
+        if (timeSinceUpdate > PANNER_TIMEOUT_MS) {
             // For memory-share based panners, check if process is still running
             if (it->isMemoryShareBased && it->processId != 0) {
                 if (!isProcessRunning(it->processId)) {
                     shouldRemove = true;
+                    it->connectionStatus = PannerConnectionStatus::Disconnected;
                     DBG("[PannerTrackingManager] Removing panner (process dead): " + it->name);
+                } else {
+                    // Process is running but no updates - mark as stale (not playing audio)
+                    it->connectionStatus = PannerConnectionStatus::Stale;
+                    it->isActive = false;
                 }
-                // If process is running, keep it even if "timed out"
             } else {
                 // For OSC panners, use timeout-based removal
                 shouldRemove = true;
+                it->connectionStatus = PannerConnectionStatus::Disconnected;
                 DBG("[PannerTrackingManager] Removing OSC panner (timed out): " + it->name);
             }
+        } else {
+            // Recently updated - mark as active
+            it->connectionStatus = PannerConnectionStatus::Active;
         }
         
         if (shouldRemove) {

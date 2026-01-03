@@ -300,11 +300,18 @@ public:
     void initialise(const juce::String& commandLine) override {
         DBG("[M1SystemHelper] Initializing with command line: " + commandLine);
         
-        // Parse command line for --debug-fake-panners N
+        // Parse command line for --debug-fake-panners N and --debug-fake-blocks
         parseFakePannersFlag(commandLine);
+        parseDebugFakeBlocksFlag(commandLine);
         
         // Setup socket activation for on-demand startup
         SocketActivationHandler::setupSocketActivation();
+        
+        // Set debug flags on the service
+        if (debugFakeBlocks)
+        {
+            Mach1::M1SystemHelperService::getInstance().setDebugFakeBlocks(true);
+        }
         
         // Initialize the service directly on the main thread (no separate thread)
         Mach1::M1SystemHelperService::getInstance().initialise();
@@ -396,7 +403,25 @@ private:
         }
     }
     
+    void parseDebugFakeBlocksFlag(const juce::String& commandLine)
+    {
+        // Look for --debug-fake-blocks
+        juce::StringArray args;
+        args.addTokens(commandLine, " ", "\"");
+        
+        for (int i = 0; i < args.size(); ++i)
+        {
+            if (args[i] == "--debug-fake-blocks")
+            {
+                debugFakeBlocks = true;
+                DBG("[M1SystemHelper] Debug mode: fake block generation enabled for capture timeline testing");
+                break;
+            }
+        }
+    }
+    
     int debugFakePannerCount = 0;
+    bool debugFakeBlocks = false;
     std::unique_ptr<Mach1::FakePannerSimulator> fakePannerSimulator;
 };
 

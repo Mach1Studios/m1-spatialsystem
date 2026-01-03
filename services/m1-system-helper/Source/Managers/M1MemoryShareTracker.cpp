@@ -558,10 +558,16 @@ void M1MemoryShareTracker::cleanupInactivePanners() {
                 shouldRemove = true;
                 reason = "process " + std::to_string(it->processId) + " no longer running";
             } else {
-                // Process still running - just mark as stale but keep tracking
+                // Process still running - mark as stale but keep tracking
                 // The panner might just not be playing audio
                 it->isActive = false;
+                it->isStale = true;
+                DBG("[M1MemoryShareTracker] Panner marked stale (process running, no updates): " + 
+                    juce::String(it->name) + " (PID: " + std::to_string(it->processId) + ")");
             }
+        } else {
+            // Recently updated - clear stale flag
+            it->isStale = false;
         }
         
         if (shouldRemove) {

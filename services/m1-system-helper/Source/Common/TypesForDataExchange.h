@@ -134,7 +134,11 @@ struct GenericAudioBufferHeader
     uint32_t consumerCount;     // Number of expected consumers
     uint32_t acknowledgedCount; // Number of consumers that have acknowledged
     
-    uint32_t reserved[2];       // Reserved for future expansion (reduced from 4 to 2)
+    // Sample-accurate position for capture/export (v2 field)
+    int64_t startSamplePosition; // Sample position in DAW timeline (calculated from playheadPositionInSeconds * sampleRate)
+    uint32_t sampleRate;         // Sample rate for this buffer (for startSamplePosition calculation)
+    
+    uint32_t reserved[1];       // Reserved for future expansion
 
     // Parameters follow immediately after this struct
     // Each parameter is: GenericParameter + parameter data
@@ -144,7 +148,7 @@ struct GenericAudioBufferHeader
                                 headerSize(sizeof(GenericAudioBufferHeader)), updateSource(1),
                                 isUpdatingFromExternal(0), bufferId(0), sequenceNumber(0),
                                 bufferTimestamp(0), requiresAcknowledgment(0), consumerCount(0),
-                                acknowledgedCount(0)
+                                acknowledgedCount(0), startSamplePosition(0), sampleRate(44100)
     {
         std::memset(reserved, 0, sizeof(reserved));
     }

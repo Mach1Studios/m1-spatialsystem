@@ -60,6 +60,7 @@ struct MemorySharePannerInfo {
     
     // Status
     bool isActive = false;
+    bool isStale = false;  // True if timed out but process still running
     juce::int64 lastUpdateTime = 0;
     
     // Default constructor

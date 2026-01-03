@@ -123,6 +123,7 @@ private:
     juce::Colour nativeColour{0xFF2196F3};                // Blue for native
     juce::Colour offlineColour{0xFF9E9E9E};               // Gray for offline
     juce::Colour expiredColour{0xFFF44336};               // Red for expired
+    juce::Colour staleColour{0xFFFFEB3B};                 // Yellow for stale (not playing but connected)
     
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(InputTracklistComponent)
 };

@@ -84,9 +84,12 @@ void M1SystemHelperService::initialise() {
     if (showSessionUI && pannerTrackingManager) {
         juce::MessageManager::callAsync([this]() {
             if (pannerTrackingManager && showSessionUI) {
-                sessionUI = std::make_unique<SessionUI>(*pannerTrackingManager);
+                sessionUI = std::make_unique<SessionUI>(*pannerTrackingManager, debugFakeBlocks);
                 sessionUI->setVisible(true);  // Shows system tray icon
                 DBG("[M1SystemHelperService] Created system tray icon on main thread");
+                if (debugFakeBlocks) {
+                    DBG("[M1SystemHelperService] Debug fake blocks enabled");
+                }
             }
         });
     }

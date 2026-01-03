@@ -34,6 +34,10 @@ set(CORE_SOURCES
     Core/AudioStreaming.cpp
     Core/ExternalMixerProcessor.h
     Core/ExternalMixerProcessor.cpp
+    Core/CoverageModel.h
+    Core/CoverageModel.cpp
+    Core/CaptureEngine.h
+    Core/CaptureEngine.cpp
 )
 
 # Network files
@@ -74,6 +78,8 @@ set(UI_COMPONENT_SOURCES
     UI/Components/InputPanelContainer.cpp
     UI/Components/TimelineComponent.h
     UI/Components/TimelineComponent.cpp
+    UI/Components/CaptureTimelinePanel.h
+    UI/Components/CaptureTimelinePanel.cpp
     UI/Components/Panner3DViewPanel.h
     UI/Components/Panner3DViewPanel.cpp
     UI/Components/MonitorPanel.h

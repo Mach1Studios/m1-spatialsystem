@@ -15,8 +15,10 @@
 
 #include <JuceHeader.h>
 #include "../Managers/PannerTrackingManager.h"
+#include "../Core/CaptureEngine.h"
 #include "Components/InputPanelContainer.h"
 #include "Components/TimelineComponent.h"
+#include "Components/CaptureTimelinePanel.h"
 #include "Components/Panner3DViewPanel.h"
 #include "Components/MonitorPanel.h"
 
@@ -52,7 +54,7 @@ class SessionMainComponent : public juce::Component,
                              private juce::Timer
 {
 public:
-    SessionMainComponent(PannerTrackingManager& manager);
+    SessionMainComponent(PannerTrackingManager& manager, bool debugFakeBlocks = false);
     ~SessionMainComponent() override;
     
     void resized() override;
@@ -67,19 +69,29 @@ public:
     // Access to components
     InputPanelContainer* getInputPanel() { return inputPanelContainer.get(); }
     Panner3DViewPanel* get3DView() { return view3DComponent.get(); }
-    TimelineComponent* getTimeline() { return timelineComponent.get(); }
+    CaptureTimelinePanel* getCaptureTimeline() { return captureTimelinePanel.get(); }
+    CaptureEngine* getCaptureEngine() { return captureEngine.get(); }
+    
+    // Capture control
+    bool startCapture(const juce::String& sessionId = "");
+    void stopCapture();
+    bool isCapturing() const;
 
 private:
     void setupLayout();
+    void setupCaptureEngine(bool debugFakeBlocks);
     
     // Reference to panner manager
     PannerTrackingManager& pannerManager;
+    
+    // Capture Engine (background thread)
+    std::unique_ptr<CaptureEngine> captureEngine;
     
     // UI Components
     std::unique_ptr<InputPanelContainer> inputPanelContainer;
     std::unique_ptr<Panner3DViewPanel> view3DComponent;
     std::unique_ptr<MonitorPanel> monitorComponent;
-    std::unique_ptr<TimelineComponent> timelineComponent;
+    std::unique_ptr<CaptureTimelinePanel> captureTimelinePanel;
     
     // Layout managers
     juce::StretchableLayoutManager verticalLayout;   // Main vs Timeline
@@ -95,6 +107,9 @@ private:
     juce::Colour backgroundColour{0xFF1A1A1A};
     juce::Colour resizerColour{0xFF404040};
     
+    // Debug mode
+    bool m_debugFakeBlocks = false;
+    
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SessionMainComponent)
 };
 
@@ -106,8 +121,11 @@ class SessionUI : public juce::SystemTrayIconComponent,
                   private juce::Timer
 {
 public:
-    SessionUI(PannerTrackingManager& manager);
+    SessionUI(PannerTrackingManager& manager, bool debugFakeBlocks = false);
     ~SessionUI() override;
+    
+    // Debug mode
+    void setDebugFakeBlocks(bool enabled) { m_debugFakeBlocks = enabled; }
 
     // SystemTrayIconComponent overrides
     void mouseDown(const juce::MouseEvent& event) override;
@@ -138,6 +156,7 @@ private:
     bool lastMemoryShareStatus;
     bool lastOSCStatus;
     bool isMenuTimer = false;  // Flag to distinguish menu vs data timers
+    bool m_debugFakeBlocks = false;  // Debug mode for fake block generation
     
     // MenuBarModel for macOS compatibility
     class MyMenuBarModel : public juce::MenuBarModel
