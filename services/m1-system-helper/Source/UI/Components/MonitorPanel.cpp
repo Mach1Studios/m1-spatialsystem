@@ -11,17 +11,15 @@ namespace Mach1 {
 //==============================================================================
 MonitorPanel::MonitorPanel()
 {
-    // Title label
-    titleLabel = std::make_unique<juce::Label>("title", "Monitor Interface");
-    titleLabel->setFont(juce::Font(14.0f, juce::Font::bold));
-    titleLabel->setColour(juce::Label::textColourId, textColour);
-    titleLabel->setJustificationType(juce::Justification::centred);
-    addAndMakeVisible(titleLabel.get());
+    // Title label (hidden, we draw it in paint)
+    titleLabel = std::make_unique<juce::Label>("title", "");
+    titleLabel->setVisible(false);
+    addChildComponent(titleLabel.get());
     
     // Status label
     statusLabel = std::make_unique<juce::Label>("status", 
-        "Reserved space for m1-monitor GUI");
-    statusLabel->setFont(juce::Font(12.0f));
+        "Monitoring UI placeholder");
+    statusLabel->setFont(juce::Font(10.0f));
     statusLabel->setColour(juce::Label::textColourId, dimTextColour);
     statusLabel->setJustificationType(juce::Justification::centred);
     addAndMakeVisible(statusLabel.get());
@@ -37,70 +35,78 @@ void MonitorPanel::paint(juce::Graphics& g)
     // Fill background
     g.fillAll(backgroundColour);
     
+    // Draw toolbar area
+    auto bounds = getLocalBounds();
+    auto toolbarBounds = bounds.removeFromTop(TOOLBAR_HEIGHT);
+    
+    g.setColour(toolbarColour);
+    g.fillRect(toolbarBounds);
+    
+    // Draw section title
+    g.setColour(juce::Colour(0xFF808080));
+    g.setFont(juce::Font(11.0f, juce::Font::bold));
+    g.drawText("M1 SPATIAL OUT", toolbarBounds.withLeft(10), juce::Justification::centredLeft);
+    
+    g.setColour(borderColour);
+    g.drawHorizontalLine(TOOLBAR_HEIGHT - 1, 0, (float)getWidth());
+    
     // Draw border
     g.setColour(borderColour);
     g.drawRect(getLocalBounds(), 1);
     
-    // Draw placeholder icon/graphic
+    // Draw placeholder content if no embedded monitor
     if (embeddedMonitor == nullptr)
     {
-        auto bounds = getLocalBounds().reduced(20);
-        auto iconBounds = bounds.withSizeKeepingCentre(80, 80).translated(0, -20);
+        auto contentBounds = bounds.reduced(20);
         
-        // Draw speaker/monitor icon placeholder
+        // Draw compass-like circle (matching reference)
+        auto circleSize = juce::jmin(contentBounds.getWidth(), contentBounds.getHeight()) * 0.5f;
+        auto circleBounds = contentBounds.toFloat()
+            .withSizeKeepingCentre(circleSize, circleSize)
+            .translated(0, -20);
+        
         g.setColour(borderColour);
-        g.drawRoundedRectangle(iconBounds.toFloat(), 8.0f, 2.0f);
+        g.drawEllipse(circleBounds, 1.0f);
         
-        // Draw simple speaker cone
-        auto centerX = iconBounds.getCentreX();
-        auto centerY = iconBounds.getCentreY();
+        // Draw crosshairs
+        auto centerX = circleBounds.getCentreX();
+        auto centerY = circleBounds.getCentreY();
+        auto radius = circleSize * 0.5f;
         
-        g.setColour(dimTextColour.withAlpha(0.3f));
+        g.setColour(juce::Colour(0xFF333333));
+        g.drawLine(centerX - radius, centerY, centerX + radius, centerY, 1.0f);
+        g.drawLine(centerX, centerY - radius, centerX, centerY + radius, 1.0f);
         
-        // Draw concentric arcs representing sound waves
-        for (int i = 0; i < 3; ++i)
-        {
-            float radius = 15.0f + i * 12.0f;
-            float startAngle = -juce::MathConstants<float>::pi * 0.3f;
-            float endAngle = juce::MathConstants<float>::pi * 0.3f;
-            
-            juce::Path arc;
-            arc.addCentredArc(centerX, centerY, radius, radius, 0, startAngle, endAngle, true);
-            g.strokePath(arc, juce::PathStrokeType(2.0f));
-        }
+        // Draw center marker
+        g.setColour(accentColour);
+        g.fillEllipse(centerX - 4, centerY - 4, 8, 8);
         
-        // Draw speaker symbol
-        g.fillRect(centerX - 20, centerY - 10, 15, 20);
-        
-        juce::Path cone;
-        cone.addTriangle(centerX - 5, centerY - 15, 
-                         centerX - 5, centerY + 15, 
-                         centerX + 15, centerY);
-        g.fillPath(cone);
+        // Draw cardinal direction labels
+        g.setColour(dimTextColour);
+        g.setFont(juce::Font(9.0f));
+        g.drawText("F", centerX - 10, centerY - radius - 15, 20, 15, juce::Justification::centred);
+        g.drawText("B", centerX - 10, centerY + radius + 2, 20, 15, juce::Justification::centred);
+        g.drawText("L", centerX - radius - 18, centerY - 7, 15, 15, juce::Justification::centred);
+        g.drawText("R", centerX + radius + 5, centerY - 7, 15, 15, juce::Justification::centred);
     }
 }
 
 void MonitorPanel::resized()
 {
     auto bounds = getLocalBounds();
+    bounds.removeFromTop(TOOLBAR_HEIGHT);  // Skip toolbar area
     
     if (embeddedMonitor != nullptr)
     {
-        // If we have an embedded monitor, give it full space
+        // If we have an embedded monitor, give it space below toolbar
         embeddedMonitor->setBounds(bounds);
-        titleLabel->setVisible(false);
         statusLabel->setVisible(false);
     }
     else
     {
         // Show placeholder content
-        titleLabel->setVisible(true);
         statusLabel->setVisible(true);
-        
-        titleLabel->setBounds(bounds.removeFromTop(30));
-
-        // Status label gets remaining space in center
-        statusLabel->setBounds(bounds.reduced(10).translated(0, 40));
+        statusLabel->setBounds(bounds.removeFromBottom(30).reduced(10, 5));
     }
 }
 

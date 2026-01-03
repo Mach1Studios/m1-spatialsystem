@@ -257,24 +257,26 @@ private:
     // Toolbar height
     static constexpr int TOOLBAR_HEIGHT = 28;
     
-    // Styling
-    juce::Colour backgroundColour{0xFF1A1A1A};
-    juce::Colour cubeColour{0xFF505050};
-    juce::Colour gridColour{0xFF303030};
-    juce::Colour floorGridColour{0xFF353535};
+    // Styling - matching reference design
+    juce::Colour backgroundColour{0xFF0D0D0D};
+    juce::Colour cubeColour{0xFF333333};
+    juce::Colour gridColour{0xFF1A1A1A};
+    juce::Colour floorGridColour{0xFF222222};
     
-    // Mach1 axis colors (X=Red, Y=Green, Z=Blue)
-    juce::Colour axisXColour{0xFFE06060};  // Red for X (left/right)
-    juce::Colour axisYColour{0xFF60E060};  // Green for Y (up/down)
-    juce::Colour axisZColour{0xFF6060E0};  // Blue for Z (forward/back)
+    // Mach1 axis colors (muted to match reference)
+    juce::Colour axisXColour{0xFF6B6B6B};  // X
+    juce::Colour axisYColour{0xFF6B6B6B};  // Y (matches accent)
+    juce::Colour axisZColour{0xFF6B6B6B};  // Z
     
-    juce::Colour reticleColour{0xFF4CAF50};
-    juce::Colour selectedReticleColour{0xFFF5B942};  // Mach1 yellow
-    juce::Colour textColour{0xFFE0E0E0};
-    juce::Colour labelBackgroundColour{0xCC1A1A1A};
-    juce::Colour buttonColour{0xFF404040};
-    juce::Colour buttonHoverColour{0xFF505050};
-    juce::Colour buttonActiveColour{0xFFF5B942};
+    juce::Colour reticleColour{0xFF939393};
+    juce::Colour selectedReticleColour{0xFFFFAA00};  // m1-yellow
+    juce::Colour textColour{0xFFCCCCCC};
+    juce::Colour labelBackgroundColour{0xDD0D0D0D};
+    juce::Colour buttonColour{0xFF1F1F1F};
+    juce::Colour buttonHoverColour{0xFF2A2A2A};
+    juce::Colour buttonActiveColour{0xFF939393};
+    juce::Colour toolbarColour{0xFF141414};
+    juce::Colour borderColour{0xFF2A2A2A};
     
     // Configuration
     static constexpr float CUBE_SIZE = 1.0f;

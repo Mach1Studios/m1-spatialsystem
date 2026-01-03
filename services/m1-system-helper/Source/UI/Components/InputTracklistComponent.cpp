@@ -11,21 +11,23 @@ namespace Mach1 {
 //==============================================================================
 InputTracklistComponent::InputTracklistComponent()
 {
-    // Create title label
-    titleLabel = std::make_unique<juce::Label>("title", "Input Tracklist");
-    titleLabel->setFont(juce::Font(14.0f, juce::Font::bold));
-    titleLabel->setColour(juce::Label::textColourId, textColour);
-    titleLabel->setJustificationType(juce::Justification::centred);
-    addAndMakeVisible(titleLabel.get());
+    // Create title label (hidden - container handles title now)
+    titleLabel = std::make_unique<juce::Label>("title", "");
+    titleLabel->setVisible(false);
+    addChildComponent(titleLabel.get());
     
-    // Create table
+    // Create table with reference styling
     table = std::make_unique<juce::TableListBox>("PannerTable", this);
     table->setColour(juce::TableListBox::backgroundColourId, backgroundColour);
     table->setColour(juce::TableListBox::textColourId, textColour);
+    table->setColour(juce::TableListBox::outlineColourId, borderColour);
     table->setColour(juce::TableHeaderComponent::backgroundColourId, headerColour);
-    table->setColour(juce::TableHeaderComponent::textColourId, textColour);
+    table->setColour(juce::TableHeaderComponent::textColourId, juce::Colour(0xFF808080));
+    table->setColour(juce::TableHeaderComponent::highlightColourId, juce::Colour(0xFF1F1F1F));
     table->getHeader().setStretchToFitActive(true);
     table->setMultipleSelectionEnabled(false);
+    table->setRowHeight(22);  // Compact rows like reference
+    table->getHeader().setColour(juce::TableHeaderComponent::outlineColourId, borderColour);
     addAndMakeVisible(table.get());
     
     // Set up columns
@@ -88,11 +90,8 @@ void InputTracklistComponent::resized()
 {
     auto bounds = getLocalBounds();
     
-    // Title at top
-    titleLabel->setBounds(bounds.removeFromTop(25));
-    
-    // Table takes remaining space
-    table->setBounds(bounds.reduced(2));
+    // Table takes all space (title is handled by container)
+    table->setBounds(bounds);
 }
 
 //==============================================================================
@@ -111,11 +110,20 @@ void InputTracklistComponent::paintRowBackground(juce::Graphics& g, int rowNumbe
         g.setColour(selectedRowColour);
         g.fillRect(0, 0, width, height);
     }
-    else if (rowNumber % 2 == 0)
+    else if (rowNumber % 2 == 1)
     {
-        g.setColour(backgroundColour.brighter(0.05f));
+        g.setColour(rowAlternateColour);
         g.fillRect(0, 0, width, height);
     }
+    else
+    {
+        g.setColour(backgroundColour);
+        g.fillRect(0, 0, width, height);
+    }
+    
+    // Draw bottom border for each row
+    g.setColour(borderColour);
+    g.drawHorizontalLine(height - 1, 0.0f, static_cast<float>(width));
 }
 
 void InputTracklistComponent::paintCell(juce::Graphics& g, int rowNumber, int columnId, int width, int height, bool rowIsSelected)

@@ -103,9 +103,9 @@ private:
     std::unique_ptr<juce::StretchableLayoutResizerBar> leftRightResizer;
     std::unique_ptr<juce::StretchableLayoutResizerBar> view3DMonitorResizer;
     
-    // Styling
-    juce::Colour backgroundColour{0xFF1A1A1A};
-    juce::Colour resizerColour{0xFF404040};
+    // Styling - matching reference design
+    juce::Colour backgroundColour{0xFF0D0D0D};      // Very dark background
+    juce::Colour resizerColour{0xFF1A1A1A};         // Subtle resizer
     
     // Debug mode
     bool m_debugFakeBlocks = false;

@@ -52,9 +52,9 @@ void Panner3DViewPanel::updatePannerData(const std::vector<PannerInfo>& panners)
             ? juce::String(index + 1)
             : juce::String(panner.name).substring(0, 10);
         
-        // Color based on state
+        // Color based on state - gray for active, orange for OSC
         if (panner.isMemoryShareBased) {
-            reticle.colour = juce::Colour(0xFF4CAF50);  // Green for MemoryShare
+            reticle.colour = reticleColour;  // Gray
         } else {
             reticle.colour = juce::Colour(0xFFFF9800);  // Orange for OSC
         }
@@ -122,8 +122,8 @@ void Panner3DViewPanel::paint(juce::Graphics& g)
     drawPannerReticles(g);
     drawCameraInfo(g);
     
-    // Draw border
-    g.setColour(gridColour);
+    // Draw border matching reference design
+    g.setColour(borderColour);
     g.drawRect(getLocalBounds(), 1);
     
     // Draw instructions at bottom
@@ -139,48 +139,48 @@ void Panner3DViewPanel::drawToolbar(juce::Graphics& g)
     auto toolbarArea = bounds.removeFromTop(TOOLBAR_HEIGHT);
     
     // Toolbar background
-    g.setColour(juce::Colour(0xFF252525));
+    g.setColour(toolbarColour);
     g.fillRect(toolbarArea);
-    g.setColour(gridColour);
+    g.setColour(borderColour);
     g.drawHorizontalLine(TOOLBAR_HEIGHT - 1, 0, (float)getWidth());
     
-    // Title
-    g.setColour(textColour);
-    g.setFont(juce::Font(12.0f, juce::Font::bold));
-    g.drawText("3D Soundfield", toolbarArea.removeFromLeft(100), juce::Justification::centredLeft);
+    // Section title "SOUNDFIELD DISPLAY" like the reference
+    g.setColour(juce::Colour(0xFF808080));
+    g.setFont(juce::Font(11.0f, juce::Font::bold));
+    g.drawText("SOUNDFIELD DISPLAY", toolbarArea.withLeft(10), juce::Justification::centredLeft);
     
-    // Buttons on the right
-    int buttonWidth = 70;
-    int buttonHeight = 20;
+    // Buttons on the right - smaller, more compact
+    int buttonWidth = 40;
+    int buttonHeight = 18;
     int buttonY = (TOOLBAR_HEIGHT - buttonHeight) / 2;
     int buttonX = getWidth() - 10;
     
-    // Reset button
-    buttonX -= buttonWidth + 5;
+    // Reset button (icon-style)
+    buttonX -= buttonWidth + 3;
     resetButtonBounds = juce::Rectangle<int>(buttonX, buttonY, buttonWidth, buttonHeight);
     g.setColour(buttonColour);
-    g.fillRoundedRectangle(resetButtonBounds.toFloat(), 3.0f);
+    g.fillRoundedRectangle(resetButtonBounds.toFloat(), 2.0f);
     g.setColour(textColour);
-    g.setFont(juce::Font(10.0f));
-    g.drawText("Reset", resetButtonBounds, juce::Justification::centred);
+    g.setFont(juce::Font(9.0f));
+    g.drawText("RESET", resetButtonBounds, juce::Justification::centred);
     
     // Front View button
-    buttonX -= buttonWidth + 5;
+    buttonX -= buttonWidth + 3;
     frontViewButtonBounds = juce::Rectangle<int>(buttonX, buttonY, buttonWidth, buttonHeight);
     bool isFront = (camera.preset == CameraPreset::Front);
     g.setColour(isFront ? buttonActiveColour : buttonColour);
-    g.fillRoundedRectangle(frontViewButtonBounds.toFloat(), 3.0f);
-    g.setColour(isFront ? juce::Colour(0xFF1A1A1A) : textColour);
-    g.drawText("Front", frontViewButtonBounds, juce::Justification::centred);
+    g.fillRoundedRectangle(frontViewButtonBounds.toFloat(), 2.0f);
+    g.setColour(isFront ? juce::Colour(0xFF0D0D0D) : textColour);
+    g.drawText("3D", frontViewButtonBounds, juce::Justification::centred);
     
     // Top-Down button
-    buttonX -= buttonWidth + 5;
+    buttonX -= buttonWidth + 3;
     topDownButtonBounds = juce::Rectangle<int>(buttonX, buttonY, buttonWidth, buttonHeight);
     bool isTopDown = (camera.preset == CameraPreset::TopDown);
     g.setColour(isTopDown ? buttonActiveColour : buttonColour);
-    g.fillRoundedRectangle(topDownButtonBounds.toFloat(), 3.0f);
-    g.setColour(isTopDown ? juce::Colour(0xFF1A1A1A) : textColour);
-    g.drawText("Top Down", topDownButtonBounds, juce::Justification::centred);
+    g.fillRoundedRectangle(topDownButtonBounds.toFloat(), 2.0f);
+    g.setColour(isTopDown ? juce::Colour(0xFF0D0D0D) : textColour);
+    g.drawText("TOP", topDownButtonBounds, juce::Justification::centred);
 }
 
 void Panner3DViewPanel::resized()

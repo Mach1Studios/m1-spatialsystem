@@ -111,19 +111,21 @@ private:
         ModeStatusColumn = 8
     };
     
-    // Styling
-    juce::Colour backgroundColour{0xFF1A1A1A};
-    juce::Colour headerColour{0xFF2A2A2A};
-    juce::Colour textColour{0xFFE0E0E0};
-    juce::Colour selectedRowColour{0xFF404040};
-    juce::Colour memoryShareIndicatorColour{0xFF4CAF50};  // Green for M1MemoryShare
+    // Styling - matching reference design
+    juce::Colour backgroundColour{0xFF0D0D0D};
+    juce::Colour headerColour{0xFF141414};
+    juce::Colour textColour{0xFFCCCCCC};
+    juce::Colour selectedRowColour{0xFF2A2A2A};           // Dark gray for selection
+    juce::Colour memoryShareIndicatorColour{0xFF939393}; // Gray for indicators
     juce::Colour oscIndicatorColour{0xFFFF9800};          // Orange for OSC
-    juce::Colour editableColour{0xFF6EC6FF};              // Light blue for editable cells
-    juce::Colour streamingColour{0xFF4CAF50};             // Green for streaming
-    juce::Colour nativeColour{0xFF2196F3};                // Blue for native
-    juce::Colour offlineColour{0xFF9E9E9E};               // Gray for offline
-    juce::Colour expiredColour{0xFFF44336};               // Red for expired
-    juce::Colour staleColour{0xFFFFEB3B};                 // Yellow for stale (not playing but connected)
+    juce::Colour editableColour{0xFFCCCCCC};              // Same as text - subtle
+    juce::Colour streamingColour{0xFF939393};             // Gray for streaming
+    juce::Colour nativeColour{0xFF939393};                // Gray for active native
+    juce::Colour offlineColour{0xFF666666};               // Gray for offline
+    juce::Colour expiredColour{0xFFFF4444};               // Red for expired
+    juce::Colour staleColour{0xFFFFAA00};                 // Amber for stale
+    juce::Colour rowAlternateColour{0xFF111111};          // Slight alternate row color
+    juce::Colour borderColour{0xFF2A2A2A};                // Subtle borders
     
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(InputTracklistComponent)
 };

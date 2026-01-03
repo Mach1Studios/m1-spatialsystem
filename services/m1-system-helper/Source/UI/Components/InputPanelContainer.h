@@ -15,6 +15,7 @@
 #include <JuceHeader.h>
 #include "InputTracklistComponent.h"
 #include "InputMixerComponent.h"
+#include "FlatButtonLookAndFeel.h"
 #include "../../Managers/PannerTrackingManager.h"
 
 namespace Mach1 {
@@ -76,16 +77,21 @@ private:
     // Layout
     static constexpr int TOOLBAR_HEIGHT = 28;
     
-    // Styling
-    juce::Colour backgroundColour{0xFF1A1A1A};
-    juce::Colour toolbarColour{0xFF252525};
-    juce::Colour buttonColour{0xFF404040};
-    juce::Colour buttonActiveColour{0xFFF5B942};  // Mach1 yellow
-    juce::Colour textColour{0xFFE0E0E0};
-    juce::Colour separatorColour{0xFF404040};
+    // Styling - matching reference design
+    juce::Colour backgroundColour{0xFF0D0D0D};
+    juce::Colour toolbarColour{0xFF141414};
+    juce::Colour buttonColour{0xFF1F1F1F};
+    juce::Colour buttonActiveColour{0xFF939393};  // Gray for active state
+    juce::Colour textColour{0xFFCCCCCC};
+    juce::Colour headerTextColour{0xFF808080};    // Dimmer header text
+    juce::Colour separatorColour{0xFF2A2A2A};
+    juce::Colour borderColour{0xFF2A2A2A};
     
     // Update button states
     void updateButtonStates();
+    
+    // Custom look and feel for flat buttons
+    FlatButtonLookAndFeel flatButtonLookAndFeel;
     
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(InputPanelContainer)
 };

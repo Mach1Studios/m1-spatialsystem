@@ -126,21 +126,24 @@ bool SessionMainComponent::isCapturing() const
 void SessionMainComponent::setupLayout()
 {
     // Main vertical layout: [Main content] [Resizer] [Timeline]
-    verticalLayout.setItemLayout(0, 100, -1.0, -0.75);  // Main content: 75%
-    verticalLayout.setItemLayout(1, 5, 5, 5);           // Resizer
-    verticalLayout.setItemLayout(2, 80, -0.4, -0.25);   // Timeline: 25%
+    // Reference shows timeline at bottom, but smaller proportion
+    verticalLayout.setItemLayout(0, 100, -1.0, -0.80);  // Main content: 80%
+    verticalLayout.setItemLayout(1, 3, 3, 3);           // Thinner resizer
+    verticalLayout.setItemLayout(2, 60, -0.35, -0.20);  // Timeline: 20%
     
     // Horizontal layout: [Input Panel] [Resizer] [Right Panel]
-    horizontalLayout.setItemLayout(0, 200, -1.0, -0.35);  // Input panel: 35%
-    horizontalLayout.setItemLayout(1, 5, 5, 5);           // Resizer
-    horizontalLayout.setItemLayout(2, 200, -1.0, -0.65);  // Right panel: 65%
+    // Reference shows roughly equal split with input tracklist on left
+    horizontalLayout.setItemLayout(0, 200, -1.0, -0.50);  // Input panel: 50%
+    horizontalLayout.setItemLayout(1, 3, 3, 3);           // Thinner resizer
+    horizontalLayout.setItemLayout(2, 200, -1.0, -0.50);  // Right panel: 50%
     
     // Right panel layout: [3D View] [Resizer] [Monitor]
-    rightPanelLayout.setItemLayout(0, 100, -1.0, -0.65);  // 3D View: 65%
-    rightPanelLayout.setItemLayout(1, 5, 5, 5);           // Resizer
-    rightPanelLayout.setItemLayout(2, 80, -0.5, -0.35);   // Monitor: 35%
+    // Reference shows 3D view larger than monitor
+    rightPanelLayout.setItemLayout(0, 100, -1.0, -0.60);  // 3D View: 60%
+    rightPanelLayout.setItemLayout(1, 3, 3, 3);           // Thinner resizer
+    rightPanelLayout.setItemLayout(2, 80, -0.5, -0.40);   // Monitor: 40%
     
-    // Create resizer bars
+    // Create resizer bars - thinner/more subtle
     mainTimelineResizer = std::make_unique<juce::StretchableLayoutResizerBar>(
         &verticalLayout, 1, false);
     mainTimelineResizer->setColour(juce::ResizableWindow::backgroundColourId, resizerColour);
@@ -388,15 +391,15 @@ void SessionUI::showSessionWindow()
         // Create the main component with debug flag
         mainComponent = std::make_unique<SessionMainComponent>(pannerManager, m_debugFakeBlocks);
         
-        // Create the window
+        // Create the window with darker background matching reference
         sessionWindow = std::make_unique<SessionDocumentWindow>(
-            "Mach1 Spatial System Helper",
-            juce::Colour(0xFF1A1A1A),
+            "Mach1 Spatial System",
+            juce::Colour(0xFF0D0D0D),  // Very dark background
             juce::DocumentWindow::allButtons);
         
         sessionWindow->setContentNonOwned(mainComponent.get(), false);
         sessionWindow->setResizable(true, false);
-        sessionWindow->centreWithSize(1100, 700);
+        sessionWindow->centreWithSize(1200, 750);  // Slightly larger default
         sessionWindow->setUsingNativeTitleBar(true);
     }
     

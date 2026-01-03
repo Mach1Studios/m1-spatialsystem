@@ -362,10 +362,14 @@ void CaptureEngine::writeChunk(PannerCaptureState& state, const ChunkHeader& hea
     m_totalChunksWritten.fetch_add(1);
     m_totalBytesWritten.fetch_add(ChunkHeader::SIZE + StateSnapshot::SIZE + header.audioDataSize);
     
-    // Notify listeners occasionally
-    if (state.chunksWritten % 50 == 0)
+    // Notify listeners less frequently to avoid GUI stalls (every ~500ms worth of chunks)
+    // At 48kHz with 512 sample blocks, that's about 47 blocks per 500ms
+    if (state.chunksWritten % 100 == 0)
     {
-        sendChangeMessage();
+        // Use async notification to avoid blocking capture thread
+        juce::MessageManager::callAsync([this]() {
+            sendChangeMessage();
+        });
     }
 }
 

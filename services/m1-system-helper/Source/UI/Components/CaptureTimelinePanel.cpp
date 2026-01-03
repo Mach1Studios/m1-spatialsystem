@@ -11,8 +11,11 @@ namespace Mach1 {
 //==============================================================================
 CaptureTimelinePanel::CaptureTimelinePanel()
 {
-    // Create buttons
-    m_resetButton = std::make_unique<juce::TextButton>("Reset");
+    // Create buttons with flat styling (matching Soundfield Display)
+    m_resetButton = std::make_unique<juce::TextButton>("RESET");
+    m_resetButton->setLookAndFeel(&m_flatButtonLookAndFeel);
+    m_resetButton->setColour(juce::TextButton::buttonColourId, m_buttonColour);
+    m_resetButton->setColour(juce::TextButton::textColourOffId, m_textColour);
     m_resetButton->onClick = [this]() {
         if (m_engine)
         {
@@ -27,7 +30,12 @@ CaptureTimelinePanel::CaptureTimelinePanel()
     };
     addAndMakeVisible(m_resetButton.get());
     
-    m_lockRangeButton = std::make_unique<juce::TextButton>("Lock Range");
+    m_lockRangeButton = std::make_unique<juce::TextButton>("LOCK");
+    m_lockRangeButton->setLookAndFeel(&m_flatButtonLookAndFeel);
+    m_lockRangeButton->setColour(juce::TextButton::buttonColourId, m_buttonColour);
+    m_lockRangeButton->setColour(juce::TextButton::textColourOffId, m_textColour);
+    m_lockRangeButton->setColour(juce::TextButton::buttonOnColourId, m_buttonActiveColour);
+    m_lockRangeButton->setColour(juce::TextButton::textColourOnId, juce::Colour(0xFF0D0D0D));
     m_lockRangeButton->setClickingTogglesState(true);
     m_lockRangeButton->onClick = [this]() {
         m_rangeLocked = m_lockRangeButton->getToggleState();
@@ -43,7 +51,10 @@ CaptureTimelinePanel::CaptureTimelinePanel()
     };
     addAndMakeVisible(m_lockRangeButton.get());
     
-    m_exportButton = std::make_unique<juce::TextButton>("Export...");
+    m_exportButton = std::make_unique<juce::TextButton>("EXPORT");
+    m_exportButton->setLookAndFeel(&m_flatButtonLookAndFeel);
+    m_exportButton->setColour(juce::TextButton::buttonColourId, m_buttonColour);
+    m_exportButton->setColour(juce::TextButton::textColourOffId, m_textColour);
     m_exportButton->onClick = [this]() {
         // TODO: Implement export dialog
         juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::InfoIcon,
@@ -53,25 +64,46 @@ CaptureTimelinePanel::CaptureTimelinePanel()
     };
     addAndMakeVisible(m_exportButton.get());
     
-    m_fillGapsToggle = std::make_unique<juce::ToggleButton>("Fill Gaps Only");
+    m_fillGapsToggle = std::make_unique<juce::ToggleButton>("FILL GAPS");
+    m_fillGapsToggle->setLookAndFeel(&m_flatButtonLookAndFeel);
+    m_fillGapsToggle->setColour(juce::ToggleButton::textColourId, m_textColour);
+    m_fillGapsToggle->setColour(juce::ToggleButton::tickColourId, m_textColour);
+    m_fillGapsToggle->setColour(juce::ToggleButton::tickDisabledColourId, juce::Colour(0xFF666666));
     m_fillGapsToggle->onClick = [this]() {
         m_fillGapsOnly = m_fillGapsToggle->getToggleState();
         // TODO: Implement fill-gaps-only capture mode
     };
     addAndMakeVisible(m_fillGapsToggle.get());
     
-    m_statusLabel = std::make_unique<juce::Label>("status", "Not capturing");
-    m_statusLabel->setColour(juce::Label::textColourId, m_textColour);
-    m_statusLabel->setFont(juce::Font(12.0f));
-    addAndMakeVisible(m_statusLabel.get());
+    m_autoZoomToggle = std::make_unique<juce::ToggleButton>("AUTO ZOOM");
+    m_autoZoomToggle->setLookAndFeel(&m_flatButtonLookAndFeel);
+    m_autoZoomToggle->setColour(juce::ToggleButton::textColourId, m_textColour);
+    m_autoZoomToggle->setColour(juce::ToggleButton::tickColourId, m_textColour);
+    m_autoZoomToggle->setColour(juce::ToggleButton::tickDisabledColourId, juce::Colour(0xFF666666));
+    m_autoZoomToggle->setToggleState(true, juce::dontSendNotification);
+    m_autoZoomToggle->onClick = [this]() {
+        m_autoZoom = m_autoZoomToggle->getToggleState();
+        if (m_autoZoom)
+        {
+            fitToRange();
+        }
+    };
+    addAndMakeVisible(m_autoZoomToggle.get());
     
-    // Start timer for updates
-    startTimerHz(30);  // 30 fps update rate
+    // Start timer for updates - reduced frequency for performance
+    startTimerHz(15);  // 15 fps update rate (was 30)
 }
 
 CaptureTimelinePanel::~CaptureTimelinePanel()
 {
     stopTimer();
+    
+    // Clear look and feel before buttons are destroyed
+    m_resetButton->setLookAndFeel(nullptr);
+    m_lockRangeButton->setLookAndFeel(nullptr);
+    m_exportButton->setLookAndFeel(nullptr);
+    m_fillGapsToggle->setLookAndFeel(nullptr);
+    m_autoZoomToggle->setLookAndFeel(nullptr);
     
     if (m_engine)
     {
@@ -106,6 +138,10 @@ void CaptureTimelinePanel::paint(juce::Graphics& g)
     drawTimeline(g);
     drawRuler(g);
     drawStats(g);
+    
+    // Draw border around entire panel
+    g.setColour(m_borderColour);
+    g.drawRect(getLocalBounds(), 1);
 }
 
 void CaptureTimelinePanel::resized()
@@ -127,18 +163,20 @@ void CaptureTimelinePanel::resized()
     // Timeline in the middle
     m_timelineBounds = bounds;
     
-    // Layout control buttons
-    auto controlsArea = m_controlsBounds.reduced(4, 4);
-    m_resetButton->setBounds(controlsArea.removeFromLeft(60));
-    controlsArea.removeFromLeft(4);
-    m_lockRangeButton->setBounds(controlsArea.removeFromLeft(80));
-    controlsArea.removeFromLeft(4);
-    m_exportButton->setBounds(controlsArea.removeFromLeft(70));
-    controlsArea.removeFromLeft(16);
-    m_fillGapsToggle->setBounds(controlsArea.removeFromLeft(100));
+    // Layout control buttons - compact style
+    auto controlsArea = m_controlsBounds.reduced(6, 5);
+    int buttonHeight = 18;
+    int buttonY = (m_controlsBounds.getHeight() - buttonHeight) / 2;
     
-    // Status label on the right
-    m_statusLabel->setBounds(controlsArea.removeFromRight(200));
+    m_resetButton->setBounds(controlsArea.removeFromLeft(50).withHeight(buttonHeight).withY(buttonY));
+    controlsArea.removeFromLeft(3);
+    m_lockRangeButton->setBounds(controlsArea.removeFromLeft(45).withHeight(buttonHeight).withY(buttonY));
+    controlsArea.removeFromLeft(3);
+    m_exportButton->setBounds(controlsArea.removeFromLeft(50).withHeight(buttonHeight).withY(buttonY));
+    controlsArea.removeFromLeft(10);
+    m_fillGapsToggle->setBounds(controlsArea.removeFromLeft(80).withHeight(buttonHeight).withY(buttonY));
+    controlsArea.removeFromLeft(6);
+    m_autoZoomToggle->setBounds(controlsArea.removeFromLeft(70).withHeight(buttonHeight).withY(buttonY));
 }
 
 //==============================================================================
@@ -190,11 +228,8 @@ void CaptureTimelinePanel::changeListenerCallback(juce::ChangeBroadcaster* sourc
 {
     if (source == m_engine)
     {
-        // Update cache on message thread
-        juce::MessageManager::callAsync([this]() {
-            updateCache();
-            repaint();
-        });
+        // Mark that cache needs update - timer will handle it to batch updates
+        m_cacheUpdatePending.store(true);
     }
 }
 
@@ -202,41 +237,63 @@ void CaptureTimelinePanel::timerCallback()
 {
     if (m_engine && m_engine->isCapturing())
     {
-        updateCache();
+        // Only update if there's pending data or periodically (every 4th frame = ~4Hz background)
+        static int frameCounter = 0;
+        bool shouldUpdate = m_cacheUpdatePending.exchange(false) || (++frameCounter % 4 == 0);
         
-        // Auto-follow playhead if not locked
-        if (m_autoFollow && !m_rangeLocked && !m_isDragging)
+        if (shouldUpdate)
+        {
+            updateCache();
+        }
+        
+        // Auto-zoom to fit all captured data
+        if (m_autoZoom && !m_isDragging)
+        {
+            fitToRange();
+        }
+        // Auto-follow playhead if not zooming
+        else if (m_autoFollow && !m_rangeLocked && !m_isDragging)
         {
             updateViewFromCoverage();
         }
         
-        repaint();
+        if (shouldUpdate)
+        {
+            repaint();
+        }
     }
 }
 
 //==============================================================================
 void CaptureTimelinePanel::drawHeader(juce::Graphics& g)
 {
-    g.setColour(m_timelineBackgroundColour);
+    // Toolbar background
+    g.setColour(m_toolbarColour);
     g.fillRect(m_headerBounds);
     
+    // Section title - dimmer style like reference
     g.setColour(m_headerTextColour);
-    g.setFont(juce::Font(16.0f, juce::Font::bold));
+    g.setFont(juce::Font(11.0f, juce::Font::bold));
     
-    juce::String title = "Capture Timeline";
+    juce::String title = "CAPTURE TIMELINE";
+    g.drawText(title, m_headerBounds.withLeft(10), juce::Justification::centredLeft);
+    
+    // Session ID on the right (if capturing)
     if (m_engine && m_engine->isCapturing())
     {
-        title += " - Session: " + m_engine->getSessionId();
+        g.setFont(juce::Font(10.0f));
+        g.setColour(m_textColour.withAlpha(0.7f));
+        g.drawText(m_engine->getSessionId(), m_headerBounds.reduced(10, 0).withRight(m_headerBounds.getRight() - 30), 
+                   juce::Justification::centredRight);
+        
+        // Draw capture indicator (red dot when capturing - like a record indicator)
+        g.setColour(juce::Colour(0xFFFF4444));
+        g.fillEllipse(m_headerBounds.getRight() - 20.0f, m_headerBounds.getCentreY() - 4.0f, 8.0f, 8.0f);
     }
     
-    g.drawText(title, m_headerBounds.reduced(8, 0), juce::Justification::centredLeft);
-    
-    // Draw capture indicator
-    if (m_engine && m_engine->isCapturing())
-    {
-        g.setColour(juce::Colours::red);
-        g.fillEllipse(m_headerBounds.getRight() - 24.0f, m_headerBounds.getCentreY() - 6.0f, 12.0f, 12.0f);
-    }
+    // Bottom border
+    g.setColour(m_borderColour);
+    g.drawHorizontalLine(m_headerBounds.getBottom() - 1, 0, (float)getWidth());
 }
 
 void CaptureTimelinePanel::drawTimeline(juce::Graphics& g)
@@ -255,39 +312,48 @@ void CaptureTimelinePanel::drawTimeline(juce::Graphics& g)
     drawPlayhead(g);
     
     // Draw placeholder if no data
-    const juce::ScopedLock lock(m_cacheMutex);
-    if (m_cachedData.anyCoverage.getIntervals().empty())
+    if (m_cacheMutex.tryEnter())
     {
-        g.setColour(m_textColour.withAlpha(0.5f));
-        g.setFont(juce::Font(14.0f));
-        g.drawText("No captured data", m_timelineBounds, juce::Justification::centred);
+        if (m_cachedData.coverageIntervals.empty())
+        {
+            g.setColour(m_textColour.withAlpha(0.5f));
+            g.setFont(juce::Font(14.0f));
+            g.drawText("No captured data", m_timelineBounds, juce::Justification::centred);
+        }
+        m_cacheMutex.exit();
     }
 }
 
 void CaptureTimelinePanel::drawCoverageIntervals(juce::Graphics& g)
 {
-    const juce::ScopedLock lock(m_cacheMutex);
-    
-    g.setColour(m_coverageColour);
-    
-    for (const auto& interval : m_cachedData.anyCoverage.getIntervals())
+    // Use try-lock to avoid blocking paint on slow cache updates
+    if (m_cacheMutex.tryEnter())
     {
-        int x1 = sampleToPixel(interval.start);
-        int x2 = sampleToPixel(interval.end);
+        g.setColour(m_coverageColour);
         
-        if (x2 > m_timelineBounds.getX() && x1 < m_timelineBounds.getRight())
+        for (const auto& interval : m_cachedData.coverageIntervals)
         {
-            x1 = std::max(x1, m_timelineBounds.getX());
-            x2 = std::min(x2, m_timelineBounds.getRight());
+            int x1 = sampleToPixel(interval.start);
+            int x2 = sampleToPixel(interval.end);
             
-            g.fillRect(x1, m_timelineBounds.getY() + 4, x2 - x1, m_timelineBounds.getHeight() - 8);
+            if (x2 > m_timelineBounds.getX() && x1 < m_timelineBounds.getRight())
+            {
+                x1 = std::max(x1, m_timelineBounds.getX());
+                x2 = std::min(x2, m_timelineBounds.getRight());
+                
+                g.fillRect(x1, m_timelineBounds.getY() + 4, x2 - x1, m_timelineBounds.getHeight() - 8);
+            }
         }
+        
+        m_cacheMutex.exit();
     }
 }
 
 void CaptureTimelinePanel::drawDropouts(juce::Graphics& g)
 {
-    const juce::ScopedLock lock(m_cacheMutex);
+    // Use try-lock to avoid blocking paint
+    if (!m_cacheMutex.tryEnter())
+        return;
     
     // Draw partial dropouts (some panners missing)
     g.setColour(m_partialDropoutColour.withAlpha(0.6f));
@@ -325,16 +391,23 @@ void CaptureTimelinePanel::drawDropouts(juce::Graphics& g)
             g.fillRect(x1, m_timelineBounds.getY() + 4, x2 - x1, m_timelineBounds.getHeight() - 8);
         }
     }
+    
+    m_cacheMutex.exit();
 }
 
 void CaptureTimelinePanel::drawPlayhead(juce::Graphics& g)
 {
-    const juce::ScopedLock lock(m_cacheMutex);
-    
-    if (m_cachedData.latestSample <= 0)
+    // Use try-lock to avoid blocking paint
+    if (!m_cacheMutex.tryEnter())
         return;
     
-    int x = sampleToPixel(m_cachedData.latestSample);
+    int64_t latestSample = m_cachedData.latestSample;
+    m_cacheMutex.exit();
+    
+    if (latestSample <= 0)
+        return;
+    
+    int x = sampleToPixel(latestSample);
     
     if (x >= m_timelineBounds.getX() && x <= m_timelineBounds.getRight())
     {
@@ -364,8 +437,13 @@ void CaptureTimelinePanel::drawRuler(juce::Graphics& g)
     if (viewRange <= 0)
         viewRange = 1;
     
-    const juce::ScopedLock lock(m_cacheMutex);
-    uint32_t sampleRate = m_cachedData.sampleRate > 0 ? m_cachedData.sampleRate : 44100;
+    // Get sample rate without blocking
+    uint32_t sampleRate = 44100;
+    if (m_cacheMutex.tryEnter())
+    {
+        sampleRate = m_cachedData.sampleRate > 0 ? m_cachedData.sampleRate : 44100;
+        m_cacheMutex.exit();
+    }
     
     // Find a nice tick interval (in samples)
     double viewSeconds = static_cast<double>(viewRange) / sampleRate;
@@ -409,13 +487,16 @@ void CaptureTimelinePanel::drawRuler(juce::Graphics& g)
 
 void CaptureTimelinePanel::drawStats(juce::Graphics& g)
 {
-    const juce::ScopedLock lock(m_cacheMutex);
+    // Use try-lock to avoid blocking paint
+    if (!m_cacheMutex.tryEnter())
+        return;
+    
+    auto stats = m_cachedData.stats;
+    uint32_t sampleRate = m_cachedData.sampleRate > 0 ? m_cachedData.sampleRate : 44100;
+    m_cacheMutex.exit();
     
     g.setColour(m_textColour);
     g.setFont(juce::Font(11.0f));
-    
-    auto& stats = m_cachedData.stats;
-    uint32_t sampleRate = m_cachedData.sampleRate > 0 ? m_cachedData.sampleRate : 44100;
     
     double capturedSeconds = static_cast<double>(stats.totalCapturedSamples) / sampleRate;
     double totalSeconds = static_cast<double>(stats.totalRangeSamples) / sampleRate;
@@ -534,28 +615,28 @@ void CaptureTimelinePanel::updateCache()
     if (!m_engine)
         return;
     
-    const juce::ScopedLock lock(m_cacheMutex);
-    
     auto& coverageModel = m_engine->getCoverageModel();
     
-    m_cachedData.stats = coverageModel.getGlobalStats();
-    m_cachedData.anyCoverage = coverageModel.getAnyCoverage();
-    m_cachedData.anyDropouts = coverageModel.getAnyDropouts();
-    m_cachedData.allDropouts = coverageModel.getAllDropouts();
-    m_cachedData.latestSample = coverageModel.getLatestSamplePosition();
-    m_cachedData.sampleRate = coverageModel.getSampleRate();
-    m_cachedData.capturing = m_engine->isCapturing();
+    // Get lightweight stats first (fast, minimal locking)
+    auto stats = coverageModel.getGlobalStats();
+    auto latestSample = coverageModel.getLatestSamplePosition();
+    auto sampleRate = coverageModel.getSampleRate();
+    bool capturing = m_engine->isCapturing();
     
-    // Update status label
-    if (m_cachedData.capturing)
+    // Get coverage intervals (this may take longer)
+    auto anyCoverage = coverageModel.getAnyCoverage();
+    
+    // Now update the cached data with a short lock
     {
-        m_statusLabel->setText("Capturing...", juce::dontSendNotification);
-        m_statusLabel->setColour(juce::Label::textColourId, juce::Colours::lightgreen);
-    }
-    else
-    {
-        m_statusLabel->setText("Not capturing", juce::dontSendNotification);
-        m_statusLabel->setColour(juce::Label::textColourId, m_textColour);
+        const juce::ScopedLock lock(m_cacheMutex);
+        
+        m_cachedData.stats = stats;
+        m_cachedData.coverageIntervals = anyCoverage.getIntervals();
+        m_cachedData.anyDropouts = coverageModel.getAnyDropouts();
+        m_cachedData.allDropouts = coverageModel.getAllDropouts();
+        m_cachedData.latestSample = latestSample;
+        m_cachedData.sampleRate = sampleRate;
+        m_cachedData.capturing = capturing;
     }
 }
 

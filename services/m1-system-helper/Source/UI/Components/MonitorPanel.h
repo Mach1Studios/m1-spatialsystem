@@ -44,12 +44,16 @@ private:
     // Future: Embedded monitor component
     juce::Component* embeddedMonitor = nullptr;
     
-    // Styling
-    juce::Colour backgroundColour{0xFF1A1A1A};
-    juce::Colour borderColour{0xFF404040};
-    juce::Colour textColour{0xFFE0E0E0};
-    juce::Colour dimTextColour{0xFF808080};
-    juce::Colour accentColour{0xFF4CAF50};
+    // Styling - matching reference design
+    juce::Colour backgroundColour{0xFF0D0D0D};
+    juce::Colour toolbarColour{0xFF141414};
+    juce::Colour borderColour{0xFF2A2A2A};
+    juce::Colour textColour{0xFFCCCCCC};
+    juce::Colour dimTextColour{0xFF666666};
+    juce::Colour accentColour{0xFF939393};            // Gray accent
+    
+    // Toolbar height
+    static constexpr int TOOLBAR_HEIGHT = 28;
     
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MonitorPanel)
 };

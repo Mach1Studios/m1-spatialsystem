@@ -81,19 +81,20 @@ private:
     juce::Rectangle<float> labelBounds;
     juce::Rectangle<float> gainReadoutBounds;
     
-    // Styling
-    juce::Colour backgroundColour{0xFF2A2A2A};
-    juce::Colour meterBackgroundColour{0xFF1A1A1A};
-    juce::Colour meterGreenColour{0xFF4CAF50};
-    juce::Colour meterYellowColour{0xFFFFC107};
-    juce::Colour meterRedColour{0xFFF44336};
-    juce::Colour faderTrackColour{0xFF404040};
-    juce::Colour faderThumbColour{0xFFE0E0E0};
-    juce::Colour textColour{0xFFE0E0E0};
-    juce::Colour dimTextColour{0xFF909090};
-    juce::Colour selectedColour{0xFFF5B942};
-    juce::Colour memShareColour{0xFF4CAF50};
+    // Styling - matching reference design
+    juce::Colour backgroundColour{0xFF141414};
+    juce::Colour meterBackgroundColour{0xFF0D0D0D};
+    juce::Colour meterGreenColour{0xFF939393};        // Gray for meters
+    juce::Colour meterYellowColour{0xFFFFAA00};       // Amber
+    juce::Colour meterRedColour{0xFFFF4444};          // Red
+    juce::Colour faderTrackColour{0xFF2A2A2A};
+    juce::Colour faderThumbColour{0xFFCCCCCC};
+    juce::Colour textColour{0xFFCCCCCC};
+    juce::Colour dimTextColour{0xFF666666};
+    juce::Colour selectedColour{0xFFFFAA00};          // Amber for selection
+    juce::Colour memShareColour{0xFF939393};          // Gray for indicators
     juce::Colour oscColour{0xFFFF9800};
+    juce::Colour borderColour{0xFF2A2A2A};
     
     // Interaction state
     bool isDraggingFader = false;
@@ -148,9 +149,9 @@ private:
     static constexpr int CHANNEL_SPACING = 2;
     static constexpr int HEADER_HEIGHT = 0;  // No header, container has toolbar
     
-    // Styling
-    juce::Colour backgroundColour{0xFF1A1A1A};
-    juce::Colour separatorColour{0xFF404040};
+    // Styling - matching reference design
+    juce::Colour backgroundColour{0xFF0D0D0D};
+    juce::Colour separatorColour{0xFF1A1A1A};
     
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(InputMixerComponent)
 };
