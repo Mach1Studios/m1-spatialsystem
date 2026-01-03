@@ -120,6 +120,11 @@ void TimelineComponent::paint(juce::Graphics& g)
 {
     g.fillAll(backgroundColour);
     
+    // Draw title
+    g.setColour(textColour);
+    g.setFont(juce::Font(14.0f, juce::Font::bold));
+    g.drawText("Captured Blocks (WIP)", getLocalBounds().removeFromTop(25), juce::Justification::centred);
+    
     // Draw timeline
     drawTimeline(g);
     
@@ -131,6 +136,15 @@ void TimelineComponent::paint(juce::Graphics& g)
     
     // Draw time labels
     drawTimeLabels(g);
+    
+    // Draw placeholder text if no events
+    if (bufferEvents.empty())
+    {
+        g.setColour(textColour.withAlpha(0.5f));
+        g.setFont(juce::Font(12.0f));
+        g.drawText("Timeline placeholder - Audio block events will appear here when streaming",
+                   bufferAreaBounds, juce::Justification::centred);
+    }
 }
 
 void TimelineComponent::resized()

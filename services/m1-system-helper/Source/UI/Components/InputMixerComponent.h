@@ -6,16 +6,18 @@
     Features:
     - Shows each panner as a channel strip with meters and gain control
     - Real-time level meters for each panner
-    - Gain knobs for adjustment
-    - Mini panner reticle grid (future feature)
+    - Gain faders for adjustment
+    - Mini panner position indicator
     - Visual feedback for M1MemoryShare vs OSC tracking
+    - Horizontal scrolling when many panners exist
     
     Channel Strip Elements:
-    - Panner name
-    - Panner Input Meter(s) [one per channel]
-    - Panner Output Gain Slider [controls Panner's Gain knob]
-    - Panner Mini Reticle indicator (future feature) [controls Panner's azimuth/diverge]
-    - Panner Mute/Solo buttons (for locally muting or soloing via the ExternalMixerProcessor)
+    - Channel number
+    - Panner name (truncated)
+    - Level meter (stereo or mono based on channels)
+    - Gain fader
+    - dB readout
+    - Mute/Solo buttons (placeholder for future)
 */
 
 #pragma once
@@ -38,10 +40,9 @@ public:
     
     // Data updates
     void updatePannerData(const PannerInfo& panner);
-    void setLevelMeter(float level);
-    void setGainValue(float gain);
+    void setLevelMeter(float levelL, float levelR = -1.0f);  // -1 means mono
     
-    // Make public so main component can access it
+    // Selection state
     bool isSelected = false;
     
     // Component overrides
@@ -52,6 +53,7 @@ public:
     void mouseDown(const juce::MouseEvent& event) override;
     void mouseDrag(const juce::MouseEvent& event) override;
     void mouseUp(const juce::MouseEvent& event) override;
+    void mouseWheelMove(const juce::MouseEvent& event, const juce::MouseWheelDetails& wheel) override;
     
     // Callbacks
     std::function<void(int, float)> onGainChanged;
@@ -60,44 +62,55 @@ public:
 private:
     // Data
     int channelIndex;
-    float gainValue = 0.5f;
-    float meterLevel = 0.0f;
+    float gainValue = 0.0f;  // in dB
+    float meterLevelL = 0.0f;
+    float meterLevelR = 0.0f;
+    bool isStereo = false;
     PannerInfo currentPanner;
     
-    // UI elements
-    std::unique_ptr<juce::Label> channelLabel;
-    std::unique_ptr<juce::Label> nameLabel;
+    // Drawing helpers
+    void drawLevelMeter(juce::Graphics& g, juce::Rectangle<float> bounds, float level);
+    void drawGainFader(juce::Graphics& g, juce::Rectangle<float> bounds);
+    void drawPannerIndicator(juce::Graphics& g, juce::Rectangle<float> bounds);
     
-    // Meter drawing
-    void drawLevelMeter(juce::Graphics& g, juce::Rectangle<int> bounds);
-    void drawGainKnob(juce::Graphics& g, juce::Rectangle<int> bounds);
-    
-    // Layout
-    juce::Rectangle<int> meterBounds;
-    juce::Rectangle<int> gainKnobBounds;
-    juce::Rectangle<int> labelBounds;
+    // Layout bounds (calculated in resized)
+    juce::Rectangle<float> meterBoundsL;
+    juce::Rectangle<float> meterBoundsR;
+    juce::Rectangle<float> faderBounds;
+    juce::Rectangle<float> pannerIndicatorBounds;
+    juce::Rectangle<float> labelBounds;
+    juce::Rectangle<float> gainReadoutBounds;
     
     // Styling
     juce::Colour backgroundColour{0xFF2A2A2A};
-    juce::Colour meterColour{0xFF4CAF50};
-    juce::Colour knobColour{0xFF666666};
+    juce::Colour meterBackgroundColour{0xFF1A1A1A};
+    juce::Colour meterGreenColour{0xFF4CAF50};
+    juce::Colour meterYellowColour{0xFFFFC107};
+    juce::Colour meterRedColour{0xFFF44336};
+    juce::Colour faderTrackColour{0xFF404040};
+    juce::Colour faderThumbColour{0xFFE0E0E0};
     juce::Colour textColour{0xFFE0E0E0};
-    juce::Colour selectedColour{0xFF0078D4};
+    juce::Colour dimTextColour{0xFF909090};
+    juce::Colour selectedColour{0xFFF5B942};
+    juce::Colour memShareColour{0xFF4CAF50};
+    juce::Colour oscColour{0xFFFF9800};
     
     // Interaction state
-    bool isDragging = false;
-    juce::Point<int> lastMousePosition;
+    bool isDraggingFader = false;
+    float dragStartGain = 0.0f;
+    int dragStartY = 0;
     
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PannerChannelStrip)
 };
 
 /**
- * Main mixer component that contains all channel strips
+ * Main mixer component that contains all channel strips with horizontal scrolling
  */
-class InputMixerComponent : public juce::Component
+class InputMixerComponent : public juce::Component,
+                            public juce::ScrollBar::Listener
 {
 public:
-    explicit InputMixerComponent();
+    InputMixerComponent();
     ~InputMixerComponent() override;
     
     // Data updates
@@ -109,6 +122,9 @@ public:
     void paint(juce::Graphics& g) override;
     void resized() override;
     
+    // ScrollBar::Listener
+    void scrollBarMoved(juce::ScrollBar* scrollBarThatHasMoved, double newRangeStart) override;
+    
     // Callbacks
     std::function<void(int, float)> onGainChanged;
     std::function<void(int)> onChannelSelected;
@@ -116,19 +132,21 @@ public:
 private:
     // Data
     std::vector<PannerInfo> pannerData;
-    std::vector<float> levelData;
     int selectedPannerIndex = -1;
     
     // UI components
     std::vector<std::unique_ptr<PannerChannelStrip>> channelStrips;
-    std::unique_ptr<juce::Label> titleLabel;
+    std::unique_ptr<juce::Viewport> viewport;
+    std::unique_ptr<juce::Component> stripContainer;
     
     // Layout
     void updateChannelStrips();
-    int getChannelStripWidth() const;
-    static constexpr int CHANNEL_STRIP_WIDTH = 80;
-    static constexpr int CHANNEL_STRIP_HEIGHT = 200;
-    static constexpr int CHANNEL_SPACING = 4;
+    void updateStripContainer();
+    
+    static constexpr int CHANNEL_STRIP_WIDTH = 70;
+    static constexpr int CHANNEL_STRIP_MIN_HEIGHT = 180;
+    static constexpr int CHANNEL_SPACING = 2;
+    static constexpr int HEADER_HEIGHT = 0;  // No header, container has toolbar
     
     // Styling
     juce::Colour backgroundColour{0xFF1A1A1A};
@@ -137,4 +155,4 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(InputMixerComponent)
 };
 
-} // namespace Mach1 
+} // namespace Mach1

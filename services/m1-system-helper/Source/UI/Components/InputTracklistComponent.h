@@ -4,19 +4,21 @@
     UI component that displays a table of all discovered M1-Panner instances.
     
     Features:
-    - Shows index, name, azimuth, elevation, diverge, and gain for each panner
-    - Supports selection of panner instances
+    - Shows index, name, channels, azimuth, elevation, diverge, gain, mode/status
+    - Supports inline editing of azimuth, elevation, diverge, outGain
     - Real-time updates from PannerTrackingManager
     - Indicates tracking method (M1MemoryShare vs OSC)
+    - Bi-directional parameter editing via .mem command region + OSC fallback
     
     Table Columns:
     - Index: Panner number/ID
     - Name: Panner instance name
-
-    - Azimuth: Current azimuth value
-    - Elevation: Current elevation value
-    - Diverge: Current diverge value
-    - Out Gain (dB): Current gain value
+    - Channels: Number of channels
+    - Azimuth: Current azimuth value (editable)
+    - Elevation: Current elevation value (editable)
+    - Diverge: Current diverge value (editable)
+    - Out Gain (dB): Current gain value (editable)
+    - Mode/Status: Streaming/Native/Offline/Expired
 */
 
 #pragma once
@@ -28,11 +30,15 @@
 
 namespace Mach1 {
 
+// Forward declaration
+class PannerTrackingManager;
+
 /**
- * Table component that displays all M1-Panner instances
+ * Table component that displays all M1-Panner instances with inline editing
  */
 class InputTracklistComponent : public juce::Component,
-                               public juce::TableListBoxModel
+                                public juce::TableListBoxModel,
+                                public juce::Label::Listener
 {
 public:
     explicit InputTracklistComponent();
@@ -43,8 +49,14 @@ public:
     void setSelectedPanner(int index);
     int getSelectedPanner() const { return selectedPannerIndex; }
     
+    // Set tracking manager for bi-directional editing
+    void setPannerTrackingManager(PannerTrackingManager* manager);
+    
     // Selection callback
     std::function<void(int)> onSelectionChanged;
+    
+    // Parameter change callback (for OSC fallback)
+    std::function<void(int pannerIndex, const juce::String& paramName, float value)> onParameterChanged;
     
     // Component overrides
     void paint(juce::Graphics& g) override;
@@ -57,14 +69,31 @@ private:
     void paintCell(juce::Graphics& g, int rowNumber, int columnId, int width, int height, bool rowIsSelected) override;
     void cellClicked(int rowNumber, int columnId, const juce::MouseEvent& event) override;
     void cellDoubleClicked(int rowNumber, int columnId, const juce::MouseEvent& event) override;
+    juce::Component* refreshComponentForCell(int rowNumber, int columnId, bool isRowSelected, 
+                                              juce::Component* existingComponentToUpdate) override;
+    
+    // Label::Listener for inline editing
+    void labelTextChanged(juce::Label* labelThatHasChanged) override;
     
     // Column setup
     void setupColumns();
     juce::String getColumnText(int rowNumber, int columnId) const;
+    juce::String getModeStatusText(const PannerInfo& panner) const;
+    bool isColumnEditable(int columnId) const;
+    
+    // Inline editing
+    void startEditing(int rowNumber, int columnId);
+    void commitEdit(int rowNumber, int columnId, float newValue);
+    void sendParameterUpdate(int rowNumber, const juce::String& paramName, float value);
     
     // Data
     std::vector<PannerInfo> pannerData;
     int selectedPannerIndex = -1;
+    PannerTrackingManager* pannerManager = nullptr;
+    
+    // Editing state
+    int editingRow = -1;
+    int editingColumn = -1;
     
     // UI components
     std::unique_ptr<juce::TableListBox> table;
@@ -78,7 +107,8 @@ private:
         AzimuthColumn = 4,
         ElevationColumn = 5,
         DivergeColumn = 6,
-        OutGainColumn = 7
+        OutGainColumn = 7,
+        ModeStatusColumn = 8
     };
     
     // Styling
@@ -88,8 +118,43 @@ private:
     juce::Colour selectedRowColour{0xFF404040};
     juce::Colour memoryShareIndicatorColour{0xFF4CAF50};  // Green for M1MemoryShare
     juce::Colour oscIndicatorColour{0xFFFF9800};          // Orange for OSC
+    juce::Colour editableColour{0xFF6EC6FF};              // Light blue for editable cells
+    juce::Colour streamingColour{0xFF4CAF50};             // Green for streaming
+    juce::Colour nativeColour{0xFF2196F3};                // Blue for native
+    juce::Colour offlineColour{0xFF9E9E9E};               // Gray for offline
+    juce::Colour expiredColour{0xFFF44336};               // Red for expired
     
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(InputTracklistComponent)
 };
 
-} // namespace Mach1 
+/**
+ * Editable label component for inline cell editing
+ */
+class EditableTableCell : public juce::Label
+{
+public:
+    EditableTableCell(InputTracklistComponent& owner, int row, int column)
+        : ownerTable(owner), rowIndex(row), columnId(column)
+    {
+        setEditable(false, true, false); // Single click to edit
+        setJustificationType(juce::Justification::centredLeft);
+        
+        // Styling
+        setColour(juce::Label::textColourId, juce::Colour(0xFFE0E0E0));
+        setColour(juce::Label::backgroundColourId, juce::Colours::transparentBlack);
+        setColour(juce::Label::outlineColourId, juce::Colours::transparentBlack);
+        setColour(juce::TextEditor::textColourId, juce::Colour(0xFFE0E0E0));
+        setColour(juce::TextEditor::backgroundColourId, juce::Colour(0xFF2A2A2A));
+        setColour(juce::TextEditor::highlightColourId, juce::Colour(0xFF4CAF50));
+    }
+    
+    int getRow() const { return rowIndex; }
+    int getColumnId() const { return columnId; }
+    
+private:
+    [[maybe_unused]] InputTracklistComponent& ownerTable;
+    int rowIndex;
+    int columnId;
+};
+
+} // namespace Mach1

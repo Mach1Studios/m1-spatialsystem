@@ -70,12 +70,14 @@ set(UI_COMPONENT_SOURCES
     UI/Components/InputTracklistComponent.cpp
     UI/Components/InputMixerComponent.h
     UI/Components/InputMixerComponent.cpp
-    UI/Components/SoundfieldDisplayComponent.h
-    UI/Components/SoundfieldDisplayComponent.cpp
-    UI/Components/M1SpatialOutComponent.h
-    UI/Components/M1SpatialOutComponent.cpp
+    UI/Components/InputPanelContainer.h
+    UI/Components/InputPanelContainer.cpp
     UI/Components/TimelineComponent.h
     UI/Components/TimelineComponent.cpp
+    UI/Components/Panner3DViewPanel.h
+    UI/Components/Panner3DViewPanel.cpp
+    UI/Components/MonitorPanel.h
+    UI/Components/MonitorPanel.cpp
 )
 
 # Combine all source files

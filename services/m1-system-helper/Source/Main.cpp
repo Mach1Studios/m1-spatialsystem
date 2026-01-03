@@ -1,24 +1,35 @@
 #include <JuceHeader.h>
 #include "M1SystemHelperService.h"
+#include <thread>
+#include <future>
+#include <chrono>
+#include <atomic>
+
+#ifndef JUCE_WINDOWS
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
 #include <fcntl.h>      // for fcntl
 #include <sys/select.h> // for select
-#include <thread>
-#include <future>
-#include <chrono>
-#include <atomic>
+#endif
+
+// Forward declaration for fake panner simulator
+namespace Mach1 {
+    class FakePannerSimulator;
+}
 
 // Socket activation handler for on-demand service startup
 class SocketActivationHandler {
 private:
     static std::atomic<bool> s_shouldStop;
     static std::thread s_socketThread;
+#ifndef JUCE_WINDOWS
     static int s_sockfd;
+#endif
 
 public:
     static void setupSocketActivation() {
+#ifndef JUCE_WINDOWS
         s_shouldStop = false;
         
         s_socketThread = std::thread([]() {
@@ -77,20 +88,153 @@ public:
             unlink(addr.sun_path);
             DBG("[M1SystemHelper] Socket activation listener stopped");
         });
+#endif
     }
     
     static void stopSocketActivation() {
+#ifndef JUCE_WINDOWS
         s_shouldStop = true;
         if (s_socketThread.joinable()) {
             s_socketThread.join();
         }
+#endif
     }
 };
 
 // Static member definitions
 std::atomic<bool> SocketActivationHandler::s_shouldStop{false};
 std::thread SocketActivationHandler::s_socketThread;
+#ifndef JUCE_WINDOWS
 int SocketActivationHandler::s_sockfd = -1;
+#endif
+
+//==============================================================================
+/**
+ * Fake panner simulator for testing the UI without a DAW
+ * Enabled via --debug-fake-panners N command line flag
+ */
+namespace Mach1 {
+
+class FakePannerSimulator : public juce::Timer
+{
+public:
+    FakePannerSimulator(PannerTrackingManager& manager, int numPanners)
+        : pannerManager(manager), pannerCount(numPanners)
+    {
+        // Initialize fake panners
+        for (int i = 0; i < pannerCount; ++i)
+        {
+            FakePanner fake;
+            fake.name = "Fake Panner " + std::to_string(i + 1);
+            fake.azimuth = static_cast<float>(i * 360 / pannerCount);
+            fake.elevation = static_cast<float>((i % 3 - 1) * 30);
+            fake.diverge = 50.0f;
+            fake.gain = 0.0f;
+            fake.channels = (i % 2 == 0) ? 1 : 2;
+            fake.phase = static_cast<float>(i) * 0.5f;
+            fakePanners.push_back(fake);
+        }
+        
+        DBG("[FakePannerSimulator] Created " + juce::String(pannerCount) + " fake panners");
+        
+        // Start animation timer (60fps for smooth animation)
+        startTimer(16);
+    }
+    
+    ~FakePannerSimulator() override
+    {
+        stopTimer();
+    }
+    
+    void timerCallback() override
+    {
+        // Animate azimuth for each fake panner
+        float time = static_cast<float>(juce::Time::getMillisecondCounter()) / 1000.0f;
+        
+        for (size_t i = 0; i < fakePanners.size(); ++i)
+        {
+            auto& fake = fakePanners[i];
+            
+            // Oscillate azimuth between -180 and 180
+            float baseAzimuth = static_cast<float>(i * 360 / pannerCount);
+            float oscillation = 45.0f * std::sin(time * 0.5f + fake.phase);
+            fake.azimuth = baseAzimuth + oscillation;
+            
+            // Wrap to -180 to 180 range
+            while (fake.azimuth > 180.0f) fake.azimuth -= 360.0f;
+            while (fake.azimuth < -180.0f) fake.azimuth += 360.0f;
+            
+            // Oscillate elevation slightly
+            fake.elevation = static_cast<float>((static_cast<int>(i) % 3 - 1) * 30) + 
+                            10.0f * std::sin(time * 0.3f + fake.phase * 1.5f);
+        }
+        
+        // Inject fake panners into the tracking system
+        injectFakePanners();
+    }
+    
+private:
+    struct FakePanner
+    {
+        std::string name;
+        float azimuth = 0.0f;
+        float elevation = 0.0f;
+        float diverge = 50.0f;
+        float gain = 0.0f;
+        int channels = 1;
+        float phase = 0.0f;
+    };
+    
+    void injectFakePanners()
+    {
+        // Create PannerInfo structures and inject them
+        // Note: This directly manipulates the internal state for testing
+        // In production, panners would be discovered via MemoryShare/OSC
+        
+        std::vector<PannerInfo> fakeInfos;
+        
+        for (size_t i = 0; i < fakePanners.size(); ++i)
+        {
+            const auto& fake = fakePanners[i];
+            
+            PannerInfo info;
+            info.name = fake.name;
+            info.port = 10000 + static_cast<int>(i);
+            info.processId = 99990 + static_cast<uint32_t>(i);
+            info.azimuth = fake.azimuth;
+            info.elevation = fake.elevation;
+            info.diverge = fake.diverge;
+            info.gain = fake.gain;
+            info.channels = static_cast<uint32_t>(fake.channels);
+            info.isActive = true;
+            info.isMemoryShareBased = (i % 2 == 0);  // Alternate between types
+            info.lastUpdateTime = juce::Time::currentTimeMillis();
+            info.isPlaying = (i % 3 != 0);
+            info.sampleRate = 48000;
+            info.samplesPerBlock = 512;
+            
+            fakeInfos.push_back(info);
+        }
+        
+        // Note: We can't directly inject into PannerTrackingManager's internal state
+        // The fake panners will need to be integrated differently
+        // For now, we store them in a global that can be accessed
+        s_fakePannerInfos = fakeInfos;
+    }
+    
+    PannerTrackingManager& pannerManager;
+    int pannerCount;
+    std::vector<FakePanner> fakePanners;
+    
+public:
+    // Static storage for fake panner data (accessible from outside)
+    static std::vector<PannerInfo> s_fakePannerInfos;
+};
+
+// Static initialization
+std::vector<PannerInfo> FakePannerSimulator::s_fakePannerInfos;
+
+} // namespace Mach1
 
 #if !defined(GUI_APP) && defined(JUCE_WINDOWS)
 // Windows service implementation
@@ -154,11 +298,26 @@ public:
     bool moreThanOneInstanceAllowed() override { return false; }
 
     void initialise(const juce::String& commandLine) override {
+        DBG("[M1SystemHelper] Initializing with command line: " + commandLine);
+        
+        // Parse command line for --debug-fake-panners N
+        parseFakePannersFlag(commandLine);
+        
         // Setup socket activation for on-demand startup
         SocketActivationHandler::setupSocketActivation();
         
         // Initialize the service directly on the main thread (no separate thread)
         Mach1::M1SystemHelperService::getInstance().initialise();
+        
+        // Create fake panner simulator if flag was set
+        if (debugFakePannerCount > 0)
+        {
+            DBG("[M1SystemHelper] Creating " + juce::String(debugFakePannerCount) + " fake panners for testing");
+            fakePannerSimulator = std::make_unique<Mach1::FakePannerSimulator>(
+                Mach1::M1SystemHelperService::getInstance().getPannerTrackingManager(),
+                debugFakePannerCount
+            );
+        }
         
         DBG("[M1SystemHelper] Service initialized on main thread");
         
@@ -168,6 +327,9 @@ public:
 
     void shutdown() override {
         DBG("[M1SystemHelper] Application shutdown starting...");
+        
+        // Stop fake panner simulator
+        fakePannerSimulator.reset();
         
         // Stop the socket activation thread
         DBG("[M1SystemHelper] Stopping socket activation thread...");
@@ -214,7 +376,28 @@ public:
     }
 
 private:
-    // No service thread needed - everything runs on main JUCE message thread
+    void parseFakePannersFlag(const juce::String& commandLine)
+    {
+        // Look for --debug-fake-panners N
+        juce::StringArray args;
+        args.addTokens(commandLine, " ", "\"");
+        
+        for (int i = 0; i < args.size(); ++i)
+        {
+            if (args[i] == "--debug-fake-panners" && i + 1 < args.size())
+            {
+                debugFakePannerCount = args[i + 1].getIntValue();
+                if (debugFakePannerCount > 0)
+                {
+                    DBG("[M1SystemHelper] Debug mode: will create " + juce::String(debugFakePannerCount) + " fake panners");
+                }
+                break;
+            }
+        }
+    }
+    
+    int debugFakePannerCount = 0;
+    std::unique_ptr<Mach1::FakePannerSimulator> fakePannerSimulator;
 };
 
 START_JUCE_APPLICATION(M1SystemHelperApplication)

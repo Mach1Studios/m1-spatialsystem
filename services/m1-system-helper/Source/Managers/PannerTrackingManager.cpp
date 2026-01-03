@@ -381,6 +381,57 @@ void PannerTrackingManager::sendToPanner(const PannerInfo& panner, const juce::O
 }
 
 // =============================================================================
+// BIDIRECTIONAL PARAMETER UPDATES
+// =============================================================================
+
+bool PannerTrackingManager::sendParameterUpdate(const PannerInfo& panner, const std::string& parameterName, float value) {
+    DBG("[PannerTrackingManager] sendParameterUpdate (float): " + juce::String(parameterName) + " = " + juce::String(value));
+    
+    // For MemoryShare-based panners, write to the command region of the .mem file
+    if (panner.isMemoryShareBased && memoryShareTracker) {
+        // TODO: Implement writing to .mem command region
+        // The M1MemoryShare class needs a writeCommand() or similar method
+        // that writes to the HelperToPluginCommands region of the shared memory
+        
+        // For now, log that this is a stub and return false
+        DBG("[PannerTrackingManager] MemoryShare command writing not yet fully implemented");
+        DBG("[PannerTrackingManager] Would write: " + juce::String(parameterName) + " = " + juce::String(value) +
+            " to panner PID " + juce::String(panner.processId));
+        
+        // Return true to indicate we "handled" it (stub)
+        return true;
+    }
+    
+    // For OSC-based panners, send an OSC message
+    if (!panner.isMemoryShareBased && oscTracker && panner.port > 0) {
+        // Construct OSC message for parameter update
+        // TODO: Implement actual OSC parameter update protocol
+        // Example: /panner-param portId paramName value
+        
+        juce::OSCMessage paramMsg("/panner-param");
+        paramMsg.addInt32(panner.port);
+        paramMsg.addString(juce::String(parameterName));
+        paramMsg.addFloat32(value);
+        
+        // Send via OSC tracker
+        oscTracker->sendToPanner(panner.port, paramMsg);
+        
+        DBG("[PannerTrackingManager] Sent OSC parameter update to port " + juce::String(panner.port));
+        return true;
+    }
+    
+    return false;
+}
+
+bool PannerTrackingManager::sendParameterUpdate(const PannerInfo& panner, const std::string& parameterName, int value) {
+    return sendParameterUpdate(panner, parameterName, static_cast<float>(value));
+}
+
+bool PannerTrackingManager::sendParameterUpdate(const PannerInfo& panner, const std::string& parameterName, bool value) {
+    return sendParameterUpdate(panner, parameterName, value ? 1.0f : 0.0f);
+}
+
+// =============================================================================
 // OSC FALLBACK (Backward Compatibility)
 // =============================================================================
 

@@ -1,7 +1,7 @@
 /*
     SessionUI.cpp
     -------------
-    System tray icon using timer-based approach for reliable native OS menus
+    Implementation of the system tray icon and resizable status window
 */
 
 #include "SessionUI.h"
@@ -9,7 +9,139 @@
 namespace Mach1 {
 
 //==============================================================================
-// MenuBarModel Implementation (for macOS compatibility)
+// SessionMainComponent
+//==============================================================================
+
+SessionMainComponent::SessionMainComponent(PannerTrackingManager& manager)
+    : pannerManager(manager)
+{
+    // Create components
+    inputPanelContainer = std::make_unique<InputPanelContainer>();
+    view3DComponent = std::make_unique<Panner3DViewPanel>();
+    monitorComponent = std::make_unique<MonitorPanel>();
+    timelineComponent = std::make_unique<TimelineComponent>();
+    
+    // Set up callbacks
+    inputPanelContainer->onSelectionChanged = [this](int index) {
+        view3DComponent->setSelectedPannerIndex(index);
+    };
+    
+    inputPanelContainer->setPannerTrackingManager(&pannerManager);
+    
+    view3DComponent->onPannerSelected = [this](int index) {
+        inputPanelContainer->setSelectedPanner(index);
+    };
+    
+    // Add as visible children
+    addAndMakeVisible(inputPanelContainer.get());
+    addAndMakeVisible(view3DComponent.get());
+    addAndMakeVisible(monitorComponent.get());
+    addAndMakeVisible(timelineComponent.get());
+    
+    // Set up layout
+    setupLayout();
+    
+    // Initial data update
+    updateFromManager();
+    
+    // Start update timer for polling panner data
+    startTimerHz(10); // Update at 10Hz
+}
+
+SessionMainComponent::~SessionMainComponent()
+{
+    stopTimer();
+}
+
+void SessionMainComponent::setupLayout()
+{
+    // Main vertical layout: [Main content] [Resizer] [Timeline]
+    verticalLayout.setItemLayout(0, 100, -1.0, -0.75);  // Main content: 75%
+    verticalLayout.setItemLayout(1, 5, 5, 5);           // Resizer
+    verticalLayout.setItemLayout(2, 80, -0.4, -0.25);   // Timeline: 25%
+    
+    // Horizontal layout: [Input Panel] [Resizer] [Right Panel]
+    horizontalLayout.setItemLayout(0, 200, -1.0, -0.35);  // Input panel: 35%
+    horizontalLayout.setItemLayout(1, 5, 5, 5);           // Resizer
+    horizontalLayout.setItemLayout(2, 200, -1.0, -0.65);  // Right panel: 65%
+    
+    // Right panel layout: [3D View] [Resizer] [Monitor]
+    rightPanelLayout.setItemLayout(0, 100, -1.0, -0.65);  // 3D View: 65%
+    rightPanelLayout.setItemLayout(1, 5, 5, 5);           // Resizer
+    rightPanelLayout.setItemLayout(2, 80, -0.5, -0.35);   // Monitor: 35%
+    
+    // Create resizer bars
+    mainTimelineResizer = std::make_unique<juce::StretchableLayoutResizerBar>(
+        &verticalLayout, 1, false);
+    mainTimelineResizer->setColour(juce::ResizableWindow::backgroundColourId, resizerColour);
+    addAndMakeVisible(mainTimelineResizer.get());
+    
+    leftRightResizer = std::make_unique<juce::StretchableLayoutResizerBar>(
+        &horizontalLayout, 1, true);
+    leftRightResizer->setColour(juce::ResizableWindow::backgroundColourId, resizerColour);
+    addAndMakeVisible(leftRightResizer.get());
+    
+    view3DMonitorResizer = std::make_unique<juce::StretchableLayoutResizerBar>(
+        &rightPanelLayout, 1, false);
+    view3DMonitorResizer->setColour(juce::ResizableWindow::backgroundColourId, resizerColour);
+    addAndMakeVisible(view3DMonitorResizer.get());
+}
+
+void SessionMainComponent::resized()
+{
+    auto bounds = getLocalBounds();
+    
+    // Vertical layout for main content vs timeline
+    juce::Component* verticalComps[] = { nullptr, mainTimelineResizer.get(), timelineComponent.get() };
+    verticalLayout.layOutComponents(verticalComps, 3, 
+                                    bounds.getX(), bounds.getY(), 
+                                    bounds.getWidth(), bounds.getHeight(),
+                                    true, true);
+    
+    // Get main content area (from first item of vertical layout)
+    auto mainBounds = bounds.withHeight(verticalLayout.getItemCurrentPosition(1));
+    
+    // Horizontal layout for input panel vs right panel
+    juce::Component* horizontalComps[] = { inputPanelContainer.get(), leftRightResizer.get(), nullptr };
+    horizontalLayout.layOutComponents(horizontalComps, 3,
+                                      mainBounds.getX(), mainBounds.getY(),
+                                      mainBounds.getWidth(), mainBounds.getHeight(),
+                                      false, true);
+    
+    // Get right panel area
+    int rightPanelX = horizontalLayout.getItemCurrentPosition(2);
+    auto rightBounds = mainBounds.withLeft(rightPanelX);
+    
+    // Right panel layout for 3D view vs monitor
+    juce::Component* rightComps[] = { view3DComponent.get(), view3DMonitorResizer.get(), monitorComponent.get() };
+    rightPanelLayout.layOutComponents(rightComps, 3,
+                                      rightBounds.getX(), rightBounds.getY(),
+                                      rightBounds.getWidth(), rightBounds.getHeight(),
+                                      true, true);
+}
+
+void SessionMainComponent::paint(juce::Graphics& g)
+{
+    g.fillAll(backgroundColour);
+}
+
+void SessionMainComponent::timerCallback()
+{
+    // Poll panner data regularly
+    updateFromManager();
+}
+
+void SessionMainComponent::updateFromManager()
+{
+    auto panners = pannerManager.getActivePanners();
+    
+    inputPanelContainer->updatePannerData(panners);
+    view3DComponent->updatePannerData(panners);
+    timelineComponent->updateBufferEvents(panners);
+}
+
+//==============================================================================
+// SessionUI::MyMenuBarModel
 //==============================================================================
 
 SessionUI::MyMenuBarModel::MyMenuBarModel()
@@ -26,7 +158,7 @@ SessionUI::MyMenuBarModel::~MyMenuBarModel()
 }
 
 //==============================================================================
-// SessionUI Implementation
+// SessionUI
 //==============================================================================
 
 SessionUI::SessionUI(PannerTrackingManager& manager)
@@ -50,6 +182,8 @@ SessionUI::SessionUI(PannerTrackingManager& manager)
 SessionUI::~SessionUI()
 {
     DBG("[SessionUI] Destructor called");
+    stopTimer();
+    mainComponent = nullptr;
     sessionWindow = nullptr;
     trayMenu = nullptr;
 }
@@ -73,30 +207,30 @@ void SessionUI::timerCallback()
     {
         // Handle menu display (50ms timer)
         DBG("[SessionUI] timerCallback - showing menu");
-    stopTimer();
+        stopTimer();
         isMenuTimer = false;
-    
-    // Create fresh menu each time
-    createMenu();
-    
-    if (trayMenu)
-    {
-        DBG("[SessionUI] Using MessageManager::callAsync approach");
         
-        // Use MessageManager::callAsync like the working example
-        juce::MessageManager::callAsync([this]()
+        // Create fresh menu each time
+        createMenu();
+        
+        if (trayMenu)
         {
-            DBG("[SessionUI] Async callback - calling showDropdownMenu");
-            showDropdownMenu(*trayMenu);
-            DBG("[SessionUI] showDropdownMenu call completed");
+            DBG("[SessionUI] Using MessageManager::callAsync approach");
+            
+            // Use MessageManager::callAsync like the working example
+            juce::MessageManager::callAsync([this]()
+            {
+                DBG("[SessionUI] Async callback - calling showDropdownMenu");
+                showDropdownMenu(*trayMenu);
+                DBG("[SessionUI] showDropdownMenu call completed");
                 
                 // Restart regular data timer after menu interaction
                 startTimer(1000);
-        });
-    }
-    else
-    {
-        DBG("[SessionUI] ERROR: trayMenu is null!");
+            });
+        }
+        else
+        {
+            DBG("[SessionUI] ERROR: trayMenu is null!");
             // Restart regular timer even if menu failed
             startTimer(1000);
         }
@@ -105,22 +239,6 @@ void SessionUI::timerCallback()
     {
         // Handle regular status updates (every 1 second)
         updateStatus();
-        
-        // Update components if window is open
-        if (sessionWindow && sessionWindow->isVisible())
-        {
-            auto activePanners = pannerManager.getActivePanners();
-            
-            if (tracklistComponent)
-            {
-                tracklistComponent->updatePannerData(activePanners);
-            }
-            
-            if (timelineComponent)
-            {
-                timelineComponent->updateBufferEvents(activePanners);
-            }
-        }
     }
 }
 
@@ -139,9 +257,14 @@ void SessionUI::createMenu()
     statusText += ", OSC: " + juce::String(lastOSCStatus ? "Active" : "Inactive");
     
     // Add menu items
-    trayMenu->addItem("Show Session UI", [this]() { 
-        DBG("[SessionUI] Menu callback triggered!");
+    trayMenu->addItem("Open Status Window", [this]() { 
+        DBG("[SessionUI] Open Status Window callback triggered!");
         showSessionWindow(); 
+    });
+    trayMenu->addSeparator();
+    trayMenu->addItem("Copy Diagnostics", [this]() {
+        DBG("[SessionUI] Copy Diagnostics callback triggered!");
+        copyDiagnosticsToClipboard();
     });
     trayMenu->addSeparator();
     trayMenu->addItem(statusText, false, false, [](){}); // Non-clickable status
@@ -154,6 +277,11 @@ void SessionUI::createMenu()
         
         // Stop timers first
         stopTimer();
+        
+        // Clean up main component
+        if (mainComponent) {
+            mainComponent.reset();
+        }
         
         // Clean up session window if open
         if (sessionWindow) {
@@ -173,8 +301,8 @@ void SessionUI::createMenu()
         
         // Use async call to ensure cleanup completes before quit
         juce::MessageManager::callAsync([]() {
-        juce::JUCEApplication::getInstance()->systemRequestedQuit(); 
-    });
+            juce::JUCEApplication::getInstance()->systemRequestedQuit(); 
+        });
     });
     
     DBG("[SessionUI] Menu created with " + juce::String(trayMenu->getNumItems()) + " items");
@@ -186,58 +314,29 @@ void SessionUI::showSessionWindow()
     
     if (!sessionWindow)
     {
+        // Create the main component
+        mainComponent = std::make_unique<SessionMainComponent>(pannerManager);
+        
+        // Create the window
         sessionWindow = std::make_unique<SessionDocumentWindow>(
-            "Mach1 Spatial System - Input Tracklist",
-            juce::Colours::darkgrey,
-            juce::DocumentWindow::allButtons
-        );
+            "Mach1 Spatial System Helper",
+            juce::Colour(0xFF1A1A1A),
+            juce::DocumentWindow::allButtons);
         
-        // Create main component container
-        auto mainComponent = std::make_unique<juce::Component>();
-        mainComponent->setSize(700, 600);  // Increased height for timeline
-        
-        // Create INPUT Tracklist component
-        auto inputTracklist = std::make_unique<InputTracklistComponent>();
-        
-        // Set up selection callback
-        inputTracklist->onSelectionChanged = [this](int index) {
-            DBG("[SessionUI] Panner " + juce::String(index + 1) + " selected");
-        };
-        
-        // Create Timeline component
-        auto timeline = std::make_unique<TimelineComponent>();
-        
-        // Add components to main component
-        mainComponent->addAndMakeVisible(inputTracklist.get());
-        mainComponent->addAndMakeVisible(timeline.get());
-        
-        // Layout - tracklist on top, timeline on bottom
-        inputTracklist->setBounds(10, 10, 680, 280);  // Top half
-        timeline->setBounds(10, 300, 680, 290);  // Bottom half
-        
-        // Store references for updates
-        tracklistComponent = inputTracklist.get();
-        timelineComponent = timeline.get();
-        
-        // Release pointers (component takes ownership)
-        inputTracklist.release();
-        timeline.release();
-        
-        sessionWindow->setContentOwned(mainComponent.release(), true);
-        sessionWindow->centreWithSize(700, 600);
-        sessionWindow->setResizable(true, true);
+        sessionWindow->setContentNonOwned(mainComponent.get(), false);
+        sessionWindow->setResizable(true, false);
+        sessionWindow->centreWithSize(1100, 700);
         sessionWindow->setUsingNativeTitleBar(true);
-    }
-    
-    // Update tracklist with current panner data
-    if (tracklistComponent)
-    {
-        auto activePanners = pannerManager.getActivePanners();
-        tracklistComponent->updatePannerData(activePanners);
     }
     
     sessionWindow->setVisible(true);
     sessionWindow->toFront(true);
+    
+    // Update data
+    if (mainComponent)
+    {
+        mainComponent->updateFromManager();
+    }
 }
 
 void SessionUI::updateStatus()
@@ -253,6 +352,49 @@ void SessionUI::updateStatus()
     
     // Update tray icon based on status
     updateTrayIcon();
+}
+
+void SessionUI::copyDiagnosticsToClipboard()
+{
+    juce::String diagnostics = generateDiagnosticsText();
+    juce::SystemClipboard::copyTextToClipboard(diagnostics);
+    DBG("[SessionUI] Diagnostics copied to clipboard");
+}
+
+juce::String SessionUI::generateDiagnosticsText()
+{
+    juce::String text;
+    
+    text << "=== Mach1 Spatial System Helper Diagnostics ===" << juce::newLine;
+    text << "Time: " << juce::Time::getCurrentTime().toString(true, true, true, true) << juce::newLine;
+    text << juce::newLine;
+    
+    auto panners = pannerManager.getActivePanners();
+    
+    text << "Connected Panners: " << juce::String(static_cast<int>(panners.size())) << juce::newLine;
+    text << "MemoryShare Active: " << (lastMemoryShareStatus ? "Yes" : "No") << juce::newLine;
+    text << "OSC Active: " << (lastOSCStatus ? "Yes" : "No") << juce::newLine;
+    text << juce::newLine;
+    
+    int index = 1;
+    for (const auto& panner : panners)
+    {
+        text << "--- Panner " << index << " ---" << juce::newLine;
+        text << "  Name: " << panner.name << juce::newLine;
+        text << "  Port: " << juce::String(panner.port) << juce::newLine;
+        text << "  Process ID: " << juce::String(static_cast<int>(panner.processId)) << juce::newLine;
+        text << "  Channels: " << juce::String(static_cast<int>(panner.channels)) << juce::newLine;
+        text << "  Azimuth: " << juce::String(panner.azimuth, 1) << juce::newLine;
+        text << "  Elevation: " << juce::String(panner.elevation, 1) << juce::newLine;
+        text << "  Diverge: " << juce::String(panner.diverge, 1) << juce::newLine;
+        text << "  Gain: " << juce::String(panner.gain, 1) << " dB" << juce::newLine;
+        text << "  Tracking: " << (panner.isMemoryShareBased ? "MemoryShare" : "OSC") << juce::newLine;
+        text << "  Active: " << (panner.isActive ? "Yes" : "No") << juce::newLine;
+        text << juce::newLine;
+        index++;
+    }
+    
+    return text;
 }
 
 void SessionUI::updateTrayIcon()
@@ -279,4 +421,4 @@ juce::Image SessionUI::createTrayIcon(bool isActive)
     return icon;
 }
 
-} // namespace Mach1 
+} // namespace Mach1
