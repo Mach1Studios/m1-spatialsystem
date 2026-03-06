@@ -43,6 +43,7 @@ Source: "..\resources\templates\Reaper\*"; DestDir: "{app}\templates\Reaper"; Co
 
 Source: "..\..\m1-monitor\build\M1-Monitor_artefacts\Release\VST3\M1-Monitor.vst3"; DestDir: "{code:GetDir|1}"; Components: vst3; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\..\m1-panner\build\M1-Panner_artefacts\Release\VST3\M1-Panner.vst3"; DestDir: "{code:GetDir|1}"; Components: vst3; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\resources\templates\Nuendo\Mach1 Spatial Template.npr"; DestDir: "{app}\templates\Nuendo\Mach1 Spatial Template.npr"; Components: vst3; Flags: ignoreversion recursesubdirs createallsubdirs
 
 Source: "..\..\m1-transcoder\dist\M1-Transcoder.exe"; Excludes: "ffmpeg.exe,ffmpeg.dll"; DestDir: "{app}"; Components: m1transcoder; Flags: ignoreversion; AfterInstall: RunPostinstallTranscoder
 
