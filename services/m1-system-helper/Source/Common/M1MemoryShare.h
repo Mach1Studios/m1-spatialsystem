@@ -96,6 +96,22 @@ public:
     };
 
     /**
+     * Control message for bidirectional communication (helper -> panner)
+     * Stored in a ring buffer within the SharedMemoryHeader region.
+     */
+    struct ControlMessage
+    {
+        uint32_t parameterID;       // Which parameter to update
+        ParameterType parameterType;
+        float floatValue;
+        int32_t intValue;
+
+        ControlMessage() : parameterID(0), parameterType(ParameterType::FLOAT), floatValue(0.0f), intValue(0) {}
+    };
+
+    static constexpr uint32_t MAX_CONTROL_MESSAGES = 16;
+
+    /**
      * Constructor for creating/opening a shared memory segment
      * @param memoryName Unique name for the shared memory segment (OS-wide)
      * @param totalSize Total size of the shared memory in bytes (must be >= 4KB)
@@ -297,6 +313,18 @@ public:
     };
 
     MemoryStats getStats() const;
+
+    /**
+     * Write a control message (helper -> panner) into the shared memory control ring
+     * @return true if the message was written successfully
+     */
+    bool writeControlMessage(uint32_t parameterID, ParameterType type, float floatValue, int32_t intValue = 0);
+
+    /**
+     * Read the next pending control message (panner reads from helper)
+     * @return true if a message was available
+     */
+    bool readControlMessage(ControlMessage& outMessage);
 
     /**
      * Static method to delete a shared memory segment by name

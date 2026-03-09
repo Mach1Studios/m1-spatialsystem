@@ -187,10 +187,6 @@ private:
     
     void injectFakePanners()
     {
-        // Create PannerInfo structures and inject them
-        // Note: This directly manipulates the internal state for testing
-        // In production, panners would be discovered via MemoryShare/OSC
-        
         std::vector<PannerInfo> fakeInfos;
         
         for (size_t i = 0; i < fakePanners.size(); ++i)
@@ -207,7 +203,7 @@ private:
             info.gain = fake.gain;
             info.channels = static_cast<uint32_t>(fake.channels);
             info.isActive = true;
-            info.isMemoryShareBased = (i % 2 == 0);  // Alternate between types
+            info.isMemoryShareBased = true;
             info.lastUpdateTime = juce::Time::currentTimeMillis();
             info.isPlaying = (i % 3 != 0);
             info.sampleRate = 48000;
@@ -216,23 +212,13 @@ private:
             fakeInfos.push_back(info);
         }
         
-        // Note: We can't directly inject into PannerTrackingManager's internal state
-        // The fake panners will need to be integrated differently
-        // For now, we store them in a global that can be accessed
-        s_fakePannerInfos = fakeInfos;
+        pannerManager.injectFakePanners(fakeInfos);
     }
     
     PannerTrackingManager& pannerManager;
     int pannerCount;
     std::vector<FakePanner> fakePanners;
-    
-public:
-    // Static storage for fake panner data (accessible from outside)
-    static std::vector<PannerInfo> s_fakePannerInfos;
 };
-
-// Static initialization
-std::vector<PannerInfo> FakePannerSimulator::s_fakePannerInfos;
 
 } // namespace Mach1
 
@@ -289,7 +275,7 @@ int main(int argc, char* argv[]) {
 
 #else
 
-class M1SystemHelperApplication : public juce::JUCEApplication {
+class M1SystemHelperApplication : public juce::JUCEApplication, private juce::Timer {
 public:
     M1SystemHelperApplication() = default;
     
@@ -300,23 +286,17 @@ public:
     void initialise(const juce::String& commandLine) override {
         DBG("[M1SystemHelper] Initializing with command line: " + commandLine);
         
-        // Parse command line for --debug-fake-panners N and --debug-fake-blocks
         parseFakePannersFlag(commandLine);
         parseDebugFakeBlocksFlag(commandLine);
+        parseKeepAliveFlag(commandLine);
         
-        // Setup socket activation for on-demand startup
         SocketActivationHandler::setupSocketActivation();
         
-        // Set debug flags on the service
         if (debugFakeBlocks)
-        {
             Mach1::M1SystemHelperService::getInstance().setDebugFakeBlocks(true);
-        }
         
-        // Initialize the service directly on the main thread (no separate thread)
         Mach1::M1SystemHelperService::getInstance().initialise();
         
-        // Create fake panner simulator if flag was set
         if (debugFakePannerCount > 0)
         {
             DBG("[M1SystemHelper] Creating " + juce::String(debugFakePannerCount) + " fake panners for testing");
@@ -326,55 +306,44 @@ public:
             );
         }
         
-        DBG("[M1SystemHelper] Service initialized on main thread");
+        if (!keepAlive)
+            startTimer(AUTO_QUIT_CHECK_INTERVAL_MS);
         
-        // Run the JUCE message loop - this is the ONLY message loop
-        juce::MessageManager::getInstance()->runDispatchLoop();
+        DBG("[M1SystemHelper] Service initialized (keepAlive=" + juce::String(keepAlive ? "true" : "false") + ")");
     }
 
     void shutdown() override {
         DBG("[M1SystemHelper] Application shutdown starting...");
-        
-        // Stop fake panner simulator
+        stopTimer();
         fakePannerSimulator.reset();
-        
-        // Stop the socket activation thread
-        DBG("[M1SystemHelper] Stopping socket activation thread...");
+        Mach1::M1SystemHelperService::getInstance().shutdown();
         SocketActivationHandler::stopSocketActivation();
-        
         DBG("[M1SystemHelper] Application shutdown complete");
     }
     
     void systemRequestedQuit() override { 
         DBG("[M1SystemHelper] System requested quit");
-        // Shutdown the service first to clean up properly
-        Mach1::M1SystemHelperService::getInstance().shutdown();
-        // Let JUCE handle its own shutdown - it will call our shutdown() automatically
         quit();
-        // Add a fallback with proper JUCE cleanup using a separate thread
-        std::thread([]() {
-            std::this_thread::sleep_for(std::chrono::milliseconds(500));
-            DBG("[M1SystemHelper] Fallback exit - cleaning up JUCE resources");
-            
-            // Force cleanup of any remaining JUCE resources before exit
-            try {
-                // Stop any remaining timers
-                auto& service = Mach1::M1SystemHelperService::getInstance();
-                service.shutdown();
-                service.stopTimer();
-                
-                // Ensure MessageManager cleanup
-                if (auto* mm = juce::MessageManager::getInstanceWithoutCreating()) {
-                    mm->stopDispatchLoop();
-                }
-                
-                DBG("[M1SystemHelper] JUCE cleanup complete, forcing exit");
-            } catch (...) {
-                // Ignore any exceptions during cleanup
+    }
+    
+    void timerCallback() override {
+        // Auto-quit logic: if no panners connected for AUTO_QUIT_TIMEOUT_MS, shut down
+        auto& service = Mach1::M1SystemHelperService::getInstance();
+        bool hasPanners = service.getPannerTrackingManager().hasPanners();
+        
+        if (hasPanners) {
+            lastPannerSeenTime = juce::Time::currentTimeMillis();
+        } else if (lastPannerSeenTime > 0) {
+            auto elapsed = juce::Time::currentTimeMillis() - lastPannerSeenTime;
+            if (elapsed > AUTO_QUIT_TIMEOUT_MS) {
+                DBG("[M1SystemHelper] No panners connected for " + juce::String(AUTO_QUIT_TIMEOUT_MS / 1000) + "s, auto-quitting");
+                systemRequestedQuit();
+                return;
             }
-            
-            std::exit(0);
-        }).detach();
+        } else {
+            // First call, initialize the timer
+            lastPannerSeenTime = juce::Time::currentTimeMillis();
+        }
     }
     
     void anotherInstanceStarted(const juce::String&) override { 
@@ -385,19 +354,13 @@ public:
 private:
     void parseFakePannersFlag(const juce::String& commandLine)
     {
-        // Look for --debug-fake-panners N
         juce::StringArray args;
         args.addTokens(commandLine, " ", "\"");
-        
         for (int i = 0; i < args.size(); ++i)
         {
             if (args[i] == "--debug-fake-panners" && i + 1 < args.size())
             {
                 debugFakePannerCount = args[i + 1].getIntValue();
-                if (debugFakePannerCount > 0)
-                {
-                    DBG("[M1SystemHelper] Debug mode: will create " + juce::String(debugFakePannerCount) + " fake panners");
-                }
                 break;
             }
         }
@@ -405,23 +368,65 @@ private:
     
     void parseDebugFakeBlocksFlag(const juce::String& commandLine)
     {
-        // Look for --debug-fake-blocks
         juce::StringArray args;
         args.addTokens(commandLine, " ", "\"");
-        
         for (int i = 0; i < args.size(); ++i)
         {
             if (args[i] == "--debug-fake-blocks")
             {
                 debugFakeBlocks = true;
-                DBG("[M1SystemHelper] Debug mode: fake block generation enabled for capture timeline testing");
                 break;
             }
         }
     }
     
+    void parseKeepAliveFlag(const juce::String& commandLine)
+    {
+        juce::StringArray args;
+        args.addTokens(commandLine, " ", "\"");
+        for (int i = 0; i < args.size(); ++i)
+        {
+            if (args[i] == "--keep-alive")
+            {
+                keepAlive = true;
+                DBG("[M1SystemHelper] Keep-alive mode enabled (will not auto-quit)");
+                break;
+            }
+        }
+        
+        // Also check settings file for persistent preference
+        if (!keepAlive)
+        {
+            juce::File settingsFile;
+        #if JUCE_MAC
+            settingsFile = juce::File::getSpecialLocation(juce::File::commonApplicationDataDirectory)
+                                .getChildFile("Application Support")
+                                .getChildFile("Mach1")
+                                .getChildFile("settings.json");
+        #else
+            settingsFile = juce::File::getSpecialLocation(juce::File::commonApplicationDataDirectory)
+                                .getChildFile("Mach1")
+                                .getChildFile("settings.json");
+        #endif
+            if (settingsFile.existsAsFile())
+            {
+                auto json = juce::JSON::parse(settingsFile.loadFileAsString());
+                if (auto* obj = json.getDynamicObject())
+                {
+                    if (obj->hasProperty("keepHelperAlive"))
+                        keepAlive = static_cast<bool>(obj->getProperty("keepHelperAlive"));
+                }
+            }
+        }
+    }
+    
+    static constexpr int AUTO_QUIT_CHECK_INTERVAL_MS = 10000; // Check every 10s
+    static constexpr juce::int64 AUTO_QUIT_TIMEOUT_MS = 300000; // 5 minutes with no panners
+    
     int debugFakePannerCount = 0;
     bool debugFakeBlocks = false;
+    bool keepAlive = false;
+    juce::int64 lastPannerSeenTime = 0;
     std::unique_ptr<Mach1::FakePannerSimulator> fakePannerSimulator;
 };
 

@@ -507,6 +507,60 @@ bool M1MemoryShare::deleteSharedMemory(const juce::String& memoryName)
     return deleted || true; // Consider it deleted if not found
 }
 
+bool M1MemoryShare::writeControlMessage(uint32_t parameterID, ParameterType type, float floatValue, int32_t intValue)
+{
+    if (!isValid() || !m_header)
+        return false;
+
+    uint32_t writeIdx = m_header->controlWriteIndex % MAX_CONTROL_MESSAGES;
+
+    // Store control message right after the QueuedBuffer array inside the header reserved space.
+    // The control ring is stored at the very end of the header + queue region.
+    // For simplicity, we store it as fields in the header's control indices (already have controlMessageCount).
+    // Since we can't add a variable-size array to the header without changing layout,
+    // we use the controlWriteIndex / controlReadIndex as a simple counter pair.
+    // The actual control message data is written into the first 256 bytes of the data buffer's tail.
+
+    // Compute offset for control message ring at the END of the data buffer
+    size_t controlRingOffset = m_dataBufferSize - (MAX_CONTROL_MESSAGES * sizeof(ControlMessage));
+    if (controlRingOffset >= m_dataBufferSize)
+        return false;
+
+    ControlMessage* ring = reinterpret_cast<ControlMessage*>(m_dataBuffer + controlRingOffset);
+    ring[writeIdx].parameterID = parameterID;
+    ring[writeIdx].parameterType = type;
+    ring[writeIdx].floatValue = floatValue;
+    ring[writeIdx].intValue = intValue;
+
+    m_header->controlWriteIndex++;
+    m_header->controlMessageCount++;
+
+    return true;
+}
+
+bool M1MemoryShare::readControlMessage(ControlMessage& outMessage)
+{
+    if (!isValid() || !m_header)
+        return false;
+
+    if (m_header->controlReadIndex >= m_header->controlWriteIndex)
+        return false; // No pending messages
+
+    uint32_t readIdx = m_header->controlReadIndex % MAX_CONTROL_MESSAGES;
+
+    size_t controlRingOffset = m_dataBufferSize - (MAX_CONTROL_MESSAGES * sizeof(ControlMessage));
+    if (controlRingOffset >= m_dataBufferSize)
+        return false;
+
+    const ControlMessage* ring = reinterpret_cast<const ControlMessage*>(m_dataBuffer + controlRingOffset);
+    outMessage = ring[readIdx];
+
+    m_header->controlReadIndex++;
+    m_header->controlMessageCount--;
+
+    return true;
+}
+
 bool M1MemoryShare::readAudioBufferWithGenericParameters(juce::AudioBuffer<float>& audioBuffer,
                                                        ParameterMap& parameters,
                                                        uint64_t& dawTimestamp,

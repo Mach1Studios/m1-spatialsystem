@@ -3,7 +3,6 @@
 #include "Common/Common.h"
 #include "Common/ServiceLocator.h"
 #include "Core/ConfigManager.h"
-#include "Core/AudioStreaming.h"
 #include "Core/ExternalMixerProcessor.h"
 #include "Managers/ClientManager.h"
 #include "Managers/PluginManager.h"
@@ -32,16 +31,11 @@ public:
     PluginManager& getPluginManager() { return *pluginManager; }
     ServiceManager& getServiceManager() { return *serviceManager; }
     
-    // New panner tracking functionality
+    // Panner tracking
     PannerTrackingManager& getPannerTrackingManager() { return *pannerTrackingManager; }
     
-    // New streaming functionality
-    AudioStreamManager& getAudioStreamManager() { return *audioStreamManager; }
+    // External mixer
     ExternalMixerProcessor& getExternalMixer() { return *externalMixer; }
-    
-    void updateClientSeenTime(juce::int64 time) {
-        timeWhenHelperLastSeenAClient = time;
-    }
     
 private:
     M1SystemHelperService();
@@ -57,11 +51,10 @@ private:
     std::unique_ptr<ConfigManager> configManager;
     std::unique_ptr<OSCHandler> oscHandler;
     
-    // New panner tracking component
+    // Panner tracking component
     std::unique_ptr<PannerTrackingManager> pannerTrackingManager;
     
-    // New streaming components
-    std::unique_ptr<AudioStreamManager> audioStreamManager;
+    // External mixer
     std::unique_ptr<ExternalMixerProcessor> externalMixer;
     
     // UI component

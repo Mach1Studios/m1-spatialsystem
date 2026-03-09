@@ -172,11 +172,11 @@ void CaptureTimelinePanel::resized()
     controlsArea.removeFromLeft(3);
     m_lockRangeButton->setBounds(controlsArea.removeFromLeft(45).withHeight(buttonHeight).withY(buttonY));
     controlsArea.removeFromLeft(3);
-    m_exportButton->setBounds(controlsArea.removeFromLeft(50).withHeight(buttonHeight).withY(buttonY));
+    m_exportButton->setBounds(controlsArea.removeFromLeft(55).withHeight(buttonHeight).withY(buttonY));
     controlsArea.removeFromLeft(10);
-    m_fillGapsToggle->setBounds(controlsArea.removeFromLeft(80).withHeight(buttonHeight).withY(buttonY));
+    m_fillGapsToggle->setBounds(controlsArea.removeFromLeft(100).withHeight(buttonHeight).withY(buttonY));
     controlsArea.removeFromLeft(6);
-    m_autoZoomToggle->setBounds(controlsArea.removeFromLeft(70).withHeight(buttonHeight).withY(buttonY));
+    m_autoZoomToggle->setBounds(controlsArea.removeFromLeft(100).withHeight(buttonHeight).withY(buttonY));
 }
 
 //==============================================================================
@@ -432,12 +432,12 @@ void CaptureTimelinePanel::drawRuler(juce::Graphics& g)
     g.setColour(m_rulerColour);
     g.drawRect(m_rulerBounds);
     
-    // Calculate tick interval based on view range
     int64_t viewRange = m_viewEndSample - m_viewStartSample;
-    if (viewRange <= 0)
-        viewRange = 1;
     
-    // Get sample rate without blocking
+    // Don't draw ticks when view range is effectively empty
+    if (viewRange <= 0)
+        return;
+    
     uint32_t sampleRate = 44100;
     if (m_cacheMutex.tryEnter())
     {
@@ -445,25 +445,28 @@ void CaptureTimelinePanel::drawRuler(juce::Graphics& g)
         m_cacheMutex.exit();
     }
     
-    // Find a nice tick interval (in samples)
     double viewSeconds = static_cast<double>(viewRange) / sampleRate;
-    double tickIntervalSeconds = 1.0;  // Default 1 second ticks
+    double tickIntervalSeconds = 1.0;
     
-    if (viewSeconds > 300) tickIntervalSeconds = 60.0;      // 5+ min: 1 min ticks
-    else if (viewSeconds > 60) tickIntervalSeconds = 10.0;  // 1+ min: 10 sec ticks
-    else if (viewSeconds > 10) tickIntervalSeconds = 1.0;   // 10+ sec: 1 sec ticks
-    else if (viewSeconds > 1) tickIntervalSeconds = 0.1;    // 1+ sec: 100ms ticks
-    else tickIntervalSeconds = 0.01;                         // <1 sec: 10ms ticks
+    if (viewSeconds > 300) tickIntervalSeconds = 60.0;
+    else if (viewSeconds > 60) tickIntervalSeconds = 10.0;
+    else if (viewSeconds > 10) tickIntervalSeconds = 1.0;
+    else if (viewSeconds > 1) tickIntervalSeconds = 0.1;
+    else tickIntervalSeconds = 0.01;
     
     int64_t tickIntervalSamples = static_cast<int64_t>(tickIntervalSeconds * sampleRate);
     if (tickIntervalSamples <= 0)
         tickIntervalSamples = sampleRate;
     
-    // Draw ticks
+    // Limit max visible ticks to avoid dense overlapping labels
+    int maxTicks = m_rulerBounds.getWidth() / 50;
+    if (maxTicks < 2) maxTicks = 2;
+    while (viewRange / tickIntervalSamples > maxTicks)
+        tickIntervalSamples *= 2;
+    
     int64_t firstTick = (m_viewStartSample / tickIntervalSamples) * tickIntervalSamples;
     
-    g.setColour(m_textColour);
-    g.setFont(juce::Font(10.0f));
+    g.setFont(juce::Font(9.0f));
     
     for (int64_t tick = firstTick; tick <= m_viewEndSample; tick += tickIntervalSamples)
     {
@@ -471,15 +474,13 @@ void CaptureTimelinePanel::drawRuler(juce::Graphics& g)
         
         if (x >= m_rulerBounds.getX() && x <= m_rulerBounds.getRight())
         {
-            // Draw tick mark
             g.setColour(m_rulerColour);
             g.drawLine((float)x, (float)m_rulerBounds.getY(),
                       (float)x, (float)m_rulerBounds.getY() + 6, 1.0f);
             
-            // Draw label
-            g.setColour(m_textColour);
+            g.setColour(m_textColour.withAlpha(0.8f));
             double seconds = static_cast<double>(tick) / sampleRate;
-            g.drawText(formatTime(seconds), x - 25, m_rulerBounds.getY() + 6, 50, 16,
+            g.drawText(formatTime(seconds), x - 28, m_rulerBounds.getY() + 6, 56, 14,
                       juce::Justification::centred);
         }
     }

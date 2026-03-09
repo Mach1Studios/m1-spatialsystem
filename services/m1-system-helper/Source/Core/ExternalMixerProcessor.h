@@ -12,8 +12,22 @@
 
 namespace Mach1 {
 
-// Forward declaration
 class PannerTrackingManager;
+
+struct PerPannerEncoder {
+    std::unique_ptr<Mach1Encode<float>> m1Encode;
+
+    // Working buffers in the format expected by Mach1 API
+    std::vector<std::vector<float>> inputBuf;   // [inputChannels][samples]
+    std::vector<std::vector<float>> encodedBuf; // [outputChannels][samples]
+
+    int lastInputMode = -1;
+    int lastOutputMode = -1;
+    int lastPannerMode = -1;
+    int allocatedSamples = 0;
+    int allocatedInputChans = 0;
+    int allocatedOutputChans = 0;
+};
 
 struct MixerTrackInfo {
     int pluginPort = 0;
@@ -22,8 +36,7 @@ struct MixerTrackInfo {
     bool active = false;
     bool muted = false;
     float gain = 1.0f;
-    
-    // M1Encode settings from plugin
+
     float azimuth = 0.0f;
     float elevation = 0.0f;
     float diverge = 0.0f;
@@ -34,13 +47,9 @@ struct MixerTrackInfo {
     int panner_mode = 0;
     int inputMode = 0;
     int outputMode = 0;
-    
-    // Meter values
+
     std::vector<float> inputLevels;
     juce::int64 lastUpdateTime = 0;
-    
-    // Each track has its own M1Encode instance
-    std::unique_ptr<Mach1Encode<float>> m1Encode;
 };
 
 class ExternalMixerProcessor {
@@ -48,28 +57,22 @@ public:
     ExternalMixerProcessor();
     ~ExternalMixerProcessor();
     
-    // Initialize the processor
     void initialize(double sampleRate, int maxBlockSize);
-    
-    // Set panner tracking manager for memory-share based streaming
     void setPannerTrackingManager(PannerTrackingManager* manager);
     
     // Audio processing
     void processAudioBlock(float* const* outputChannels, int numChannels, int numSamples);
-    
-    // Process memory-share panners - mix all registered memory-share panners into output
     void processMemorySharePanners(int numSamples);
     
-    // Track management  
+    // Track management (legacy OSC-based, kept for compatibility)
     void addTrack(int pluginPort, const juce::String& trackName);
     void removeTrack(int pluginPort);
     void updateTrackSettings(int pluginPort, float azimuth, float elevation, float diverge, float gain);
     
-    // Mixer control
     void setTrackGain(int pluginPort, float gain);
     void setTrackMute(int pluginPort, bool muted);
     
-    // Master output control
+    // Master output
     void setOutputFormat(int formatMode);
     void setMasterYPR(float yaw, float pitch, float roll);
     int getOutputChannelCount() const;
@@ -78,53 +81,55 @@ public:
     std::vector<float> getOutputLevels() const;
     std::vector<float> getTrackInputLevels(int pluginPort) const;
     
-    // Track info
     std::vector<MixerTrackInfo> getTrackInfo() const;
     bool hasActiveTracks() const;
     
-    // Recording/Export
+    // Recording
     void startRecording(const juce::File& outputFile);
     void stopRecording();
     bool isRecording() const { return recording; }
     
 private:
-    void updateTrackLevels();
+    void updateTrackLevels(int numSamples);
     void processTrack(int pluginPort, MixerTrackInfo& track, float* const* mixChannels, int numSamples);
     void applyMasterDecoding(float* const* channels, int numChannels, int numSamples);
     
-    // Audio processing members
+    PerPannerEncoder& getOrCreateEncoder(uint32_t processId);
+    void configureEncoder(PerPannerEncoder& enc, const MemorySharePannerInfo& panner, int numSamples);
+    void cleanupStaleEncoders(const std::vector<MemorySharePannerInfo>& activePanners);
+    
     double sampleRate = 44100.0;
     int blockSize = 512;
-    int maxChannels = 14;  // Maximum channels to support
+    int spatialChannelCount = 8; // M1Spatial_8 default
+
+    std::unique_ptr<Mach1Decode<float>> m1Decode;
     
-    // Mach1 API objects - one decode for master output, multiple encode per track
-    std::unique_ptr<Mach1Decode<float>> m1Decode;         // Single decoder for master output
-    
-    // Track management - each track contains its own M1Encode
-    std::unordered_map<int, MixerTrackInfo> trackMap;   // Using map for faster lookup by pluginPort
+    // Legacy OSC track map
+    std::unordered_map<int, MixerTrackInfo> trackMap;
     juce::CriticalSection tracksMutex;
     
-    // Processing buffers (raw float arrays)
-    std::vector<std::vector<float>> spatialMixBuffer;      // Multichannel spatial mix
-    std::vector<std::vector<float>> trackProcessBuffer;    // Per-track processing
-    std::vector<std::vector<float>> tempBuffer;            // Temporary calculations
+    // Per-panner M1Encode instances keyed by PID
+    std::unordered_map<uint32_t, PerPannerEncoder> pannerEncoders;
     
-    // Output format and decoding
-    int currentOutputFormat = 0; // M1Spatial_14 by default
+    // Processing buffers (spatialChannelCount channels x blockSize samples)
+    std::vector<std::vector<float>> spatialMixBuffer;
+    
+    // Decode working buffers
+    std::vector<std::vector<float>> decodeSrcBuffer;  // [spatialChannelCount][samples]
+    std::vector<std::vector<float>> decodeOutBuffer;   // [2][samples] stereo output
+    
+    // Output format and head-tracking
+    Mach1EncodeOutputMode currentEncodeOutputMode = M1Spatial_8;
+    Mach1DecodeMode currentDecodeMode = M1DecodeSpatial_8;
     float masterYaw = 0.0f, masterPitch = 0.0f, masterRoll = 0.0f;
     
-    // Metering (simple smoothing)
-    std::vector<float> outputLevelSmoothers;
+    // Metering
     std::vector<float> currentOutputLevels;
     
-    // Recording
     bool recording = false;
     juce::File recordingFile;
     
-    // Panner tracking manager (not owned)
     PannerTrackingManager* pannerTrackingManager = nullptr;
-    
-    // Streaming audio buffer for reading from panners
     juce::AudioBuffer<float> streamingReadBuffer;
     
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ExternalMixerProcessor)

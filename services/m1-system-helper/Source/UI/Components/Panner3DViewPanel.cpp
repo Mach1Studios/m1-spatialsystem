@@ -3,14 +3,13 @@
     ---------------------
     Implementation of the 3D panner visualization with wireframe cube and reticles.
     
-    Coordinate System (Mach1 Standard):
+    Mach1 Coordinate System:
     - X: left/right (+X is right, -X is left)
-    - Y: up/down (+Y is up, -Y is down)
-    - Z: forward/back (+Z is forward, -Z is backward)
+    - Y: front/back (+Y is front, -Y is back)
+    - Z: up/down (+Z is top, -Z is bottom)
     
-    Camera View (First Person Perspective):
-    - Default front view: viewer at center looking forward (+Z)
-    - Top-down view: looking down from above (+Y looking toward -Y)
+    Camera: yaw rotates around Z (up), pitch rotates around X (right).
+    Projection: X -> screen horizontal, Z -> screen vertical, Y -> depth.
 */
 
 #include "Panner3DViewPanel.h"
@@ -116,10 +115,9 @@ void Panner3DViewPanel::paint(juce::Graphics& g)
     drawFloorGrid(g);
     drawWireframeCube(g);
     drawListenerPosition(g);
-    drawAxes(g);
-    drawAxisLabels(g);
     drawDirectionLabels(g);
     drawPannerReticles(g);
+    drawCornerGizmo(g);
     drawCameraInfo(g);
     
     // Draw border matching reference design
@@ -307,24 +305,23 @@ bool Panner3DViewPanel::isResetButtonHit(juce::Point<int> screenPos)
 //==============================================================================
 Vec3 Panner3DViewPanel::rotateByCamera(const Vec3& pos) const
 {
-    // Apply yaw (rotation around Y axis - up)
+    // Apply yaw (rotation around Z axis - Mach1 up)
     float yawRad = camera.yaw * juce::MathConstants<float>::pi / 180.0f;
     float cosYaw = std::cos(yawRad);
     float sinYaw = std::sin(yawRad);
     
-    // Yaw rotates around Y axis: affects X and Z
     Vec3 rotatedYaw = {
-        pos.x * cosYaw - pos.z * sinYaw,
-        pos.y,
-        pos.x * sinYaw + pos.z * cosYaw
+        pos.x * cosYaw - pos.y * sinYaw,
+        pos.x * sinYaw + pos.y * cosYaw,
+        pos.z
     };
     
-    // Apply pitch (rotation around X axis - right)
-    float pitchRad = camera.pitch * juce::MathConstants<float>::pi / 180.0f;
+    // Apply pitch (rotation around X axis - Mach1 right)
+    // Negate so negative pitch = looking down = front things move up on screen
+    float pitchRad = -camera.pitch * juce::MathConstants<float>::pi / 180.0f;
     float cosPitch = std::cos(pitchRad);
     float sinPitch = std::sin(pitchRad);
     
-    // Pitch rotates around X axis: affects Y and Z
     Vec3 rotatedPitch = {
         rotatedYaw.x,
         rotatedYaw.y * cosPitch - rotatedYaw.z * sinPitch,
@@ -336,20 +333,16 @@ Vec3 Panner3DViewPanel::rotateByCamera(const Vec3& pos) const
 
 juce::Point<float> Panner3DViewPanel::project(const Vec3& worldPos) const
 {
-    // Apply camera rotation
     Vec3 rotated = rotateByCamera(worldPos);
     
-    // Apply pan offset
     rotated.x += camera.panX;
-    rotated.y += camera.panY;
+    rotated.z += camera.panY;
     
-    // Orthographic projection
-    // Standard convention: +X appears on RIGHT, -X on LEFT
     float centerX = viewBounds.getCentreX();
     float centerY = viewBounds.getCentreY();
     
-    float screenX = centerX + rotated.x * viewScale; // +X = right on screen
-    float screenY = centerY - rotated.y * viewScale; // +Y = up on screen (flip for screen coords)
+    float screenX = centerX + rotated.x * viewScale;  // X -> horizontal
+    float screenY = centerY - rotated.z * viewScale;   // Z (Mach1 up) -> vertical (flipped for screen)
     
     return {screenX, screenY};
 }
@@ -357,7 +350,7 @@ juce::Point<float> Panner3DViewPanel::project(const Vec3& worldPos) const
 float Panner3DViewPanel::getDepth(const Vec3& worldPos) const
 {
     Vec3 rotated = rotateByCamera(worldPos);
-    return rotated.z; // Z after rotation determines depth (into screen)
+    return rotated.y; // Y (Mach1 front/back) is depth after rotation
 }
 
 //==============================================================================
@@ -365,19 +358,18 @@ void Panner3DViewPanel::drawWireframeCube(juce::Graphics& g)
 {
     const float s = CUBE_SIZE;
     
-    // Define cube vertices using Mach1 coordinate system
-    // X: left(-)/right(+), Y: down(-)/up(+), Z: back(-)/front(+)
+    // Mach1 coordinate system: X: left(-)/right(+), Y: back(-)/front(+), Z: bottom(-)/top(+)
     Vec3 vertices[8] = {
-        // Bottom face (Y = -s)
-        {-s, -s, -s},  // 0: left, bottom, back
-        {+s, -s, -s},  // 1: right, bottom, back
-        {+s, -s, +s},  // 2: right, bottom, front
-        {-s, -s, +s},  // 3: left, bottom, front
-        // Top face (Y = +s)
-        {-s, +s, -s},  // 4: left, top, back
-        {+s, +s, -s},  // 5: right, top, back
-        {+s, +s, +s},  // 6: right, top, front
-        {-s, +s, +s}   // 7: left, top, front
+        // Bottom face (Z = -s)
+        {-s, -s, -s},  // 0: left, back, bottom
+        {+s, -s, -s},  // 1: right, back, bottom
+        {+s, +s, -s},  // 2: right, front, bottom
+        {-s, +s, -s},  // 3: left, front, bottom
+        // Top face (Z = +s)
+        {-s, -s, +s},  // 4: left, back, top
+        {+s, -s, +s},  // 5: right, back, top
+        {+s, +s, +s},  // 6: right, front, top
+        {-s, +s, +s}   // 7: left, front, top
     };
     
     // Define edges (pairs of vertex indices)
@@ -403,16 +395,16 @@ void Panner3DViewPanel::drawFloorGrid(juce::Graphics& g)
     const int gridDivisions = 8;
     const float gridStep = (s * 2) / gridDivisions;
     
-    // Draw grid on the center plane (Y = 0, horizon level)
+    // Draw grid on Z=0 plane (horizon/ear level in Mach1)
     for (int i = 0; i <= gridDivisions; ++i)
     {
         float offset = -s + i * gridStep;
         
-        // Lines parallel to X axis
-        drawLine3D(g, Vec3{-s, 0, offset}, Vec3{+s, 0, offset}, floorGridColour, 0.5f);
+        // Lines parallel to X axis (varying Y)
+        drawLine3D(g, Vec3{-s, offset, 0}, Vec3{+s, offset, 0}, floorGridColour, 0.5f);
         
-        // Lines parallel to Z axis
-        drawLine3D(g, Vec3{offset, 0, -s}, Vec3{offset, 0, +s}, floorGridColour, 0.5f);
+        // Lines parallel to Y axis (varying X)
+        drawLine3D(g, Vec3{offset, -s, 0}, Vec3{offset, +s, 0}, floorGridColour, 0.5f);
     }
 }
 
@@ -428,11 +420,11 @@ void Panner3DViewPanel::drawListenerPosition(juce::Graphics& g)
     g.fillEllipse(centerPos.x - listenerRadius, centerPos.y - listenerRadius,
                   listenerRadius * 2, listenerRadius * 2);
     
-    // Draw direction indicator (small triangle pointing forward)
+    // Draw direction indicator (small triangle pointing forward +Y)
     if (camera.preset != CameraPreset::TopDown)
     {
-        auto frontPos = project(Vec3{0, 0, 0.15f});
-        g.setColour(axisZColour.withAlpha(0.8f));
+        auto frontPos = project(Vec3{0, 0.15f, 0});
+        g.setColour(textColour.withAlpha(0.5f));
         
         juce::Path arrow;
         arrow.startNewSubPath(frontPos.x, frontPos.y - 3);
@@ -443,44 +435,61 @@ void Panner3DViewPanel::drawListenerPosition(juce::Graphics& g)
     }
 }
 
-void Panner3DViewPanel::drawAxes(juce::Graphics& g)
+void Panner3DViewPanel::drawCornerGizmo(juce::Graphics& g)
 {
-    const float axisLength = CUBE_SIZE * 1.15f;
-    Vec3 origin{0, 0, 0};
+    const float axisLen = 22.0f;
+    const float margin = 8.0f;
+    const float cx = margin + axisLen + 4;
+    const float cy = TOOLBAR_HEIGHT + margin + axisLen + 4;
+    const float bgRadius = axisLen + 6;
     
-    // X axis (red) - points right
-    drawLine3D(g, origin, Vec3{axisLength, 0, 0}, axisXColour, 2.0f);
+    g.setColour(juce::Colour(0x25000000));
+    g.fillEllipse(cx - bgRadius, cy - bgRadius, bgRadius * 2, bgRadius * 2);
     
-    // Y axis (green) - points up
-    drawLine3D(g, origin, Vec3{0, axisLength, 0}, axisYColour, 2.0f);
+    Vec3 xDir = rotateByCamera(Vec3{1, 0, 0});
+    Vec3 yDir = rotateByCamera(Vec3{0, 1, 0});
+    Vec3 zDir = rotateByCamera(Vec3{0, 0, 1});
     
-    // Z axis (blue) - points forward
-    drawLine3D(g, origin, Vec3{0, 0, axisLength}, axisZColour, 2.0f);
-}
-
-void Panner3DViewPanel::drawAxisLabels(juce::Graphics& g)
-{
-    const float labelOffset = CUBE_SIZE * 1.25f;
+    auto projectGizmo = [&](const Vec3& dir) -> juce::Point<float> {
+        return { cx + dir.x * axisLen, cy - dir.z * axisLen };
+    };
     
-    g.setFont(juce::Font(11.0f, juce::Font::bold));
+    juce::Point<float> center(cx, cy);
     
-    // X axis label (right)
-    auto xPos = project(Vec3{labelOffset, 0, 0});
-    g.setColour(axisXColour);
-    g.drawText("+X", juce::Rectangle<float>(xPos.x - 12, xPos.y - 8, 24, 16), 
-               juce::Justification::centred);
+    // All axes use the same gray tone, differentiated only by label
+    juce::Colour gizmoColour = textColour;
     
-    // Y axis label (up)
-    auto yPos = project(Vec3{0, labelOffset, 0});
-    g.setColour(axisYColour);
-    g.drawText("+Y", juce::Rectangle<float>(yPos.x - 12, yPos.y - 8, 24, 16), 
-               juce::Justification::centred);
+    struct AxisDraw { float depth; juce::Point<float> end; juce::String label; };
+    AxisDraw axes[3] = {
+        { xDir.y, projectGizmo(xDir), "X" },
+        { yDir.y, projectGizmo(yDir), "Y" },
+        { zDir.y, projectGizmo(zDir), "Z" }
+    };
     
-    // Z axis label (front)
-    auto zPos = project(Vec3{0, 0, labelOffset});
-    g.setColour(axisZColour);
-    g.drawText("+Z", juce::Rectangle<float>(zPos.x - 12, zPos.y - 8, 24, 16), 
-               juce::Justification::centred);
+    std::sort(std::begin(axes), std::end(axes),
+              [](const AxisDraw& a, const AxisDraw& b) { return a.depth < b.depth; });
+    
+    g.setFont(juce::Font(8.0f, juce::Font::bold));
+    
+    for (const auto& axis : axes)
+    {
+        float alpha = juce::jmap(axis.depth, -1.0f, 1.0f, 0.2f, 0.85f);
+        g.setColour(gizmoColour.withAlpha(alpha));
+        g.drawLine(center.x, center.y, axis.end.x, axis.end.y, 1.0f);
+        
+        g.fillEllipse(axis.end.x - 2.0f, axis.end.y - 2.0f, 4.0f, 4.0f);
+        
+        float dx = axis.end.x - center.x;
+        float dy = axis.end.y - center.y;
+        float len = std::sqrt(dx * dx + dy * dy);
+        if (len > 0.01f) {
+            float labelX = axis.end.x + (dx / len) * 7.0f;
+            float labelY = axis.end.y + (dy / len) * 7.0f;
+            g.drawText(axis.label,
+                       juce::Rectangle<float>(labelX - 6, labelY - 6, 12, 12),
+                       juce::Justification::centred);
+        }
+    }
 }
 
 void Panner3DViewPanel::drawDirectionLabels(juce::Graphics& g)
@@ -490,32 +499,32 @@ void Panner3DViewPanel::drawDirectionLabels(juce::Graphics& g)
     g.setFont(juce::Font(9.0f));
     g.setColour(textColour.withAlpha(0.7f));
     
-    // Front (+Z)
-    auto frontPos = project(Vec3{0, 0, labelDist});
+    // Front (+Y in Mach1)
+    auto frontPos = project(Vec3{0, labelDist, 0});
+    g.setColour(textColour.withAlpha(0.7f));
     g.drawText("FRONT", juce::Rectangle<float>(frontPos.x - 25, frontPos.y - 6, 50, 12), 
                juce::Justification::centred);
     
-    // Back (-Z)
-    auto backPos = project(Vec3{0, 0, -labelDist});
+    // Back (-Y in Mach1)
+    auto backPos = project(Vec3{0, -labelDist, 0});
+    g.setColour(textColour.withAlpha(0.4f));
     g.drawText("BACK", juce::Rectangle<float>(backPos.x - 25, backPos.y - 6, 50, 12), 
                juce::Justification::centred);
     
-    // Only show Left/Right labels when not in top-down view
+    g.setColour(textColour.withAlpha(0.6f));
+    
     if (camera.preset != CameraPreset::TopDown)
     {
-        // Right (+X)
         auto rightPos = project(Vec3{labelDist, 0, 0});
         g.drawText("R", juce::Rectangle<float>(rightPos.x - 10, rightPos.y - 6, 20, 12), 
                    juce::Justification::centred);
         
-        // Left (-X)
         auto leftPos = project(Vec3{-labelDist, 0, 0});
         g.drawText("L", juce::Rectangle<float>(leftPos.x - 10, leftPos.y - 6, 20, 12), 
                    juce::Justification::centred);
     }
     else
     {
-        // In top-down view, show all cardinal directions
         auto rightPos = project(Vec3{labelDist, 0, 0});
         g.drawText("RIGHT", juce::Rectangle<float>(rightPos.x - 25, rightPos.y - 6, 50, 12), 
                    juce::Justification::centred);
@@ -551,17 +560,16 @@ void Panner3DViewPanel::drawReticle(juce::Graphics& g, const PannerReticle& reti
     auto screenPos = project(reticle.position);
     float depth = getDepth(reticle.position);
     
-    // Size based on depth (closer = larger)
-    float depthFactor = juce::jmap(depth, -2.0f, 2.0f, 1.3f, 0.7f);
+    // Closer (higher depth Y) = larger
+    float depthFactor = juce::jmap(depth, -2.0f, 2.0f, 0.7f, 1.3f);
     float radius = RETICLE_RADIUS * depthFactor * camera.zoom;
     
-    // Color with depth-based alpha
-    float alpha = juce::jmap(depth, -2.0f, 2.0f, 1.0f, 0.5f);
+    float alpha = juce::jmap(depth, -2.0f, 2.0f, 0.5f, 1.0f);
     juce::Colour colour = reticle.isSelected ? selectedReticleColour : reticle.colour;
     colour = colour.withAlpha(alpha);
     
-    // Draw connection line to horizon grid (Y=0 plane)
-    Vec3 floorPos = {reticle.position.x, 0.0f, reticle.position.z};
+    // Draw connection line to horizon grid (Z=0 plane)
+    Vec3 floorPos = {reticle.position.x, reticle.position.y, 0.0f};
     auto floorScreenPos = project(floorPos);
     g.setColour(colour.withAlpha(alpha * 0.3f));
     g.drawLine(screenPos.x, screenPos.y, floorScreenPos.x, floorScreenPos.y, 1.0f);
@@ -636,9 +644,9 @@ void Panner3DViewPanel::drawLine3D(juce::Graphics& g, const Vec3& from, const Ve
     auto p1 = project(from);
     auto p2 = project(to);
     
-    // Calculate average depth for alpha
     float avgDepth = (getDepth(from) + getDepth(to)) / 2.0f;
-    float alpha = juce::jmap(avgDepth, -2.0f, 2.0f, 1.0f, 0.35f);
+    // Higher depth (Y) = closer to viewer = brighter
+    float alpha = juce::jmap(avgDepth, -2.0f, 2.0f, 0.35f, 1.0f);
     
     g.setColour(colour.withAlpha(alpha));
     g.drawLine(p1.x, p1.y, p2.x, p2.y, thickness);

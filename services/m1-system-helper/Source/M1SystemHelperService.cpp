@@ -51,8 +51,7 @@ M1SystemHelperService::M1SystemHelperService() {
     
     DBG("Helper listening to port: " + juce::String(configManager->getHelperPort()));
     
-    // Initialize streaming components
-    audioStreamManager = std::make_unique<AudioStreamManager>();
+    // Initialize external mixer
     externalMixer = std::make_unique<ExternalMixerProcessor>();
     externalMixer->initialize(44100.0, 512); // Default sample rate and block size
     
@@ -61,11 +60,6 @@ M1SystemHelperService::M1SystemHelperService() {
     
     // Register service for dependency injection
     Mach1::ServiceLocator::getInstance().registerService(eventSystem);
-    
-//    // Add this event subscription
-//    eventSystem->subscribe("ClientSeen", [this](const juce::var& time) {
-//        timeWhenHelperLastSeenAClient = time;
-//    });
 }
 
 M1SystemHelperService& M1SystemHelperService::getInstance() {
@@ -142,59 +136,30 @@ void M1SystemHelperService::start() {
 void M1SystemHelperService::shutdown() {
     DBG("[M1SystemHelperService] Service shutdown starting...");
     
-    // CRITICAL: Clean up SessionUI FIRST if not already done
-    // This prevents MenuBarModel singleton conflicts during JUCE shutdown
-    // MUST happen on the message thread to avoid GUI threading assertions
-            if (sessionUI) {
-        DBG("[M1SystemHelperService] Cleaning up SessionUI during shutdown");
-        
+    stopTimer();
+    
+    // Clean up SessionUI on the message thread to avoid GUI threading assertions
+    if (sessionUI) {
         if (juce::MessageManager::getInstance()->isThisTheMessageThread()) {
-            // We're on the message thread - clean up immediately
-                sessionUI->setVisible(false);
-                sessionUI.reset();
-            DBG("[M1SystemHelperService] SessionUI cleaned up synchronously");
+            sessionUI->setVisible(false);
+            sessionUI.reset();
         } else {
-            // We're on a background thread - must use message thread for GUI cleanup
-            DBG("[M1SystemHelperService] Transferring SessionUI cleanup to message thread");
-            
-            // Release ownership and transfer to message thread
-            // This prevents the unique_ptr destructor from running on the wrong thread
-            SessionUI* sessionUIPtr = sessionUI.release();
-            
-            // Schedule cleanup on message thread without capture issues
-            juce::MessageManager::callAsync([sessionUIPtr]() {
-                if (sessionUIPtr) {
-                    sessionUIPtr->setVisible(false);
-                    delete sessionUIPtr;  // Clean deletion on message thread
-                    DBG("[M1SystemHelperService] SessionUI cleaned up on message thread");
-            }
-        });
-            
-            // Brief pause to ensure the async cleanup is queued
+            SessionUI* raw = sessionUI.release();
+            juce::MessageManager::callAsync([raw]() {
+                if (raw) { raw->setVisible(false); delete raw; }
+            });
             juce::Thread::sleep(100);
         }
     }
     
-    // Stop all timers immediately
-    stopTimer();
-    
-    // Stop OSC handler timer to prevent periodic events
-    if (oscHandler) {
+    if (oscHandler)
         oscHandler->stopTimer();
-        DBG("[M1SystemHelperService] Stopped OSC handler timer");
-    }
     
-    // Stop panner tracking manager (non-GUI operation, safe to call from any thread)
-    if (pannerTrackingManager) {
+    if (pannerTrackingManager)
         pannerTrackingManager->stop();
-        DBG("[M1SystemHelperService] Stopped panner tracking manager");
-    }
     
-    // Kill orientation manager (non-GUI operation, safe to call from any thread)
-    if (serviceManager) {
-    serviceManager->killOrientationManager();
-        DBG("[M1SystemHelperService] Killed orientation manager");
-    }
+    if (serviceManager)
+        serviceManager->killOrientationManager();
     
     DBG("[M1SystemHelperService] Service shutdown complete");
 }

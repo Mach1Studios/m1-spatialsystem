@@ -5,8 +5,8 @@
     
     Coordinate System (Mach1 Standard):
     - X: left/right (+X is right, -X is left)
-    - Y: up/down (+Y is up, -Y is down)
-    - Z: forward/back (+Z is forward, -Z is backward)
+    - Y: front/back (+Y is front, -Y is back)
+    - Z: up/down (+Z is top, -Z is bottom)
     
     Azimuth/Elevation (Mach1 AED):
     - Azimuth: left -> right (negative = left, positive = right), 0 = front
@@ -37,22 +37,22 @@ namespace Mach1 {
  * Camera view presets
  */
 enum class CameraPreset {
-    Front,      // Default front view (looking at -Z from +Z)
-    TopDown,    // Looking down from above (bird's eye view)
-    Side,       // Side view (looking at -X from +X)
-    Back,       // Rear view (looking at +Z from -Z)
+    Front,      // Default front view (looking forward along +Y)
+    TopDown,    // Looking down from above (+Z looking toward -Z)
+    Side,       // Side view (looking along +X)
+    Back,       // Rear view (looking along -Y)
     Custom      // User-controlled orbit position
 };
 
 /**
  * Simple 3D camera struct for view transformation
  * Uses Mach1 coordinate system:
- * - Yaw: rotation around Y axis (up)
+ * - Yaw: rotation around Z axis (up)
  * - Pitch: rotation around X axis (right)
  */
 struct Camera3D {
-    float yaw = 0.0f;       // Rotation around Y axis (degrees), 0 = front view
-    float pitch = -15.0f;   // Rotation around X axis (degrees), negative = looking down (first-person)
+    float yaw = 0.0f;       // Rotation around Z axis (degrees), 0 = front view
+    float pitch = -15.0f;   // Rotation around X axis (degrees), negative = looking down
     float distance = 3.0f;  // Distance from center
     float fov = 60.0f;      // Field of view (not used in ortho)
     
@@ -76,29 +76,26 @@ struct Camera3D {
         
         switch (preset) {
             case CameraPreset::Front:
-                // First-person view: looking forward (+Z), slight downward tilt
-                // Negative pitch = tilt down = things in front appear higher on screen
+                // First-person view: looking forward (+Y), slight downward tilt
                 yaw = 0.0f;
                 pitch = -15.0f;
                 break;
             case CameraPreset::TopDown:
-                // Bird's eye view: looking down from above
-                // Negative pitch (-90) = look straight down, front (+Z) at top of screen
+                // Bird's eye view: looking down along -Z, front (+Y) at top of screen
                 yaw = 0.0f;
                 pitch = -90.0f;
                 break;
             case CameraPreset::Side:
-                // Looking from the right side
+                // Looking from the right side (along -X)
                 yaw = 90.0f;
                 pitch = -15.0f;
                 break;
             case CameraPreset::Back:
-                // Looking backward (toward -Z)
+                // Looking backward (along -Y)
                 yaw = 180.0f;
                 pitch = -15.0f;
                 break;
             case CameraPreset::Custom:
-                // Keep current values
                 break;
         }
     }
@@ -106,10 +103,13 @@ struct Camera3D {
 
 /**
  * 3D vector for simple math operations
- * Uses Mach1 coordinate system:
- * - X: left/right (+X is right)
- * - Y: up/down (+Y is up)
- * - Z: forward/back (+Z is forward)
+ * 
+ * Mach1 Coordinate System:
+ * - X: left/right (+X is right, -X is left)
+ * - Y: front/back (+Y is front, -Y is back)
+ * - Z: top/bottom (+Z is top, -Z is bottom)
+ * 
+ * Internal rendering maps: X->screen horizontal, Z->screen vertical, Y->depth
  */
 struct Vec3 {
     float x, y, z;
@@ -127,12 +127,12 @@ struct Vec3 {
     }
     
     /**
-     * Convert from Mach1 AED (Azimuth, Elevation, Diverge/Distance) to XYZ
+     * Convert from Mach1 AED (Azimuth, Elevation, Diverge/Distance) to Mach1 XYZ
      * 
      * Mach1 AED Convention:
-     * - Azimuth: 0 = front (+Z), positive = right (+X), negative = left (-X)
+     * - Azimuth: 0 = front (+Y), positive = right (+X), negative = left (-X)
      *   Range: -180 to +180 degrees
-     * - Elevation: 0 = horizon, positive = up (+Y), negative = down (-Y)
+     * - Elevation: 0 = horizon, positive = up (+Z), negative = down (-Z)
      *   Range: -90 to +90 degrees
      * - Diverge/Distance: radius from center
      */
@@ -140,18 +140,13 @@ struct Vec3 {
         float azRad = azimuthDeg * juce::MathConstants<float>::pi / 180.0f;
         float elRad = elevationDeg * juce::MathConstants<float>::pi / 180.0f;
         
-        // Mach1 coordinate conversion:
-        // X = distance * cos(elevation) * sin(azimuth)  [right/left]
-        // Y = distance * sin(elevation)                  [up/down]
-        // Z = distance * cos(elevation) * cos(azimuth)  [forward/back]
         return {
             distance * std::cos(elRad) * std::sin(azRad),   // X: positive azimuth -> right
-            distance * std::sin(elRad),                      // Y: positive elevation -> up
-            distance * std::cos(elRad) * std::cos(azRad)    // Z: azimuth=0 -> front
+            distance * std::cos(elRad) * std::cos(azRad),   // Y: azimuth=0 -> front
+            distance * std::sin(elRad)                       // Z: positive elevation -> up
         };
     }
     
-    // Alias for backward compatibility
     static Vec3 fromSpherical(float azimuthDeg, float elevationDeg, float radius = 1.0f) {
         return fromAED(azimuthDeg, elevationDeg, radius);
     }
@@ -218,6 +213,7 @@ private:
     void drawAxes(juce::Graphics& g);
     void drawAxisLabels(juce::Graphics& g);
     void drawDirectionLabels(juce::Graphics& g);
+    void drawCornerGizmo(juce::Graphics& g);
     void drawPannerReticles(juce::Graphics& g);
     void drawReticle(juce::Graphics& g, const PannerReticle& reticle);
     void drawCameraInfo(juce::Graphics& g);
@@ -263,10 +259,10 @@ private:
     juce::Colour gridColour{0xFF1A1A1A};
     juce::Colour floorGridColour{0xFF222222};
     
-    // Mach1 axis colors (muted to match reference)
-    juce::Colour axisXColour{0xFF6B6B6B};  // X
-    juce::Colour axisYColour{0xFF6B6B6B};  // Y (matches accent)
-    juce::Colour axisZColour{0xFF6B6B6B};  // Z
+    // Axis colors (muted gray to match UI style)
+    juce::Colour axisXColour{0xFF6B6B6B};  // X (left/right)
+    juce::Colour axisYColour{0xFF6B6B6B};  // Y (front/back)
+    juce::Colour axisZColour{0xFF6B6B6B};  // Z (up/down)
     
     juce::Colour reticleColour{0xFF939393};
     juce::Colour selectedReticleColour{0xFFFFAA00};  // m1-yellow

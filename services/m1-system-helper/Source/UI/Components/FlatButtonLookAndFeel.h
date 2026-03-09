@@ -74,6 +74,29 @@ public:
         g.drawText(button.getButtonText(), bounds, juce::Justification::centred, false);
     }
     
+    void drawToggleButton(juce::Graphics& g,
+                          juce::ToggleButton& button,
+                          bool shouldDrawButtonAsHighlighted,
+                          bool shouldDrawButtonAsDown) override
+    {
+        auto bounds = button.getLocalBounds().toFloat();
+        float tickSize = 14.0f;
+        
+        drawTickBox(g, button,
+                    bounds.getX(), bounds.getCentreY() - tickSize * 0.5f,
+                    tickSize, tickSize,
+                    button.getToggleState(),
+                    button.isEnabled(),
+                    shouldDrawButtonAsHighlighted,
+                    shouldDrawButtonAsDown);
+        
+        g.setColour(button.findColour(juce::ToggleButton::textColourId));
+        g.setFont(juce::Font(10.0f));
+        
+        auto textBounds = bounds.withLeft(bounds.getX() + tickSize + 4.0f);
+        g.drawText(button.getButtonText(), textBounds, juce::Justification::centredLeft, false);
+    }
+    
     void drawTickBox(juce::Graphics& g,
                      juce::Component& component,
                      float x, float y, float w, float h,
@@ -84,21 +107,17 @@ public:
     {
         auto bounds = juce::Rectangle<float>(x, y, w, h);
         
-        // Draw checkbox background
         g.setColour(juce::Colour(0xFF1F1F1F));
         g.fillRoundedRectangle(bounds, 2.0f);
         
-        // Draw border
         g.setColour(juce::Colour(0xFF3A3A3A));
         g.drawRoundedRectangle(bounds, 2.0f, 1.0f);
         
-        // Draw tick if checked
         if (ticked)
         {
             auto tickColour = isEnabled ? juce::Colour(0xFFCCCCCC) : juce::Colour(0xFF666666);
             g.setColour(tickColour);
             
-            // Draw checkmark
             auto tickBounds = bounds.reduced(3.0f);
             juce::Path tick;
             tick.startNewSubPath(tickBounds.getX(), tickBounds.getCentreY());

@@ -134,6 +134,9 @@ public:
     // Consumer management (M1MemoryShare only)
     bool registerAsConsumer(uint32_t consumerId);
     bool unregisterAsConsumer(uint32_t consumerId);
+
+    // Testing: inject fake panners (used by FakePannerSimulator)
+    void injectFakePanners(const std::vector<PannerInfo>& panners);
     
     // Statistics
     struct TrackingStats {

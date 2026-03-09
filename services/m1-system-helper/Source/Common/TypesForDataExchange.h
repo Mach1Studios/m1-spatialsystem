@@ -13,32 +13,31 @@
  */
 struct M1SystemHelperParameterIDs
 {
-    static const uint32_t AZIMUTH = 0x1A2B3C4D;           // "azimuth"
-    static const uint32_t ELEVATION = 0x2B3C4D5E;         // "elevation"
-    static const uint32_t DIVERGE = 0x3C4D5E6F;           // "diverge"
-    static const uint32_t GAIN = 0x4D5E6F70;              // "gain"
-    static const uint32_t STEREO_ORBIT_AZIMUTH = 0x5E6F7081; // "stereoOrbitAzimuth"
-    static const uint32_t STEREO_SPREAD = 0x6F708192;     // "stereoSpread"
-    static const uint32_t STEREO_INPUT_BALANCE = 0x708192A3; // "stereoInputBalance"
-    static const uint32_t AUTO_ORBIT = 0x8192A3B4;        // "autoOrbit"
-    static const uint32_t ISOTROPIC_MODE = 0x92A3B4C5;    // "isotropicMode"
-    static const uint32_t EQUALPOWER_MODE = 0xA3B4C5D6;   // "equalpowerMode"
-    static const uint32_t GAIN_COMPENSATION_MODE = 0xB4C5D6E7; // "gainCompensationMode"
-    static const uint32_t LOCK_OUTPUT_LAYOUT = 0xC5D6E7F8; // "lockOutputLayout"
-    static const uint32_t INPUT_MODE = 0xD6E7F809;        // "inputMode"
-    static const uint32_t OUTPUT_MODE = 0xE7F8091A;       // "outputMode"
-    static const uint32_t PORT = 0xF8091A2B;              // "port"
-    static const uint32_t STATE = 0x091A2B3C;             // "state"
-    static const uint32_t COLOR_R = 0x1A2B3C4E;           // "colorR"
-    static const uint32_t COLOR_G = 0x2B3C4E5F;           // "colorG"
-    static const uint32_t COLOR_B = 0x3C4E5F60;           // "colorB"
-    static const uint32_t COLOR_A = 0x4E5F6071;           // "colorA"
-    static const uint32_t DISPLAY_NAME = 0x5F607182;      // "displayName"
-    
-    // System Helper specific parameters
-    static const uint32_t BUFFER_ID = 0x60718293;         // "bufferId"
-    static const uint32_t BUFFER_SEQUENCE = 0x71829304;   // "bufferSequence"
-    static const uint32_t BUFFER_TIMESTAMP = 0x82930415;  // "bufferTimestamp"
+    static constexpr uint32_t AZIMUTH = 0x1A2B3C4D;
+    static constexpr uint32_t ELEVATION = 0x2B3C4D5E;
+    static constexpr uint32_t DIVERGE = 0x3C4D5E6F;
+    static constexpr uint32_t GAIN = 0x4D5E6F70;
+    static constexpr uint32_t STEREO_ORBIT_AZIMUTH = 0x5E6F7081;
+    static constexpr uint32_t STEREO_SPREAD = 0x6F708192;
+    static constexpr uint32_t STEREO_INPUT_BALANCE = 0x708192A3;
+    static constexpr uint32_t AUTO_ORBIT = 0x8192A3B4;
+    static constexpr uint32_t ISOTROPIC_MODE = 0x92A3B4C5;
+    static constexpr uint32_t EQUALPOWER_MODE = 0xA3B4C5D6;
+    static constexpr uint32_t GAIN_COMPENSATION_MODE = 0xB4C5D6E7;
+    static constexpr uint32_t LOCK_OUTPUT_LAYOUT = 0xC5D6E7F8;
+    static constexpr uint32_t INPUT_MODE = 0xD6E7F809;
+    static constexpr uint32_t OUTPUT_MODE = 0xE7F8091A;
+    static constexpr uint32_t PORT = 0xF8091A2B;
+    static constexpr uint32_t STATE = 0x091A2B3C;
+    static constexpr uint32_t COLOR_R = 0x1A2B3C4E;
+    static constexpr uint32_t COLOR_G = 0x2B3C4E5F;
+    static constexpr uint32_t COLOR_B = 0x3C4E5F60;
+    static constexpr uint32_t COLOR_A = 0x4E5F6071;
+    static constexpr uint32_t DISPLAY_NAME = 0x5F607182;
+
+    static constexpr uint32_t BUFFER_ID = 0x60718293;
+    static constexpr uint32_t BUFFER_SEQUENCE = 0x71829304;
+    static constexpr uint32_t BUFFER_TIMESTAMP = 0x82930415;
 
     // Helper function to generate hash from string (for dynamic parameter IDs)
     static uint32_t hashString(const char* str)
