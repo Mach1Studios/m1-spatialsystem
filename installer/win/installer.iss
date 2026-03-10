@@ -1,6 +1,6 @@
 [Setup]
 AppName=Mach1 Spatial System
-AppVersion=2.1.20260310
+AppVersion=2.2.20260310
 AppPublisher=Mach1
 DefaultDirName={pf64}\Mach1
 DisableProgramGroupPage=yes

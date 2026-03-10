@@ -97,8 +97,14 @@ else
 	detected_OS := $(shell uname)
 endif
 
-.PHONY: update-versions
+.PHONY: update-versions update-versions-internal
 update-versions:
+ifneq ($(detected_OS),Windows)
+	@chmod +x ./installer/generate_version.sh
+	@./installer/generate_version.sh --commit-version
+endif
+
+update-versions-internal:
 ifneq ($(detected_OS),Windows)
 	@chmod +x ./installer/generate_version.sh
 	@./installer/generate_version.sh
@@ -109,7 +115,7 @@ update-version:
 ifneq ($(detected_OS),Windows)
 	@if [ -z "$(VERSION)" ]; then \
 		echo "Usage: make update-version VERSION=<new_version>"; \
-		echo "Example: make update-version VERSION=2.0.1"; \
+		echo "Example: make update-version VERSION=2.1"; \
 		echo "Current version: $$(cat VERSION)"; \
 		echo ""; \
 		echo "This command updates the central VERSION file and regenerates all component versions."; \
@@ -119,7 +125,7 @@ ifneq ($(detected_OS),Windows)
 	@echo "$(VERSION)" > VERSION
 	@echo "Regenerating all component versions..."
 	@chmod +x ./installer/generate_version.sh
-	@./installer/generate_version.sh
+	@./installer/generate_version.sh --commit-version
 	@echo "Version update complete!"
 	@echo "Current versions:"
 	@echo "Central: $$(cat VERSION)"
@@ -505,7 +511,7 @@ overlay-debug:
 # Release Packaging
 # =============================================================================
 # Full local build: configure → build → sign → notarize → installer
-package: update-versions build docs-build codesign notarize installer-pkg
+package: update-versions-internal build docs-build codesign notarize installer-pkg
 
 # =============================================================================
 # Hybrid CI/CD Release (Recommended)
@@ -861,7 +867,7 @@ test-ci-yaml:
 	fi
 
 # clean and configure for release
-configure: clean update-versions
+configure: clean update-versions-internal
 	cmake m1-monitor -Bm1-monitor/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF
 	cmake m1-panner -Bm1-panner/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF
 ifeq ($(detected_OS),Darwin)

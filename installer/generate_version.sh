@@ -1,5 +1,20 @@
 #!/bin/bash
 
+COMMIT_VERSION=0
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --commit-version)
+            COMMIT_VERSION=1
+            shift
+            ;;
+        *)
+            echo "Unknown option: $1"
+            exit 1
+            ;;
+    esac
+done
+
 # Generate version with git hash for a specific directory
 generate_version() {
     local dir=$1
@@ -130,6 +145,50 @@ update_installer_versions() {
     fi
 }
 
+commit_and_push_version_in_repo() {
+    local repo_path="$1"
+    local version_path="$2"
+    local label="$3"
+
+    if ! git -C "$repo_path" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        echo "$label: not a git work tree, skipping automatic VERSION commit."
+        return 0
+    fi
+
+    if ! git -C "$repo_path" diff --cached --quiet --ignore-submodules --; then
+        echo "$label: staged changes already exist, skipping automatic VERSION commit."
+        return 0
+    fi
+
+    if git -C "$repo_path" diff --quiet -- "$version_path"; then
+        echo "$label: $version_path is unchanged, skipping automatic VERSION commit."
+        return 0
+    fi
+
+    git -C "$repo_path" add -- "$version_path"
+
+    if git -C "$repo_path" diff --cached --quiet -- "$version_path"; then
+        echo "$label: no staged VERSION change detected, skipping automatic VERSION commit."
+        return 0
+    fi
+
+    git -C "$repo_path" commit -m "version bump"
+    git -C "$repo_path" push origin HEAD
+}
+
+commit_and_push_versions_if_requested() {
+    if [[ "$COMMIT_VERSION" -ne 1 ]]; then
+        return 0
+    fi
+
+    commit_and_push_version_in_repo "." "VERSION" "root"
+    commit_and_push_version_in_repo "m1-panner" "VERSION" "m1-panner"
+    commit_and_push_version_in_repo "m1-monitor" "VERSION" "m1-monitor"
+    commit_and_push_version_in_repo "m1-player" "VERSION" "m1-player"
+    commit_and_push_version_in_repo "m1-orientationmanager" "VERSION" "m1-orientationmanager"
+    commit_and_push_version_in_repo "m1-transcoder" "VERSION" "m1-transcoder"
+}
+
 # Main execution
 echo "Updating component versions..."
 update_versions
@@ -148,3 +207,5 @@ echo "m1-monitor: $(cat ./m1-monitor/VERSION)"
 echo "m1-orientationmanager: $(cat ./m1-orientationmanager/VERSION)"
 echo "m1-system-helper: $(cat ./services/m1-system-helper/VERSION)"
 echo "m1-transcoder: $(cat ./m1-transcoder/VERSION)"
+
+commit_and_push_versions_if_requested
