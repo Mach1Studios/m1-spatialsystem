@@ -1,4 +1,5 @@
 #! /bin/bash
+set -euo pipefail
 
 # MACH1 SPATIAL SYSTEM 
 # Common build and distribution utilities
@@ -58,16 +59,23 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
+if ((${#POSITIONAL_ARGS[@]} > 0)); then
+  set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
+else
+  set --
+fi
 
-if [[ -n $1 ]]; then
+if [[ $# -gt 0 && -n ${1-} ]]; then
     echo "Last line of file specified as non-opt/last argument:"
     tail -1 "$1"
 fi
 
 echo "Notarizing: ${PATH}/${NAME}${EXT}..."
 
-/usr/bin/xcrun notarytool submit --wait --timeout 10m --keychain-profile ${KEYCHAINPROFILE} --apple-id ${APPLE_ID} --password ${APPLE_APP_PASS} --team-id ${APPLE_TEAM} ${PATH}/${NAME}${EXT}${ZIP}
+if ! /usr/bin/xcrun notarytool submit --wait --timeout 15m --keychain-profile "${KEYCHAINPROFILE}" --apple-id "${APPLE_ID}" --password "${APPLE_APP_PASS}" --team-id "${APPLE_TEAM}" "${PATH}/${NAME}${EXT}${ZIP}"; then
+    echo "Notarization did not complete successfully; skipping stapling."
+    exit 1
+fi
 
 # if ! /usr/bin/grep -q '"status":"Accepted"' notarize.json; then
 #     echo "Notarization failed"
@@ -80,4 +88,4 @@ echo "Notarizing: ${PATH}/${NAME}${EXT}..."
 
 echo "Notarization success, now stapling the installer ..."
 
-/usr/bin/xcrun stapler staple ${PATH}/${NAME}${EXT}
+/usr/bin/xcrun stapler staple "${PATH}/${NAME}${EXT}"
