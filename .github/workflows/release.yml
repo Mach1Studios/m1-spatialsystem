@@ -334,12 +334,15 @@ jobs:
           echo "Packaging build artifacts..."
           mkdir -p artifacts/macos-arm64
           
-          # Copy plugin builds
-          cp -r m1-monitor/build/M1-Monitor_artefacts/ artifacts/macos-arm64/M1-Monitor/
-          cp -r m1-panner/build/M1-Panner_artefacts/ artifacts/macos-arm64/M1-Panner/
-          cp -r m1-player/build/M1-Player_artefacts/ artifacts/macos-arm64/M1-Player/
-          cp -r m1-orientationmanager/build/m1-orientationmanager_artefacts/ artifacts/macos-arm64/m1-orientationmanager/
-          cp -r services/m1-system-helper/build/m1-system-helper_artefacts/ artifacts/macos-arm64/m1-system-helper/
+          # Preserve signed bundles exactly as built and notarized.
+          ditto m1-monitor/build/M1-Monitor_artefacts artifacts/macos-arm64/M1-Monitor
+          ditto m1-panner/build/M1-Panner_artefacts artifacts/macos-arm64/M1-Panner
+          ditto m1-player/build/M1-Player_artefacts artifacts/macos-arm64/M1-Player
+          ditto m1-orientationmanager/build/m1-orientationmanager_artefacts artifacts/macos-arm64/m1-orientationmanager
+          ditto services/m1-system-helper/build/m1-system-helper_artefacts artifacts/macos-arm64/m1-system-helper
+
+          # Fail the workflow early if artifact packaging corrupts the signed app bundle.
+          codesign --verify --deep --strict --verbose=2 artifacts/macos-arm64/M1-Player/Release/M1-Player.app
           
           # Create archive
           cd artifacts && tar -czvf macos-arm64-builds.tar.gz macos-arm64/
@@ -642,11 +645,13 @@ jobs:
       - name: Package build artifacts
         run: |
           mkdir -p artifacts/macos-x86
-          cp -r m1-monitor/build/M1-Monitor_artefacts/ artifacts/macos-x86/M1-Monitor/
-          cp -r m1-panner/build/M1-Panner_artefacts/ artifacts/macos-x86/M1-Panner/
-          cp -r m1-player/build/M1-Player_artefacts/ artifacts/macos-x86/M1-Player/
-          cp -r m1-orientationmanager/build/m1-orientationmanager_artefacts/ artifacts/macos-x86/m1-orientationmanager/
-          cp -r services/m1-system-helper/build/m1-system-helper_artefacts/ artifacts/macos-x86/m1-system-helper/
+          ditto m1-monitor/build/M1-Monitor_artefacts artifacts/macos-x86/M1-Monitor
+          ditto m1-panner/build/M1-Panner_artefacts artifacts/macos-x86/M1-Panner
+          ditto m1-player/build/M1-Player_artefacts artifacts/macos-x86/M1-Player
+          ditto m1-orientationmanager/build/m1-orientationmanager_artefacts artifacts/macos-x86/m1-orientationmanager
+          ditto services/m1-system-helper/build/m1-system-helper_artefacts artifacts/macos-x86/m1-system-helper
+
+          codesign --verify --deep --strict --verbose=2 artifacts/macos-x86/M1-Player/Release/M1-Player.app
           cd artifacts && tar -czvf macos-x86-builds.tar.gz macos-x86/
 
       - name: Upload build artifacts

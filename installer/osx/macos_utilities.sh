@@ -72,19 +72,23 @@ fi
 
 echo "Notarizing: ${PATH}/${NAME}${EXT}..."
 
-if ! /usr/bin/xcrun notarytool submit --wait --timeout 15m --keychain-profile "${KEYCHAINPROFILE}" --apple-id "${APPLE_ID}" --password "${APPLE_APP_PASS}" --team-id "${APPLE_TEAM}" "${PATH}/${NAME}${EXT}${ZIP}"; then
+NOTARY_JSON="$(mktemp)"
+
+if ! /usr/bin/xcrun notarytool submit --wait --timeout 15m --output-format json --keychain-profile "${KEYCHAINPROFILE}" --apple-id "${APPLE_ID}" --password "${APPLE_APP_PASS}" --team-id "${APPLE_TEAM}" "${PATH}/${NAME}${EXT}${ZIP}" > "${NOTARY_JSON}" 2>&1; then
+    /bin/cat "${NOTARY_JSON}"
+    /bin/rm -f "${NOTARY_JSON}"
     echo "Notarization did not complete successfully; skipping stapling."
     exit 1
 fi
 
-# if ! /usr/bin/grep -q '"status":"Accepted"' notarize.json; then
-#     echo "Notarization failed"
-#     /bin/cat notarize.json
-#     exit 1
-# fi
+/bin/cat "${NOTARY_JSON}"
+NOTARY_STATUS="$(/usr/bin/python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["status"])' "${NOTARY_JSON}")"
+/bin/rm -f "${NOTARY_JSON}"
 
-# delete tmp file
-#rm notarize.json
+if [[ "${NOTARY_STATUS}" != "Accepted" ]]; then
+    echo "Notarization status was ${NOTARY_STATUS}; skipping stapling."
+    exit 1
+fi
 
 echo "Notarization success, now stapling the installer ..."
 
