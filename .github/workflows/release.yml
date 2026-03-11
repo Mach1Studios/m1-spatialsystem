@@ -779,14 +779,24 @@ jobs:
 
       - name: Setup Azure Trusted Signing
         run: |
-          # Download Microsoft Trusted Signing Client (contains the Dlib for signtool)
-          # This is the same approach used locally via aax-signtool.bat
+          # Download the Artifact Signing dlib package used by signtool.
+          # Microsoft docs currently recommend Microsoft.ArtifactSigning.Client
+          # and using the latest nuget.exe for extraction.
           
-          $packageName = "Microsoft.Trusted.Signing.Client"
+          $packageName = "Microsoft.ArtifactSigning.Client"
           $outputDir = "trusted-signing-client"
+          $nugetExe = Join-Path $env:RUNNER_TEMP "nuget.exe"
           
-          # Use nuget to download the package
-          nuget install $packageName -OutputDirectory $outputDir -Source https://api.nuget.org/v3/index.json
+          # Download the latest nuget.exe to avoid runner/version mismatches.
+          Invoke-WebRequest -Uri "https://dist.nuget.org/win-x86-commandline/latest/nuget.exe" -OutFile $nugetExe
+          
+          # Use nuget to download and extract the package contents.
+          & $nugetExe install $packageName `
+            -OutputDirectory $outputDir `
+            -Source https://api.nuget.org/v3/index.json `
+            -ExcludeVersion `
+            -DirectDownload `
+            -NonInteractive
           
           # Find the Dlib DLL
           $dlibPath = Get-ChildItem -Path $outputDir -Recurse -Filter "Azure.CodeSigning.Dlib.dll" | 
@@ -887,8 +897,8 @@ jobs:
           M1SDK_PATH=
           VST2_PATH=$VST2_PATH_VALUE
           WIN_INNO_PATH=C:\Program Files (x86)\Inno Setup 6\ISCC.exe
-          WIN_SIGNTOOL_PATH=C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe
-          AZURE_DLIB_PATH=${{ github.workspace }}\azure-codesigning\lib\net8.0\any\Azure.CodeSigning.Dlib.dll
+          WIN_SIGNTOOL_PATH=$SIGNTOOL_PATH
+          AZURE_DLIB_PATH=$ACS_DLIB
           AZURE_METADATA_PATH=${{ github.workspace }}\signing-metadata.json
           AZURE_TIMESTAMP_URL=http://timestamp.acs.microsoft.com
           AZURE_CLIENT_ID=${{ secrets.AZURE_CLIENT_ID }}
