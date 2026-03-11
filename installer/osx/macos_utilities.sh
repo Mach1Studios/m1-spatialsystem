@@ -67,12 +67,12 @@ fi
 
 if [[ $# -gt 0 && -n ${1-} ]]; then
     echo "Last line of file specified as non-opt/last argument:"
-    tail -1 "$1"
+    /usr/bin/tail -1 "$1"
 fi
 
 echo "Notarizing: ${PATH}/${NAME}${EXT}..."
 
-NOTARY_JSON="$(mktemp)"
+NOTARY_JSON="$(/usr/bin/mktemp)"
 
 if ! /usr/bin/xcrun notarytool submit --wait --timeout 15m --output-format json --keychain-profile "${KEYCHAINPROFILE}" --apple-id "${APPLE_ID}" --password "${APPLE_APP_PASS}" --team-id "${APPLE_TEAM}" "${PATH}/${NAME}${EXT}${ZIP}" > "${NOTARY_JSON}" 2>&1; then
     /bin/cat "${NOTARY_JSON}"
