@@ -1,4 +1,5 @@
 #! /bin/bash
+set -euo pipefail
 
 # MACH1 SPATIAL SYSTEM 
 # Common build and distribution utilities
@@ -58,26 +59,37 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
+if ((${#POSITIONAL_ARGS[@]} > 0)); then
+  set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
+else
+  set --
+fi
 
-if [[ -n $1 ]]; then
+if [[ $# -gt 0 && -n ${1-} ]]; then
     echo "Last line of file specified as non-opt/last argument:"
-    tail -1 "$1"
+    /usr/bin/tail -1 "$1"
 fi
 
 echo "Notarizing: ${PATH}/${NAME}${EXT}..."
 
-/usr/bin/xcrun notarytool submit --wait --timeout 10m --keychain-profile ${KEYCHAINPROFILE} --apple-id ${APPLE_ID} --password ${APPLE_APP_PASS} --team-id ${APPLE_TEAM} ${PATH}/${NAME}${EXT}${ZIP}
+NOTARY_JSON="$(/usr/bin/mktemp)"
 
-# if ! /usr/bin/grep -q '"status":"Accepted"' notarize.json; then
-#     echo "Notarization failed"
-#     /bin/cat notarize.json
-#     exit 1
-# fi
+if ! /usr/bin/xcrun notarytool submit --wait --timeout 15m --output-format json --keychain-profile "${KEYCHAINPROFILE}" --apple-id "${APPLE_ID}" --password "${APPLE_APP_PASS}" --team-id "${APPLE_TEAM}" "${PATH}/${NAME}${EXT}${ZIP}" > "${NOTARY_JSON}" 2>&1; then
+    /bin/cat "${NOTARY_JSON}"
+    /bin/rm -f "${NOTARY_JSON}"
+    echo "Notarization did not complete successfully; skipping stapling."
+    exit 1
+fi
 
-# delete tmp file
-#rm notarize.json
+/bin/cat "${NOTARY_JSON}"
+NOTARY_STATUS="$(/usr/bin/python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["status"])' "${NOTARY_JSON}")"
+/bin/rm -f "${NOTARY_JSON}"
+
+if [[ "${NOTARY_STATUS}" != "Accepted" ]]; then
+    echo "Notarization status was ${NOTARY_STATUS}; skipping stapling."
+    exit 1
+fi
 
 echo "Notarization success, now stapling the installer ..."
 
-/usr/bin/xcrun stapler staple ${PATH}/${NAME}${EXT}
+/usr/bin/xcrun stapler staple "${PATH}/${NAME}${EXT}"

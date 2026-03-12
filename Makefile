@@ -97,8 +97,14 @@ else
 	detected_OS := $(shell uname)
 endif
 
-.PHONY: update-versions
+.PHONY: update-versions update-versions-internal
 update-versions:
+ifneq ($(detected_OS),Windows)
+	@chmod +x ./installer/generate_version.sh
+	@./installer/generate_version.sh --commit-version
+endif
+
+update-versions-internal:
 ifneq ($(detected_OS),Windows)
 	@chmod +x ./installer/generate_version.sh
 	@./installer/generate_version.sh
@@ -109,7 +115,7 @@ update-version:
 ifneq ($(detected_OS),Windows)
 	@if [ -z "$(VERSION)" ]; then \
 		echo "Usage: make update-version VERSION=<new_version>"; \
-		echo "Example: make update-version VERSION=2.0.1"; \
+		echo "Example: make update-version VERSION=2.1"; \
 		echo "Current version: $$(cat VERSION)"; \
 		echo ""; \
 		echo "This command updates the central VERSION file and regenerates all component versions."; \
@@ -119,7 +125,7 @@ ifneq ($(detected_OS),Windows)
 	@echo "$(VERSION)" > VERSION
 	@echo "Regenerating all component versions..."
 	@chmod +x ./installer/generate_version.sh
-	@./installer/generate_version.sh
+	@./installer/generate_version.sh --commit-version
 	@echo "Version update complete!"
 	@echo "Current versions:"
 	@echo "Central: $$(cat VERSION)"
@@ -505,7 +511,7 @@ overlay-debug:
 # Release Packaging
 # =============================================================================
 # Full local build: configure → build → sign → notarize → installer
-package: update-versions build docs-build codesign notarize installer-pkg
+package: update-versions-internal build docs-build codesign notarize installer-pkg
 
 # =============================================================================
 # Hybrid CI/CD Release (Recommended)
@@ -514,8 +520,8 @@ package: update-versions build docs-build codesign notarize installer-pkg
 # This is the recommended workflow since AAX signing requires a physical USB iLok dongle.
 #
 # Usage:
-#   make package-from-ci VERSION=2.0.1           # By version tag
-#   make package-from-ci COMMIT=abc12345          # By commit SHA
+#   make package-from-ci VERSION=2.1           # By version tag
+#   make package-from-ci COMMIT=abc12345       # By commit SHA
 #
 # Prerequisites:
 #   - AWS CLI configured with access to mach1-build-artifacts bucket
@@ -537,14 +543,14 @@ ifeq ($(detected_OS),Darwin)
 endif
 	@echo ""
 
-download-ci-artifacts:
+download-ci-artifacts: clean-ci-artifacts
 	@echo "========================================"
 	@echo "Downloading CI Build Artifacts"
 	@echo "========================================"
 ifeq ($(detected_OS),Darwin)
 	@if [ -z "$(VERSION)" ] && [ -z "$(COMMIT)" ]; then \
 		echo "ERROR: Specify VERSION or COMMIT"; \
-		echo "  make package-from-ci VERSION=2.0.1"; \
+		echo "  make package-from-ci VERSION=2.1"; \
 		echo "  make package-from-ci COMMIT=abc12345"; \
 		exit 1; \
 	fi
@@ -587,7 +593,7 @@ else ifeq ($(detected_OS),Windows)
 	@echo "Downloading Windows artifacts..."
 	@if not defined VERSION if not defined COMMIT ( \
 		echo ERROR: Specify VERSION or COMMIT && \
-		echo   make package-from-ci VERSION=2.0.1 && \
+		echo   make package-from-ci VERSION=2.1 && \
 		echo   make package-from-ci COMMIT=abc12345 && \
 		exit 1 \
 	)
@@ -625,11 +631,24 @@ ifeq ($(detected_OS),Darwin)
 	mkdir -p m1-player/build/M1-Player_artefacts; \
 	mkdir -p m1-orientationmanager/build/m1-orientationmanager_artefacts; \
 	mkdir -p services/m1-system-helper/build/m1-system-helper_artefacts; \
-	cp -r $(CI_ARTIFACTS_DIR)/$$ARCH_DIR/M1-Monitor/* m1-monitor/build/M1-Monitor_artefacts/ 2>/dev/null || true; \
-	cp -r $(CI_ARTIFACTS_DIR)/$$ARCH_DIR/M1-Panner/* m1-panner/build/M1-Panner_artefacts/ 2>/dev/null || true; \
-	cp -r $(CI_ARTIFACTS_DIR)/$$ARCH_DIR/M1-Player/* m1-player/build/M1-Player_artefacts/ 2>/dev/null || true; \
-	cp -r $(CI_ARTIFACTS_DIR)/$$ARCH_DIR/m1-orientationmanager/* m1-orientationmanager/build/m1-orientationmanager_artefacts/ 2>/dev/null || true; \
-	cp -r $(CI_ARTIFACTS_DIR)/$$ARCH_DIR/m1-system-helper/* services/m1-system-helper/build/m1-system-helper_artefacts/ 2>/dev/null || true; \
+	if [ -d "$(CI_ARTIFACTS_DIR)/$$ARCH_DIR/M1-Monitor" ]; then \
+		ditto "$(CI_ARTIFACTS_DIR)/$$ARCH_DIR/M1-Monitor" "m1-monitor/build/M1-Monitor_artefacts"; \
+	fi; \
+	if [ -d "$(CI_ARTIFACTS_DIR)/$$ARCH_DIR/M1-Panner" ]; then \
+		ditto "$(CI_ARTIFACTS_DIR)/$$ARCH_DIR/M1-Panner" "m1-panner/build/M1-Panner_artefacts"; \
+	fi; \
+	if [ -d "$(CI_ARTIFACTS_DIR)/$$ARCH_DIR/M1-Player" ]; then \
+		ditto "$(CI_ARTIFACTS_DIR)/$$ARCH_DIR/M1-Player" "m1-player/build/M1-Player_artefacts"; \
+	fi; \
+	if [ -d "$(CI_ARTIFACTS_DIR)/$$ARCH_DIR/m1-orientationmanager" ]; then \
+		ditto "$(CI_ARTIFACTS_DIR)/$$ARCH_DIR/m1-orientationmanager" "m1-orientationmanager/build/m1-orientationmanager_artefacts"; \
+	fi; \
+	if [ -d "$(CI_ARTIFACTS_DIR)/$$ARCH_DIR/m1-system-helper" ]; then \
+		ditto "$(CI_ARTIFACTS_DIR)/$$ARCH_DIR/m1-system-helper" "services/m1-system-helper/build/m1-system-helper_artefacts"; \
+	fi; \
+	if [ -d "m1-player/build/M1-Player_artefacts/Release/M1-Player.app" ]; then \
+		codesign --verify --deep --strict --verbose=2 "m1-player/build/M1-Player_artefacts/Release/M1-Player.app"; \
+	fi; \
 	echo "Artifacts installed for $$ARCH_DIR"
 endif
 
@@ -718,10 +737,23 @@ ifeq ($(detected_OS),Darwin)
 		"installer/osx/build/Mach1 Spatial System Installer.pkg" \
 		"installer/osx/build/signed/Mach1 Spatial System Installer.pkg"
 	@echo "Notarizing ARM64 installer..."
-	xcrun notarytool submit --wait --keychain-profile 'notarize-app' \
+	@NOTARY_JSON=$$(mktemp); \
+	if ! xcrun notarytool submit --wait --output-format json --keychain-profile 'notarize-app' \
 		--apple-id $(APPLE_USERNAME) --password $(ALTOOL_APPPASS) --team-id $(APPLE_TEAM_CODE) \
-		"installer/osx/build/signed/Mach1 Spatial System Installer.pkg"
-	xcrun stapler staple installer/osx/build/signed/Mach1\ Spatial\ System\ Installer.pkg
+		"installer/osx/build/signed/Mach1 Spatial System Installer.pkg" > "$$NOTARY_JSON" 2>&1; then \
+		cat "$$NOTARY_JSON"; \
+		rm -f "$$NOTARY_JSON"; \
+		echo "Notarization did not complete successfully; skipping stapling."; \
+		exit 1; \
+	fi; \
+	cat "$$NOTARY_JSON"; \
+	NOTARY_STATUS=$$(/usr/bin/python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["status"])' "$$NOTARY_JSON"); \
+	rm -f "$$NOTARY_JSON"; \
+	if [ "$$NOTARY_STATUS" != "Accepted" ]; then \
+		echo "Notarization status was $$NOTARY_STATUS; skipping stapling."; \
+		exit 1; \
+	fi; \
+	xcrun stapler staple "installer/osx/build/signed/Mach1 Spatial System Installer.pkg"
 	@# Rename to include architecture
 	mv "installer/osx/build/signed/Mach1 Spatial System Installer.pkg" \
 		"installer/osx/build/signed/Mach1 Spatial System Installer-arm64.pkg"
@@ -741,10 +773,23 @@ ifeq ($(detected_OS),Darwin)
 		"installer/osx/build/Mach1 Spatial System Installer.pkg" \
 		"installer/osx/build/signed/Mach1 Spatial System Installer.pkg"
 	@echo "Notarizing x86_64 installer..."
-	xcrun notarytool submit --wait --keychain-profile 'notarize-app' \
+	@NOTARY_JSON=$$(mktemp); \
+	if ! xcrun notarytool submit --wait --output-format json --keychain-profile 'notarize-app' \
 		--apple-id $(APPLE_USERNAME) --password $(ALTOOL_APPPASS) --team-id $(APPLE_TEAM_CODE) \
-		"installer/osx/build/signed/Mach1 Spatial System Installer.pkg"
-	xcrun stapler staple installer/osx/build/signed/Mach1\ Spatial\ System\ Installer.pkg
+		"installer/osx/build/signed/Mach1 Spatial System Installer.pkg" > "$$NOTARY_JSON" 2>&1; then \
+		cat "$$NOTARY_JSON"; \
+		rm -f "$$NOTARY_JSON"; \
+		echo "Notarization did not complete successfully; skipping stapling."; \
+		exit 1; \
+	fi; \
+	cat "$$NOTARY_JSON"; \
+	NOTARY_STATUS=$$(/usr/bin/python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["status"])' "$$NOTARY_JSON"); \
+	rm -f "$$NOTARY_JSON"; \
+	if [ "$$NOTARY_STATUS" != "Accepted" ]; then \
+		echo "Notarization status was $$NOTARY_STATUS; skipping stapling."; \
+		exit 1; \
+	fi; \
+	xcrun stapler staple "installer/osx/build/signed/Mach1 Spatial System Installer.pkg"
 	@# Rename to include architecture
 	mv "installer/osx/build/signed/Mach1 Spatial System Installer.pkg" \
 		"installer/osx/build/signed/Mach1 Spatial System Installer-x86_64.pkg"
@@ -861,7 +906,7 @@ test-ci-yaml:
 	fi
 
 # clean and configure for release
-configure: clean update-versions
+configure: clean update-versions-internal
 	cmake m1-monitor -Bm1-monitor/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF
 	cmake m1-panner -Bm1-panner/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF
 ifeq ($(detected_OS),Darwin)
@@ -1516,9 +1561,22 @@ ifeq ($(detected_OS),Darwin)
 		"installer/osx/build/Mach1 Spatial System Installer.pkg" \
 		"installer/osx/build/signed/Mach1 Spatial System Installer.pkg"; \
 	echo "Notarizing installer..."; \
-	xcrun notarytool submit --wait --keychain-profile 'notarize-app' \
+	NOTARY_JSON=$$(mktemp); \
+	if ! xcrun notarytool submit --wait --output-format json --keychain-profile 'notarize-app' \
 		--apple-id $(APPLE_USERNAME) --password $(ALTOOL_APPPASS) --team-id $(APPLE_TEAM_CODE) \
-		"installer/osx/build/signed/Mach1 Spatial System Installer.pkg"; \
+		"installer/osx/build/signed/Mach1 Spatial System Installer.pkg" > "$$NOTARY_JSON" 2>&1; then \
+		cat "$$NOTARY_JSON"; \
+		rm -f "$$NOTARY_JSON"; \
+		echo "Notarization did not complete successfully; skipping stapling."; \
+		exit 1; \
+	fi; \
+	cat "$$NOTARY_JSON"; \
+	NOTARY_STATUS=$$(/usr/bin/python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["status"])' "$$NOTARY_JSON"); \
+	rm -f "$$NOTARY_JSON"; \
+	if [ "$$NOTARY_STATUS" != "Accepted" ]; then \
+		echo "Notarization status was $$NOTARY_STATUS; skipping stapling."; \
+		exit 1; \
+	fi; \
 	xcrun stapler staple "installer/osx/build/signed/Mach1 Spatial System Installer.pkg"; \
 	mv "installer/osx/build/signed/Mach1 Spatial System Installer.pkg" \
 		"installer/osx/build/signed/Mach1 Spatial System Installer-$$ARCH_SUFFIX.pkg"; \

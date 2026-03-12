@@ -10,6 +10,7 @@ M1notifier/dist
 *.otf
 *pluginval*
 installer/resources/docs/dist
+ci-artifacts/
 
 # JUCE
 Builds
