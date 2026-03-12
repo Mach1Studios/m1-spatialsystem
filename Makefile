@@ -520,8 +520,8 @@ package: update-versions-internal build docs-build codesign notarize installer-p
 # This is the recommended workflow since AAX signing requires a physical USB iLok dongle.
 #
 # Usage:
-#   make package-from-ci VERSION=2.0.1           # By version tag
-#   make package-from-ci COMMIT=abc12345          # By commit SHA
+#   make package-from-ci VERSION=2.1           # By version tag
+#   make package-from-ci COMMIT=abc12345       # By commit SHA
 #
 # Prerequisites:
 #   - AWS CLI configured with access to mach1-build-artifacts bucket
@@ -593,7 +593,7 @@ else ifeq ($(detected_OS),Windows)
 	@echo "Downloading Windows artifacts..."
 	@if not defined VERSION if not defined COMMIT ( \
 		echo ERROR: Specify VERSION or COMMIT && \
-		echo   make package-from-ci VERSION=2.0.1 && \
+		echo   make package-from-ci VERSION=2.1 && \
 		echo   make package-from-ci COMMIT=abc12345 && \
 		exit 1 \
 	)
