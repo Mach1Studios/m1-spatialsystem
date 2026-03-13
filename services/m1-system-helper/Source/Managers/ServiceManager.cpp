@@ -16,6 +16,8 @@ ServiceManager::~ServiceManager() {
 }
 
 Result ServiceManager::startOrientationManager() {
+    timeWhenWeLastAttemptedToStartAManager = juce::Time::currentTimeMillis();
+
     // Check if port is available
     juce::DatagramSocket socket(false);
     socket.setEnablePortReuse(false);
@@ -32,22 +34,17 @@ Result ServiceManager::startOrientationManager() {
     auto m1SupportDirectory = juce::File::getSpecialLocation(juce::File::commonApplicationDataDirectory);
 
 #if JUCE_MAC
-    if (juce::SystemStats::getOperatingSystemType() <= juce::SystemStats::MacOSX_10_9) {
-        // Old MacOS (10.7-10.9)
-        int result = system(("launchctl start " + getServiceName()).toStdString().c_str());
-        if (result != 0) {
-            return Result::fail("Failed to start service with launchctl start");
-        }
-    } else if (juce::SystemStats::getOperatingSystemType() <= juce::SystemStats::MacOS_14) {
-        // 10.10 - 13 MacOS
-        int result = system(("/bin/launchctl kickstart -p " + getServiceTarget()).toStdString().c_str());
-        if (result != 0) {
-            return Result::fail("Failed to start service with launchctl kickstart");
-        }
-    } else {
-        // Modern MacOS
-        // TODO: Add this, kickstart is removed 14.4+
-        return Result::fail("Service start not implemented for this macOS version");
+    // Prefer the installed LaunchAgent on modern macOS, with a legacy start fallback.
+    const auto plistPath = getServicePath();
+    const auto bootstrapCommand = "/bin/launchctl bootstrap gui/" + juce::String(uid) + " " + plistPath.quoted();
+    const auto kickstartCommand = "/bin/launchctl kickstart -kp " + getServiceTarget();
+    const auto legacyStartCommand = "/bin/launchctl start " + getServiceName();
+    const auto command = bootstrapCommand + " >/dev/null 2>&1 || "
+                       + kickstartCommand + " >/dev/null 2>&1 || "
+                       + legacyStartCommand + " >/dev/null 2>&1";
+    int result = system(command.toStdString().c_str());
+    if (result != 0) {
+        return Result::fail("Failed to start service with launchctl");
     }
 #elif JUCE_WINDOWS
     int result = system("sc start M1-OrientationManager");
@@ -72,16 +69,15 @@ Result ServiceManager::killOrientationManager() {
     DBG("[ServiceManager] Stopping orientation manager service");
 
 #if JUCE_MAC
-    if (juce::SystemStats::getOperatingSystemType() <= juce::SystemStats::MacOSX_10_9) {
-        int result = system(("launchctl stop " + getServiceName()).toStdString().c_str());
-        if (result != 0) {
-            return Result::fail("Failed to stop service with launchctl stop");
-        }
-    } else {
-        int result = system(("launchctl kill 9 " + getServiceTarget()).toStdString().c_str());
-        if (result != 0) {
-            return Result::fail("Failed to kill service with launchctl kill");
-        }
+    const auto bootoutCommand = "/bin/launchctl bootout gui/" + juce::String(uid) + " " + getServicePath().quoted();
+    const auto killCommand = "/bin/launchctl kill 9 " + getServiceTarget();
+    const auto legacyStopCommand = "/bin/launchctl stop " + getServiceName();
+    const auto command = bootoutCommand + " >/dev/null 2>&1 || "
+                       + killCommand + " >/dev/null 2>&1 || "
+                       + legacyStopCommand + " >/dev/null 2>&1";
+    int result = system(command.toStdString().c_str());
+    if (result != 0) {
+        return Result::fail("Failed to stop service with launchctl");
     }
 #elif JUCE_WINDOWS
     int result = system("sc stop M1-OrientationManager");
@@ -98,7 +94,7 @@ Result ServiceManager::killOrientationManager() {
 
 Result ServiceManager::restartOrientationManagerIfNeeded() {
     auto currentTime = juce::Time::currentTimeMillis();
-    if (clientRequestsServer && (currentTime - timeWhenWeLastStartedAManager) > SERVICE_RESTART_DELAY_MS) {
+    if (clientRequestsServer.load() && (currentTime - timeWhenWeLastAttemptedToStartAManager) > SERVICE_RESTART_DELAY_MS) {
         DBG("[ServiceManager] Restarting orientation manager due to client request");
         
         // Kill existing service
@@ -107,24 +103,32 @@ Result ServiceManager::restartOrientationManagerIfNeeded() {
             DBG("[ServiceManager] Warning: " + killResult.getErrorMessage());
             // Continue anyway, as the service might not be running
         }
-        
-        juce::Thread::sleep(2000); // wait to terminate
-        
         // Start new service process
         auto startResult = startOrientationManager();
         if (!startResult.wasOk()) {
             DBG("[ServiceManager] Error: " + startResult.getErrorMessage());
             return startResult; // Return the error
         }
-        
-        juce::Thread::sleep(6000);
-        clientRequestsServer = false;
+
+        clientRequestsServer.store(false);
         timeWhenWeLastStartedAManager = juce::Time::currentTimeMillis();
         DBG("[ServiceManager] Orientation manager restarted successfully");
         return Result::ok();
     }
     
     return Result::ok(); // No restart needed
+}
+
+Result ServiceManager::handleClientRequestToStartOrientationManager() {
+    if (!clientRequestsServer.exchange(false))
+        return Result::ok();
+
+    auto currentTime = juce::Time::currentTimeMillis();
+    if ((currentTime - timeWhenWeLastAttemptedToStartAManager) <= SERVICE_RESTART_DELAY_MS) {
+        return Result::ok();
+    }
+
+    return startOrientationManager();
 }
 
 bool ServiceManager::isOrientationManagerRunning() const {
@@ -136,6 +140,14 @@ bool ServiceManager::isOrientationManagerRunning() const {
     socket.shutdown();
     
     return isRunning;
+}
+
+void ServiceManager::noteOrientationManagerClientPulse() {
+    lastOrientationManagerClientPulseTime.store(juce::Time::currentTimeMillis());
+}
+
+juce::int64 ServiceManager::getLastOrientationManagerClientPulseTime() const {
+    return lastOrientationManagerClientPulseTime.load();
 }
 
 // Platform-specific implementations...

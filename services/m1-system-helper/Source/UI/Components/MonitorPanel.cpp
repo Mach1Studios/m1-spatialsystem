@@ -1,138 +1,517 @@
-/*
-    MonitorPlaceholderPanel.cpp
-    ---------------------------
-    Implementation of the monitor placeholder panel.
-*/
-
 #include "MonitorPanel.h"
 
-namespace Mach1 {
+#include <cmath>
 
-//==============================================================================
+namespace Mach1 {
+namespace {
+
+juce::String formatAngle(double value)
+{
+    const double displayValue = std::abs(value) < 0.05 ? 0.0 : value;
+    return juce::String(displayValue, 1)
+        + juce::String::charToString(static_cast<juce::juce_wchar>(0x00B0));
+}
+
+juce::String formatChannelCountLabel(int channelCount)
+{
+    switch (channelCount)
+    {
+        case 4:  return "M1Spatial-4";
+        case 8:  return "M1Spatial-8";
+        case 14: return "M1Spatial-14";
+        default: return juce::String(channelCount) + " channels";
+    }
+}
+
+class MonitorMenuButton : public juce::Button
+{
+public:
+    MonitorMenuButton(const juce::String& componentName,
+                      const juce::String& buttonText,
+                      juce::Colour textColour,
+                      juce::Colour highlightColour)
+        : juce::Button(componentName)
+        , label(buttonText)
+        , textColour(textColour)
+        , highlightColour(highlightColour)
+    {
+        setMouseCursor(juce::MouseCursor::PointingHandCursor);
+    }
+
+    void paintButton(juce::Graphics& g, bool isMouseOverButton, bool isButtonDown) override
+    {
+        const auto alpha = isEnabled() ? 1.0f : 0.4f;
+        auto colour = textColour.withAlpha(alpha);
+        if (isButtonDown)
+            colour = highlightColour.withAlpha(alpha);
+        else if (isMouseOverButton)
+            colour = colour.brighter(0.2f);
+
+        const auto bounds = getLocalBounds().toFloat();
+        g.setColour(colour);
+        g.setFont(juce::Font(11.0f));
+
+        auto textBounds = bounds.reduced(0.0f, 2.0f);
+        if (showsArrow)
+            textBounds = textBounds.withTrimmedRight(12.0f);
+
+        g.drawText(label, textBounds.toNearestInt(), juce::Justification::centredLeft, true);
+
+        if (showsArrow)
+        {
+            juce::Path triangle;
+            const float centreX = bounds.getRight() - 6.0f;
+            const float centreY = bounds.getCentreY();
+            triangle.startNewSubPath(centreX - 4.0f, centreY - 2.0f);
+            triangle.lineTo(centreX + 4.0f, centreY - 2.0f);
+            triangle.lineTo(centreX, centreY + 3.0f);
+            triangle.closeSubPath();
+            g.fillPath(triangle);
+        }
+    }
+
+private:
+    juce::String label;
+    juce::Colour textColour;
+    juce::Colour highlightColour;
+    bool showsArrow = true;
+};
+
+class ReferenceYawSlider : public juce::Slider
+{
+public:
+    ReferenceYawSlider(juce::Colour dialFaceColour,
+                       juce::Colour guideColour,
+                       juce::Colour accentColour,
+                       juce::Colour textColour,
+                       juce::Colour disabledColour)
+        : dialFaceColour(dialFaceColour)
+        , guideColour(guideColour)
+        , accentColour(accentColour)
+        , textColour(textColour)
+        , disabledColour(disabledColour)
+    {
+        setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+        setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+        setScrollWheelEnabled(false);
+        setDoubleClickReturnValue(true, 0.0);
+        setMouseDragSensitivity(250);
+    }
+
+    void paint(juce::Graphics& g) override
+    {
+        const float alpha = isEnabled() ? 1.0f : 0.35f;
+        const auto bounds = getLocalBounds().toFloat().reduced(4.0f);
+        const float diameter = juce::jmin(bounds.getWidth(), bounds.getHeight());
+        auto dialBounds = juce::Rectangle<float>(diameter, diameter).withCentre(bounds.getCentre());
+        const auto centre = dialBounds.getCentre();
+        const float radius = dialBounds.getWidth() * 0.5f;
+        const auto activeColour = isEnabled() ? accentColour : disabledColour;
+
+        g.setColour(dialFaceColour.withAlpha(alpha));
+        g.fillEllipse(dialBounds);
+
+        g.setColour(guideColour.withAlpha(alpha));
+        for (int i = 0; i < 8 * 4; ++i)
+        {
+            const float angle = (juce::MathConstants<float>::twoPi / (8.0f * 4.0f)) * (float) i;
+            const float startL = radius - 12.0f;
+            const float endL = radius - 5.0f;
+
+            const juce::Point<float> start(centre.x + std::cos(angle) * startL,
+                                           centre.y + std::sin(angle) * startL);
+            const juce::Point<float> end(centre.x + std::cos(angle) * endL,
+                                         centre.y + std::sin(angle) * endL);
+            g.drawLine({ start, end }, 1.0f);
+        }
+
+        for (int i = 0; i < 8; ++i)
+        {
+            const float angle = (juce::MathConstants<float>::twoPi / 8.0f) * (float) i;
+            const float startL = radius - 24.0f;
+            const float endL = radius - 5.0f;
+
+            const juce::Point<float> start(centre.x + std::cos(angle) * startL,
+                                           centre.y + std::sin(angle) * startL);
+            const juce::Point<float> end(centre.x + std::cos(angle) * endL,
+                                         centre.y + std::sin(angle) * endL);
+            g.drawLine({ start, end }, 2.0f);
+        }
+
+        float inputValueNormalised = ((float) getValue() - (float) getMinimum())
+            / ((float) getMaximum() - (float) getMinimum());
+        inputValueNormalised -= 0.5f;
+
+        const float angle = juce::MathConstants<float>::twoPi * (inputValueNormalised - 0.25f);
+        const float angleSize = juce::MathConstants<float>::halfPi;
+
+        g.setColour(activeColour.withAlpha(alpha));
+        constexpr int numSteps = 60;
+        for (int i = 0; i < numSteps; ++i)
+        {
+            const float phase0 = (float) i / (float) numSteps;
+            const float phase1 = (float) (i + 1) / (float) numSteps;
+
+            const float angle0 = phase0 * angleSize + angle - angleSize * 0.5f;
+            const float angle1 = phase1 * angleSize + angle - angleSize * 0.5f;
+
+            const juce::Point<float> lineStart(centre.x + std::cos(angle0 - 0.01f) * (radius - 1.0f),
+                                               centre.y + std::sin(angle0 - 0.01f) * (radius - 1.0f));
+            const juce::Point<float> lineEnd(centre.x + std::cos(angle1 + 0.01f) * (radius - 1.0f),
+                                             centre.y + std::sin(angle1 + 0.01f) * (radius - 1.0f));
+            g.drawLine({ lineStart, lineEnd }, 2.5f);
+        }
+
+        const float centralLineInnerRadius = radius * (25.0f / 135.0f);
+        const juce::Point<float> centralLineStart(centre.x + std::cos(angle) * centralLineInnerRadius,
+                                                  centre.y + std::sin(angle) * centralLineInnerRadius);
+        const juce::Point<float> centralLineEnd(centre.x + std::cos(angle) * (radius - 7.0f),
+                                                centre.y + std::sin(angle) * (radius - 7.0f));
+        g.drawLine({ centralLineStart, centralLineEnd }, 3.0f);
+
+        g.setColour(textColour.withAlpha(alpha));
+        g.setFont(juce::Font(11.0f));
+        g.drawText("YAW",
+                   juce::Rectangle<float>(centre.x - 40.0f, dialBounds.getY() + dialBounds.getHeight() * 0.25f - 8.0f, 80.0f, 18.0f).toNearestInt(),
+                   juce::Justification::centred,
+                   true);
+
+        g.setFont(juce::Font(14.0f));
+        g.drawText(formatAngle(getValue()),
+                   juce::Rectangle<float>(centre.x - 60.0f, centre.y - 10.0f, 120.0f, 22.0f).toNearestInt(),
+                   juce::Justification::centred,
+                   true);
+    }
+
+private:
+    juce::Colour dialFaceColour;
+    juce::Colour guideColour;
+    juce::Colour accentColour;
+    juce::Colour textColour;
+    juce::Colour disabledColour;
+};
+
+class ReferenceAxisSlider : public juce::Slider
+{
+public:
+    enum class AxisOrientation
+    {
+        Vertical,
+        Horizontal
+    };
+
+    ReferenceAxisSlider(AxisOrientation orientation,
+                        juce::String label,
+                        juce::Colour guideColour,
+                        juce::Colour accentColour,
+                        juce::Colour textColour,
+                        juce::Colour disabledColour)
+        : orientation(orientation)
+        , label(std::move(label))
+        , guideColour(guideColour)
+        , accentColour(accentColour)
+        , textColour(textColour)
+        , disabledColour(disabledColour)
+    {
+        setSliderStyle(orientation == AxisOrientation::Vertical
+                           ? juce::Slider::LinearVertical
+                           : juce::Slider::LinearHorizontal);
+        setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+        setScrollWheelEnabled(false);
+        setDoubleClickReturnValue(true, 0.0);
+    }
+
+    void paint(juce::Graphics& g) override
+    {
+        const float alpha = isEnabled() ? 1.0f : 0.35f;
+        const auto bounds = getLocalBounds().toFloat();
+        const auto activeColour = isEnabled() ? accentColour : disabledColour;
+        constexpr float ellipseRadius = 5.0f;
+        constexpr float labelWidth = 40.0f;
+        constexpr float labelHeight = 30.0f;
+
+        g.setFont(juce::Font(11.0f));
+
+        if (orientation == AxisOrientation::Vertical)
+        {
+            const float reticlePositionNorm = juce::jlimit(0.0f,
+                                                           1.0f,
+                                                           (float) ((getValue() - getMaximum()) / (getMinimum() - getMaximum())));
+            const float trackX = bounds.getCentreX();
+
+            g.setColour(guideColour.withAlpha(alpha));
+            g.drawLine(trackX, ellipseRadius * 0.5f, trackX, bounds.getHeight() - ellipseRadius, 1.0f);
+
+            float posY = reticlePositionNorm * (bounds.getHeight() - 2.0f * ellipseRadius)
+                + ellipseRadius - g.getCurrentFont().getHeight() * 0.5f;
+            posY = juce::jlimit(0.0f, bounds.getHeight() - g.getCurrentFont().getHeight(), posY);
+
+            g.setColour(textColour.withAlpha(alpha));
+            g.drawText(label,
+                       juce::Rectangle<float>(trackX - 60.0f, posY, labelWidth, labelHeight).toNearestInt(),
+                       juce::Justification::centred,
+                       true);
+            g.drawText(formatAngle(getValue()),
+                       juce::Rectangle<float>(trackX + 15.0f, posY, labelWidth, labelHeight).toNearestInt(),
+                       juce::Justification::centred,
+                       true);
+
+            const float thumbY = reticlePositionNorm * (bounds.getHeight() - 2.0f * ellipseRadius) + ellipseRadius;
+            g.setColour(activeColour.withAlpha(alpha));
+            g.fillEllipse(trackX - ellipseRadius, thumbY - ellipseRadius, ellipseRadius * 2.0f, ellipseRadius * 2.0f);
+        }
+        else
+        {
+            const float reticlePositionNorm = juce::jlimit(0.0f,
+                                                           1.0f,
+                                                           (float) ((getValue() - getMinimum()) / (getMaximum() - getMinimum())));
+            const float trackY = bounds.getCentreY();
+
+            g.setColour(guideColour.withAlpha(alpha));
+            g.drawLine(ellipseRadius * 0.5f, trackY, bounds.getWidth() - ellipseRadius, trackY, 1.0f);
+
+            float posX = reticlePositionNorm * (bounds.getWidth() - 2.0f * ellipseRadius)
+                + ellipseRadius - labelWidth * 0.5f;
+            posX = juce::jlimit(0.0f, bounds.getWidth() - labelWidth, posX);
+
+            g.setColour(textColour.withAlpha(alpha));
+            g.drawText(label,
+                       juce::Rectangle<float>(posX + 3.0f, trackY - 35.0f, labelWidth, labelHeight).toNearestInt(),
+                       juce::Justification::centred,
+                       true);
+            g.drawText(formatAngle(getValue()),
+                       juce::Rectangle<float>(posX + 3.0f, trackY + 22.0f, labelWidth, labelHeight).toNearestInt(),
+                       juce::Justification::centred,
+                       true);
+
+            const float thumbX = reticlePositionNorm * (bounds.getWidth() - 2.0f * ellipseRadius) + ellipseRadius;
+            g.setColour(activeColour.withAlpha(alpha));
+            g.fillEllipse(thumbX - ellipseRadius, trackY - ellipseRadius, ellipseRadius * 2.0f, ellipseRadius * 2.0f);
+        }
+    }
+
+private:
+    AxisOrientation orientation;
+    juce::String label;
+    juce::Colour guideColour;
+    juce::Colour accentColour;
+    juce::Colour textColour;
+    juce::Colour disabledColour;
+};
+
+} // namespace
+
 MonitorPanel::MonitorPanel()
 {
-    // Title label (hidden, we draw it in paint)
-    titleLabel = std::make_unique<juce::Label>("title", "");
-    titleLabel->setVisible(false);
-    addChildComponent(titleLabel.get());
-    
-    // Status label
-    statusLabel = std::make_unique<juce::Label>("status", 
-        "Monitoring UI placeholder");
-    statusLabel->setFont(juce::Font(10.0f));
-    statusLabel->setColour(juce::Label::textColourId, dimTextColour);
-    statusLabel->setJustificationType(juce::Justification::centred);
-    addAndMakeVisible(statusLabel.get());
+    setOpaque(false);
+
+    settingsButton = std::make_unique<MonitorMenuButton>("settingsButton", "SETTINGS", dimTextColour, guideColour);
+    settingsButton->onClick = [this]() { showSettingsMenu(); };
+    addAndMakeVisible(settingsButton.get());
+
+    monitorButton = std::make_unique<MonitorMenuButton>("monitorButton", "MONITOR", dimTextColour, guideColour);
+    monitorButton->onClick = [this]() { showMonitorMenu(); };
+    addAndMakeVisible(monitorButton.get());
+
+    yawSlider = std::make_unique<ReferenceYawSlider>(dialFaceColour,
+                                                     guideColour,
+                                                     accentColour,
+                                                     textColour,
+                                                     disabledColour);
+    yawSlider->setRange(-180.0, 180.0, 0.1);
+    yawSlider->onValueChange = [this]() {
+        if (!suppressCallbacks && onOrientationChanged)
+            onOrientationChanged((float) yawSlider->getValue(),
+                                 (float) pitchSlider->getValue(),
+                                 (float) rollSlider->getValue());
+    };
+    addAndMakeVisible(yawSlider.get());
+
+    pitchSlider = std::make_unique<ReferenceAxisSlider>(ReferenceAxisSlider::AxisOrientation::Vertical,
+                                                        "PITCH",
+                                                        trackColour,
+                                                        accentColour,
+                                                        textColour,
+                                                        disabledColour);
+    pitchSlider->setRange(-90.0, 90.0, 0.1);
+    pitchSlider->onValueChange = [this]() {
+        if (!suppressCallbacks && onOrientationChanged)
+            onOrientationChanged((float) yawSlider->getValue(),
+                                 (float) pitchSlider->getValue(),
+                                 (float) rollSlider->getValue());
+    };
+    addAndMakeVisible(pitchSlider.get());
+
+    rollSlider = std::make_unique<ReferenceAxisSlider>(ReferenceAxisSlider::AxisOrientation::Horizontal,
+                                                       "ROLL",
+                                                       trackColour,
+                                                       accentColour,
+                                                       textColour,
+                                                       disabledColour);
+    rollSlider->setRange(-90.0, 90.0, 0.1);
+    rollSlider->onValueChange = [this]() {
+        if (!suppressCallbacks && onOrientationChanged)
+            onOrientationChanged((float) yawSlider->getValue(),
+                                 (float) pitchSlider->getValue(),
+                                 (float) rollSlider->getValue());
+    };
+    addAndMakeVisible(rollSlider.get());
+
+    setControlsEnabled(false);
 }
 
-MonitorPanel::~MonitorPanel()
-{
-}
+MonitorPanel::~MonitorPanel() = default;
 
-//==============================================================================
 void MonitorPanel::paint(juce::Graphics& g)
 {
-    // Fill background
-    g.fillAll(backgroundColour);
-    
-    // Draw toolbar area
-    auto bounds = getLocalBounds();
-    auto toolbarBounds = bounds.removeFromTop(TOOLBAR_HEIGHT);
-    
-    g.setColour(toolbarColour);
-    g.fillRect(toolbarBounds);
-    
-    // Draw section title
-    g.setColour(juce::Colour(0xFF808080));
-    g.setFont(juce::Font(11.0f, juce::Font::bold));
-    g.drawText("M1 SPATIAL OUT", toolbarBounds.withLeft(10), juce::Justification::centredLeft);
-    
-    g.setColour(borderColour);
-    g.drawHorizontalLine(TOOLBAR_HEIGHT - 1, 0, (float)getWidth());
-    
-    // Draw border
-    g.setColour(borderColour);
-    g.drawRect(getLocalBounds(), 1);
-    
-    // Draw placeholder content if no embedded monitor
-    if (embeddedMonitor == nullptr)
+    if (embeddedMonitor != nullptr)
+        return;
+
+    const int dividerY = getHeight() - BOTTOM_BAR_HEIGHT;
+    g.setColour(dividerColour);
+    g.drawHorizontalLine((float) dividerY, 24.0f, (float) getWidth() - 24.0f);
+
+    if (currentState.monitors.empty())
     {
-        auto contentBounds = bounds.reduced(20);
-        
-        // Draw compass-like circle (matching reference)
-        auto circleSize = juce::jmin(contentBounds.getWidth(), contentBounds.getHeight()) * 0.5f;
-        auto circleBounds = contentBounds.toFloat()
-            .withSizeKeepingCentre(circleSize, circleSize)
-            .translated(0, -20);
-        
-        g.setColour(borderColour);
-        g.drawEllipse(circleBounds, 1.0f);
-        
-        // Draw crosshairs
-        auto centerX = circleBounds.getCentreX();
-        auto centerY = circleBounds.getCentreY();
-        auto radius = circleSize * 0.5f;
-        
-        g.setColour(juce::Colour(0xFF333333));
-        g.drawLine(centerX - radius, centerY, centerX + radius, centerY, 1.0f);
-        g.drawLine(centerX, centerY - radius, centerX, centerY + radius, 1.0f);
-        
-        // Draw center marker
-        g.setColour(accentColour);
-        g.fillEllipse(centerX - 4, centerY - 4, 8, 8);
-        
-        // Draw cardinal direction labels
-        g.setColour(dimTextColour);
-        g.setFont(juce::Font(9.0f));
-        g.drawText("F", centerX - 10, centerY - radius - 15, 20, 15, juce::Justification::centred);
-        g.drawText("B", centerX - 10, centerY + radius + 2, 20, 15, juce::Justification::centred);
-        g.drawText("L", centerX - radius - 18, centerY - 7, 15, 15, juce::Justification::centred);
-        g.drawText("R", centerX + radius + 5, centerY - 7, 15, 15, juce::Justification::centred);
+        g.setColour(dimTextColour.withAlpha(0.9f));
+        g.setFont(juce::Font(12.0f));
+        g.drawText("No active monitor instances connected",
+                   getLocalBounds().withTrimmedBottom(BOTTOM_BAR_HEIGHT).reduced(24, 20),
+                   juce::Justification::centredBottom,
+                   true);
     }
 }
 
 void MonitorPanel::resized()
 {
-    auto bounds = getLocalBounds();
-    bounds.removeFromTop(TOOLBAR_HEIGHT);  // Skip toolbar area
-    
+    auto bounds = getLocalBounds().reduced(16, 14);
+
     if (embeddedMonitor != nullptr)
     {
-        // If we have an embedded monitor, give it space below toolbar
         embeddedMonitor->setBounds(bounds);
-        statusLabel->setVisible(false);
+        return;
     }
-    else
-    {
-        // Show placeholder content
-        statusLabel->setVisible(true);
-        statusLabel->setBounds(bounds.removeFromBottom(30).reduced(10, 5));
-    }
+
+    auto bottomBar = bounds.removeFromBottom(BOTTOM_BAR_HEIGHT);
+    settingsButton->setBounds(juce::Rectangle<int>(MENU_BUTTON_WIDTH, MENU_BUTTON_HEIGHT)
+                                  .withCentre({ getWidth() / 2, bottomBar.getCentreY() + 2 }));
+    monitorButton->setBounds(juce::Rectangle<int>(MENU_BUTTON_WIDTH, MENU_BUTTON_HEIGHT)
+                                 .withCentre({ bottomBar.getRight() - MENU_BUTTON_WIDTH / 2, bottomBar.getCentreY() + 2 }));
+
+    bounds.removeFromBottom(8);
+    if (bounds.getHeight() < ORIENTATION_SECTION_MIN_HEIGHT)
+        bounds.setHeight(ORIENTATION_SECTION_MIN_HEIGHT);
+
+    auto rightColumn = bounds.removeFromRight(juce::jmin(190, juce::jmax(160, bounds.getWidth() / 3)));
+    auto yawArea = bounds.reduced(6, 0);
+
+    const int yawSize = juce::jmin(yawArea.getWidth(), yawArea.getHeight());
+    yawSlider->setBounds(juce::Rectangle<int>(yawSize, yawSize).withCentre(yawArea.getCentre()));
+
+    auto pitchArea = rightColumn.removeFromTop(juce::roundToInt(rightColumn.getHeight() * 0.58f));
+    pitchSlider->setBounds(pitchArea.reduced(8, 12));
+
+    rightColumn.removeFromTop(6);
+    rollSlider->setBounds(rightColumn.reduced(8, 6));
 }
 
-//==============================================================================
-void MonitorPanel::buttonClicked(juce::Button* button)
-{
-}
-
-//==============================================================================
 void MonitorPanel::setMonitorComponent(juce::Component* monitorComponent)
 {
-    // Remove old embedded component if any
     if (embeddedMonitor != nullptr)
-    {
         removeChildComponent(embeddedMonitor);
-    }
-    
+
     embeddedMonitor = monitorComponent;
-    
+
     if (embeddedMonitor != nullptr)
-    {
         addAndMakeVisible(embeddedMonitor);
-    }
-    
+
+    const bool usingEmbeddedMonitor = embeddedMonitor != nullptr;
+    settingsButton->setVisible(!usingEmbeddedMonitor);
+    monitorButton->setVisible(!usingEmbeddedMonitor);
+    yawSlider->setVisible(!usingEmbeddedMonitor);
+    pitchSlider->setVisible(!usingEmbeddedMonitor);
+    rollSlider->setVisible(!usingEmbeddedMonitor);
+
     resized();
     repaint();
+}
+
+void MonitorPanel::updateState(const MonitorPanelState& state)
+{
+    currentState = state;
+    suppressCallbacks = true;
+
+    yawSlider->setValue(currentState.yaw, juce::dontSendNotification);
+    pitchSlider->setValue(currentState.pitch, juce::dontSendNotification);
+    rollSlider->setValue(currentState.roll, juce::dontSendNotification);
+
+    suppressCallbacks = false;
+
+    settingsButton->setTooltip("Output format: " + formatChannelCountLabel(currentState.channelCount));
+
+    const int activeMonitorPort = getActiveMonitorPort();
+    monitorButton->setTooltip(activeMonitorPort != 0
+                                  ? "Active monitor: " + juce::String(activeMonitorPort)
+                                  : "No active monitor selected");
+
+    setControlsEnabled(!currentState.monitors.empty());
+    repaint();
+}
+
+int MonitorPanel::getActiveMonitorPort() const
+{
+    for (const auto& monitor : currentState.monitors)
+    {
+        if (monitor.active)
+            return monitor.port;
+    }
+
+    return currentState.monitors.empty() ? 0 : currentState.monitors.front().port;
+}
+
+void MonitorPanel::showMonitorMenu()
+{
+    if (currentState.monitors.empty())
+        return;
+
+    juce::PopupMenu menu;
+    const int activeMonitorPort = getActiveMonitorPort();
+
+    for (const auto& monitor : currentState.monitors)
+    {
+        const juce::String label = "Monitor " + juce::String(monitor.port)
+            + (monitor.port == activeMonitorPort ? " (active)" : "");
+        menu.addItem(monitor.port, label, true, monitor.port == activeMonitorPort);
+    }
+
+    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(monitorButton.get()),
+                       [safeThis = juce::Component::SafePointer<MonitorPanel>(this)](int result) {
+                           if (safeThis != nullptr && result != 0 && safeThis->onActiveMonitorSelected)
+                               safeThis->onActiveMonitorSelected(result);
+                       });
+}
+
+void MonitorPanel::showSettingsMenu()
+{
+    juce::PopupMenu menu;
+    menu.addItem(4, "M1Spatial-4", true, currentState.channelCount == 4);
+    menu.addItem(8, "M1Spatial-8", true, currentState.channelCount == 8);
+    menu.addItem(14, "M1Spatial-14", true, currentState.channelCount == 14);
+
+    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(settingsButton.get()),
+                       [safeThis = juce::Component::SafePointer<MonitorPanel>(this)](int result) {
+                           if (safeThis != nullptr && result != 0 && safeThis->onOutputChannelCountChanged)
+                               safeThis->onOutputChannelCountChanged(result);
+                       });
+}
+
+void MonitorPanel::setControlsEnabled(bool enabled)
+{
+    settingsButton->setEnabled(enabled);
+    monitorButton->setEnabled(enabled);
+    yawSlider->setEnabled(enabled);
+    pitchSlider->setEnabled(enabled);
+    rollSlider->setEnabled(enabled);
 }
 
 } // namespace Mach1

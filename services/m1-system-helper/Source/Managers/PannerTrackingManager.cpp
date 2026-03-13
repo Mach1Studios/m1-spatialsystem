@@ -105,7 +105,7 @@ void PannerTrackingManager::update() {
     auto currentTime = juce::Time::currentTimeMillis();
     
     // Scan for panners at regular intervals
-    if (currentTime - lastScanTime > SCAN_INTERVAL_MS) {
+    if (currentTime - lastScanTime >= SCAN_INTERVAL_MS) {
         scanForPanners();
         lastScanTime = currentTime;
     }
@@ -148,10 +148,6 @@ void PannerTrackingManager::tryMemoryShareTracking() {
         publishTrackingMethodChanged(usingMemoryShare, usingOSC);
     }
     
-    if (usingMemoryShare) {
-        DBG("[PannerTrackingManager] M1MemoryShare found " + 
-            std::to_string(memoryShareTracker->getStats().activePanners) + " panners");
-    }
 }
 
 void PannerTrackingManager::tryOSCTracking() {
@@ -175,10 +171,6 @@ void PannerTrackingManager::tryOSCTracking() {
         publishTrackingMethodChanged(usingMemoryShare, usingOSC);
     }
     
-    if (usingOSC) {
-        DBG("[PannerTrackingManager] OSC found " + 
-            std::to_string(oscTracker->getStats().activePanners) + " panners");
-    }
 }
 
 void PannerTrackingManager::updateTrackingMethod() {

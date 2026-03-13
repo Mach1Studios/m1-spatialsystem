@@ -73,8 +73,6 @@ public:
                 if (result > 0 && FD_ISSET(s_sockfd, &readfds)) {
                     int clientfd = accept(s_sockfd, nullptr, nullptr);
                     if (clientfd >= 0) {
-                        DBG("[M1SystemHelper] Client connected via socket activation");
-                        
                         // Send acknowledgment
                         const char* response = "PONG\n";
                         send(clientfd, response, strlen(response), 0);

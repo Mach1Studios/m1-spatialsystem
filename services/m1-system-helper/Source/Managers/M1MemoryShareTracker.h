@@ -176,7 +176,7 @@ private:
     
     // Timing
     juce::int64 lastScanTime = 0;
-    static constexpr int SCAN_INTERVAL_MS = 1000;    // Scan for new panners every 1 second
+    static constexpr int SCAN_INTERVAL_MS = 250;     // Scan for new panners at 4 Hz
     static constexpr int UPDATE_INTERVAL_MS = 100;   // Update existing panners every 100ms
     static constexpr int PANNER_TIMEOUT_MS = 30000;  // Consider inactive after 30 seconds (process-based check is more reliable)
     

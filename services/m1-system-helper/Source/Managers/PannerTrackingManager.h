@@ -186,7 +186,7 @@ private:
     bool initialized = false;
     
     // Configuration
-    static constexpr int SCAN_INTERVAL_MS = 1000;  // Scan every 1 second
+    static constexpr int SCAN_INTERVAL_MS = 100;   // Refresh tracking state at 10 Hz
     static constexpr int PANNER_TIMEOUT_MS = 30000; // Consider inactive after 30 seconds
     static constexpr uint32_t CONSUMER_ID = 9001;   // Our consumer ID for M1MemoryShare
     

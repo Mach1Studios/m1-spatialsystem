@@ -8,12 +8,19 @@
 
 namespace Mach1 {
 
+namespace {
+constexpr int kTrayStatusUpdateIntervalMs = 500;
+constexpr int kTrayMenuDelayMs = 50;
+}
+
 //==============================================================================
 // SessionMainComponent
 //==============================================================================
 
-SessionMainComponent::SessionMainComponent(PannerTrackingManager& manager, bool debugFakeBlocks)
+SessionMainComponent::SessionMainComponent(PannerTrackingManager& manager, ClientManager& clientManagerRef, OSCHandler& oscHandlerRef, bool debugFakeBlocks)
     : pannerManager(manager)
+    , clientManager(clientManagerRef)
+    , oscHandler(oscHandlerRef)
     , m_debugFakeBlocks(debugFakeBlocks)
 {
     // Create components
@@ -31,6 +38,19 @@ SessionMainComponent::SessionMainComponent(PannerTrackingManager& manager, bool 
     
     view3DComponent->onPannerSelected = [this](int index) {
         inputPanelContainer->setSelectedPanner(index);
+    };
+
+    monitorComponent->onActiveMonitorSelected = [this](int port) {
+        clientManager.rotateMonitorToActive(port);
+        updateFromManager();
+    };
+
+    monitorComponent->onOrientationChanged = [this](float yaw, float pitch, float roll) {
+        oscHandler.applyMonitorOrientationFromUi(yaw, pitch, roll);
+    };
+
+    monitorComponent->onOutputChannelCountChanged = [this](int channelCount) {
+        oscHandler.applyChannelConfigFromUi(channelCount);
     };
     
     // Set up capture timeline callbacks
@@ -58,8 +78,8 @@ SessionMainComponent::SessionMainComponent(PannerTrackingManager& manager, bool 
     // Initial data update
     updateFromManager();
     
-    // Start update timer for polling panner data
-    startTimerHz(10); // Update at 10Hz
+    // Keep the open helper window close to backend tracking latency.
+    startTimerHz(20); // Update at 20Hz
 }
 
 SessionMainComponent::~SessionMainComponent()
@@ -210,6 +230,19 @@ void SessionMainComponent::updateFromManager()
     
     inputPanelContainer->updatePannerData(panners);
     view3DComponent->updatePannerData(panners);
+
+    const auto activeMonitorSnapshot = oscHandler.getActiveMonitorSnapshot();
+    MonitorPanelState monitorPanelState;
+    monitorPanelState.yaw = activeMonitorSnapshot.masterYaw;
+    monitorPanelState.pitch = activeMonitorSnapshot.masterPitch;
+    monitorPanelState.roll = activeMonitorSnapshot.masterRoll;
+    monitorPanelState.channelCount = activeMonitorSnapshot.systemChannelCount;
+    for (const auto& monitor : activeMonitorSnapshot.monitors)
+    {
+        monitorPanelState.monitors.push_back({ monitor.port, monitor.active });
+    }
+    monitorComponent->updateState(monitorPanelState);
+
     // Note: CaptureTimelinePanel updates itself via CaptureEngine's ChangeBroadcaster
 }
 
@@ -234,8 +267,10 @@ SessionUI::MyMenuBarModel::~MyMenuBarModel()
 // SessionUI
 //==============================================================================
 
-SessionUI::SessionUI(PannerTrackingManager& manager, bool debugFakeBlocks)
+SessionUI::SessionUI(PannerTrackingManager& manager, ClientManager& clientManagerRef, OSCHandler& oscHandlerRef, bool debugFakeBlocks)
     : pannerManager(manager),
+      clientManager(clientManagerRef),
+      oscHandler(oscHandlerRef),
       lastPannerCount(-1),
       lastMemoryShareStatus(false),
       lastOSCStatus(false),
@@ -244,11 +279,10 @@ SessionUI::SessionUI(PannerTrackingManager& manager, bool debugFakeBlocks)
 {
     DBG("[SessionUI] Constructor started - using timer-based system tray");
     
-    // Create tray icon
-    updateTrayIcon();
+    updateStatus();
     
-    // Start async updates for data refresh (every 1 second)
-    startTimer(1000);
+    // Keep tray status reasonably fresh without rebuilding native tray assets every 100ms.
+    startTimer(kTrayStatusUpdateIntervalMs);
     
     DBG("[SessionUI] System tray icon created successfully");
 }
@@ -272,7 +306,7 @@ void SessionUI::mouseDown(const juce::MouseEvent& event)
     // Switch to menu timer mode (50ms delay)
     stopTimer();
     isMenuTimer = true;
-    startTimer(50);
+    startTimer(kTrayMenuDelayMs);
 }
 
 void SessionUI::timerCallback()
@@ -299,19 +333,19 @@ void SessionUI::timerCallback()
                 DBG("[SessionUI] showDropdownMenu call completed");
                 
                 // Restart regular data timer after menu interaction
-                startTimer(1000);
+                startTimer(kTrayStatusUpdateIntervalMs);
             });
         }
         else
         {
             DBG("[SessionUI] ERROR: trayMenu is null!");
             // Restart regular timer even if menu failed
-            startTimer(1000);
+            startTimer(kTrayStatusUpdateIntervalMs);
         }
     }
     else
     {
-        // Handle regular status updates (every 1 second)
+        // Handle regular status updates
         updateStatus();
     }
 }
@@ -389,7 +423,7 @@ void SessionUI::showSessionWindow()
     if (!sessionWindow)
     {
         // Create the main component with debug flag
-        mainComponent = std::make_unique<SessionMainComponent>(pannerManager, m_debugFakeBlocks);
+        mainComponent = std::make_unique<SessionMainComponent>(pannerManager, clientManager, oscHandler, m_debugFakeBlocks);
         
         // Create the window with darker background matching reference
         sessionWindow = std::make_unique<SessionDocumentWindow>(
@@ -415,17 +449,20 @@ void SessionUI::showSessionWindow()
 
 void SessionUI::updateStatus()
 {
-    // Get current panner count using the correct method
-    lastPannerCount = static_cast<int>(pannerManager.getActivePanners().size());
-    
-    // Get memory share status using the correct method
-    lastMemoryShareStatus = pannerManager.isUsingMemoryShare();
-    
-    // Get OSC status using the correct method
-    lastOSCStatus = pannerManager.isUsingOSC();
-    
-    // Update tray icon based on status
-    updateTrayIcon();
+    const int newPannerCount = static_cast<int>(pannerManager.getActivePanners().size());
+    const bool newMemoryShareStatus = pannerManager.isUsingMemoryShare();
+    const bool newOSCStatus = pannerManager.isUsingOSC();
+
+    const bool statusChanged = newPannerCount != lastPannerCount
+        || newMemoryShareStatus != lastMemoryShareStatus
+        || newOSCStatus != lastOSCStatus;
+
+    lastPannerCount = newPannerCount;
+    lastMemoryShareStatus = newMemoryShareStatus;
+    lastOSCStatus = newOSCStatus;
+
+    if (statusChanged)
+        updateTrayIcon();
 }
 
 void SessionUI::copyDiagnosticsToClipboard()

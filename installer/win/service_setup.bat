@@ -1,32 +1,17 @@
 rem # MACH1 SPATIAL SYSTEM
 rem # Services Setup
 
-rem # Setup the m1-system-helper service
-if exist "%ProgramData%\Mach1\" (
-	sc query M1-System-Helper-Service >nul && sc delete M1-System-Helper-Service
-	sc query M1-System-Helper >nul && sc delete M1-System-Helper
+rem # m1-system-helper now runs as an on-demand tray app instead of a Windows service.
+rem # Remove any legacy service registrations so the plugins can launch the GUI app directly.
+sc stop "M1-System-Helper-Service" >nul 2>&1
+sc stop "M1-System-Helper" >nul 2>&1
+sc delete "M1-System-Helper-Service" >nul 2>&1
+sc delete "M1-System-Helper" >nul 2>&1
 
-	echo Installing M1-System-Helper Windows Service...
-
-	REM Create the service with manual start type (on-demand)
-	sc create "M1-System-Helper" ^
-		binPath= "C:\Program Files\Mach1\m1-system-helper.exe" ^
-		DisplayName= "Mach1 Spatial System Helper" ^
-		Description= "Background service for Mach1 Spatial System plugin & app tracking" ^
-		start= demand ^
-		type= own
-
-	if %errorlevel% == 0 (
-		echo Service installed successfully!
-		echo Service will start on-demand when Mach1 applications request it.
-		
-		REM Set service to auto-recover on failure
-		sc failure "M1-System-Helper" reset= 86400 actions= restart/30000/restart/60000/restart/120000
-		
-		echo Configuration complete.
-	) else (
-		echo Failed to install service. Make sure you're running as Administrator.
-	)
+if exist "%ProgramFiles%\Mach1\m1-system-helper.exe" (
+	echo Configured M1-System-Helper for on-demand tray launch.
+) else (
+	echo WARNING: m1-system-helper.exe was not found in %%ProgramFiles%%\Mach1
 )
 
 rem # Setup the m1-orientationmanager service

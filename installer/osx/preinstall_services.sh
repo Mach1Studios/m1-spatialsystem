@@ -18,8 +18,9 @@ then
 
 	rm -f "/Library/Application Support/Mach1/m1-orientationmanager"
 	rm -f "/Library/Application Support/Mach1/m1-system-helper"
-	rm "/Library/Application Support/LaunchAgents/com.mach1.spatial.orientationmanager.plist"
-	rm "/Library/Application Support/LaunchAgents/com.mach1.spatial.helper.plist"
+	rm -rf "/Library/Application Support/Mach1/m1-system-helper.app"
+	rm -f "/Library/Application Support/LaunchAgents/com.mach1.spatial.orientationmanager.plist"
+	rm -f "/Library/Application Support/LaunchAgents/com.mach1.spatial.helper.plist"
 	echo "Mach1 Spatial System: Removed previously installed Mach1 Spatial System services." > /Library/Application\ Support/Mach1/m1-spatialsystem.log
 fi
 

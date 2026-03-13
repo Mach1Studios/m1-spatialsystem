@@ -49,7 +49,7 @@ set(CUSTOM_BUNDLE_ID "com.mach1.spatial.helper")
 set(CUSTOM_APP_CODE "M1SW")
 
 # add the plugin targets
-juce_add_console_app(${CMAKE_PROJECT_NAME}
+juce_add_gui_app(${CMAKE_PROJECT_NAME}
                 VERSION ${CURRENT_VERSION}
                 COMPANY_NAME "Mach1"
                 COMPANY_WEBSITE "https://mach1.tech"
@@ -174,4 +174,5 @@ elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
 endif()
 
 install(TARGETS ${CMAKE_PROJECT_NAME}
+        BUNDLE DESTINATION ${CMAKE_INSTALL_PREFIX}
         RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX})

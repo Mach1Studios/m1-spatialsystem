@@ -41,18 +41,23 @@ juce::Result ClientManager::addClient(const M1OrientationClientConnection& clien
 void ClientManager::cleanupInactiveClients() {
     const juce::ScopedLock lock(mutex);
     auto currentTime = juce::Time::currentTimeMillis();
+    bool removedAnyClients = false;
     
     auto isInactive = [currentTime](const auto& client) {
         return (currentTime - client.time) > CLIENT_TIMEOUT_MS;
     };
     
     // Remove from type-specific collections and log only actual removals
-    auto removeAndLog = [&isInactive](auto& vec) {
+    auto removeAndLog = [&isInactive, &removedAnyClients](auto& vec) {
         auto partition = std::partition(vec.begin(), vec.end(), 
             [&isInactive](const auto& client) { return !isInactive(client); });
             
         for (auto it = partition; it != vec.end(); ++it) {
             DBG("[ClientManager] Client removed on port: " + std::to_string(it->port));
+        }
+
+        if (partition != vec.end()) {
+            removedAnyClients = true;
         }
         
         vec.erase(partition, vec.end());
@@ -64,11 +69,16 @@ void ClientManager::cleanupInactiveClients() {
     // Remove from main collection
     for (auto it = clients.begin(); it != clients.end();) {
         if (isInactive(*it)) {
+            removedAnyClients = true;
             eventSystem->publish("ClientRemoved", it->port);
             it = clients.erase(it);
         } else {
             ++it;
         }
+    }
+
+    if (removedAnyClients) {
+        activateClients();
     }
 }
 

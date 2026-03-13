@@ -30,6 +30,7 @@ public:
     ClientManager& getClientManager() { return *clientManager; }
     PluginManager& getPluginManager() { return *pluginManager; }
     ServiceManager& getServiceManager() { return *serviceManager; }
+    OSCHandler& getOSCHandler() { return *oscHandler; }
     
     // Panner tracking
     PannerTrackingManager& getPannerTrackingManager() { return *pannerTrackingManager; }
@@ -61,8 +62,8 @@ private:
     std::unique_ptr<SessionUI> sessionUI;
     bool showSessionUI = true;  // Default to showing UI for debugging
     bool debugFakeBlocks = false;  // Debug mode for fake capture blocks
-    
-    juce::int64 timeWhenHelperLastSeenAClient = 0;
+
+    static constexpr int TRACKING_UPDATE_INTERVAL_MS = 100;
     
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(M1SystemHelperService)
 };

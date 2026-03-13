@@ -1,4 +1,5 @@
 #include "SharedPathUtils.h"
+#include <algorithm>
 #include <cstdlib>
 
 // Note: Foundation framework integration is temporarily disabled
@@ -17,24 +18,34 @@ std::string SharedPathUtils::getSharedMemoryDirectory() {
 }
 
 std::vector<std::string> SharedPathUtils::getAllSharedDirectories() {
-    std::vector<std::string> directories;
-    
-    // Priority 1: App Group container (macOS sandboxed)
-    std::string appGroupPath = getAppGroupContainer("group.com.mach1.spatial.shared");
-    if (!appGroupPath.empty()) {
-        directories.push_back(appGroupPath + "/Library/Caches/M1-Panner");
-    }
-    
-    // Priority 2: Real system cache directory (where M1-Panner actually writes)
-    if (const char* homeDir = std::getenv("HOME")) {
-        directories.push_back(std::string(homeDir) + "/Library/Caches/M1-Panner");
-    }
-    
-    // Priority 3+: Platform-specific fallbacks
-    auto fallbacks = getFallbackDirectories();
-    directories.insert(directories.end(), fallbacks.begin(), fallbacks.end());
-    
-    return directories;
+    static const std::vector<std::string> cachedDirectories = [] {
+        std::vector<std::string> directories;
+
+        const auto appendUnique = [&directories](std::string path) {
+            if (path.empty())
+                return;
+
+            if (std::find(directories.begin(), directories.end(), path) == directories.end())
+                directories.push_back(std::move(path));
+        };
+
+        // Priority 1: App Group container (macOS sandboxed)
+        std::string appGroupPath = getAppGroupContainer("group.com.mach1.spatial.shared");
+        if (!appGroupPath.empty())
+            appendUnique(appGroupPath + "/Library/Caches/M1-Panner");
+
+        // Priority 2: Real system cache directory (where M1-Panner actually writes)
+        if (const char* homeDir = std::getenv("HOME"))
+            appendUnique(std::string(homeDir) + "/Library/Caches/M1-Panner");
+
+        // Priority 3+: Platform-specific fallbacks
+        for (auto& fallback : getFallbackDirectories())
+            appendUnique(std::move(fallback));
+
+        return directories;
+    }();
+
+    return cachedDirectories;
 }
 
 std::string SharedPathUtils::getAppGroupContainer(const std::string& groupIdentifier) {

@@ -37,11 +37,17 @@ M1SystemHelperService::M1SystemHelperService() {
     
     // Initialize OSC tracker with plugin manager
     pannerTrackingManager->initializeOSCTracker(pluginManager.get());
+
+    // Initialize external mixer
+    externalMixer = std::make_unique<ExternalMixerProcessor>();
+    externalMixer->initialize(44100.0, 512); // Default sample rate and block size
+    externalMixer->setPannerTrackingManager(pannerTrackingManager.get());
     
     oscHandler = std::make_unique<OSCHandler>(clientManager.get(), 
                                             pluginManager.get(), 
                                             serviceManager.get(),
-                                            pannerTrackingManager.get());
+                                            pannerTrackingManager.get(),
+                                            externalMixer.get());
     
     // Start listening on helper port
     if (!oscHandler->startListening(configManager->getHelperPort())) {
@@ -50,13 +56,6 @@ M1SystemHelperService::M1SystemHelperService() {
     }
     
     DBG("Helper listening to port: " + juce::String(configManager->getHelperPort()));
-    
-    // Initialize external mixer
-    externalMixer = std::make_unique<ExternalMixerProcessor>();
-    externalMixer->initialize(44100.0, 512); // Default sample rate and block size
-    
-    // Connect external mixer to panner tracking manager for memory-share streaming
-    externalMixer->setPannerTrackingManager(pannerTrackingManager.get());
     
     // Register service for dependency injection
     Mach1::ServiceLocator::getInstance().registerService(eventSystem);
@@ -78,7 +77,7 @@ void M1SystemHelperService::initialise() {
     if (showSessionUI && pannerTrackingManager) {
         juce::MessageManager::callAsync([this]() {
             if (pannerTrackingManager && showSessionUI) {
-                sessionUI = std::make_unique<SessionUI>(*pannerTrackingManager, debugFakeBlocks);
+                sessionUI = std::make_unique<SessionUI>(*pannerTrackingManager, *clientManager, *oscHandler, debugFakeBlocks);
                 sessionUI->setVisible(true);  // Shows system tray icon
                 DBG("[M1SystemHelperService] Created system tray icon on main thread");
                 if (debugFakeBlocks) {
@@ -88,7 +87,7 @@ void M1SystemHelperService::initialise() {
         });
     }
     
-    startTimer(1000); // Check status every second
+    startTimer(TRACKING_UPDATE_INTERVAL_MS); // Keep helper state responsive
 }
 
 void M1SystemHelperService::timerCallback() {
@@ -100,30 +99,22 @@ void M1SystemHelperService::timerCallback() {
     }
     
     // Check for inactive clients
-    if ((currentTime - timeWhenHelperLastSeenAClient) > CLIENT_TIMEOUT_MS) {
+    const auto lastOrientationPulseTime = serviceManager->getLastOrientationManagerClientPulseTime();
+    if (lastOrientationPulseTime > 0 && (currentTime - lastOrientationPulseTime) > CLIENT_TIMEOUT_MS) {
         if (serviceManager->isOrientationManagerRunning()) {
             auto result = serviceManager->killOrientationManager();
             if (!result.wasOk()) {
                 DBG("[M1SystemHelperService] Failed to kill orientation manager: " + result.getErrorMessage());
             }
-            timeWhenHelperLastSeenAClient = currentTime;
         }
     }
     
     // Handle client server requests
     if (serviceManager->getClientRequestsServer()) {
-        // Try to start the orientation manager
-        auto result = serviceManager->startOrientationManager();
+        auto result = serviceManager->handleClientRequestToStartOrientationManager();
         if (!result.wasOk()) {
             DBG("[M1SystemHelperService] Failed to start orientation manager: " + result.getErrorMessage());
-            
-            // If starting fails, try restarting
-            result = serviceManager->restartOrientationManagerIfNeeded();
-            if (!result.wasOk()) {
-                DBG("[M1SystemHelperService] Failed to restart orientation manager: " + result.getErrorMessage());
-            }
         }
-        serviceManager->setClientRequestsServer(false);
     }
 }
 

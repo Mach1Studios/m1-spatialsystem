@@ -15,6 +15,8 @@
 
 #include <JuceHeader.h>
 #include "../Managers/PannerTrackingManager.h"
+#include "../Managers/ClientManager.h"
+#include "../Network/OSCHandler.h"
 #include "../Core/CaptureEngine.h"
 #include "Components/InputPanelContainer.h"
 #include "Components/TimelineComponent.h"
@@ -54,7 +56,7 @@ class SessionMainComponent : public juce::Component,
                              private juce::Timer
 {
 public:
-    SessionMainComponent(PannerTrackingManager& manager, bool debugFakeBlocks = false);
+    SessionMainComponent(PannerTrackingManager& manager, ClientManager& clientManager, OSCHandler& oscHandler, bool debugFakeBlocks = false);
     ~SessionMainComponent() override;
     
     void resized() override;
@@ -83,6 +85,8 @@ private:
     
     // Reference to panner manager
     PannerTrackingManager& pannerManager;
+    ClientManager& clientManager;
+    OSCHandler& oscHandler;
     
     // Capture Engine (background thread)
     std::unique_ptr<CaptureEngine> captureEngine;
@@ -121,7 +125,7 @@ class SessionUI : public juce::SystemTrayIconComponent,
                   private juce::Timer
 {
 public:
-    SessionUI(PannerTrackingManager& manager, bool debugFakeBlocks = false);
+    SessionUI(PannerTrackingManager& manager, ClientManager& clientManager, OSCHandler& oscHandler, bool debugFakeBlocks = false);
     ~SessionUI() override;
     
     // Debug mode
@@ -147,6 +151,8 @@ private:
     
     // Components
     PannerTrackingManager& pannerManager;
+    ClientManager& clientManager;
+    OSCHandler& oscHandler;
     std::unique_ptr<SessionDocumentWindow> sessionWindow;
     std::unique_ptr<juce::PopupMenu> trayMenu;
     std::unique_ptr<SessionMainComponent> mainComponent;

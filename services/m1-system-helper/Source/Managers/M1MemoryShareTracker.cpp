@@ -123,7 +123,7 @@ void M1MemoryShareTracker::update() {
     auto currentTime = juce::Time::currentTimeMillis();
     
     // Scan for new memory segments periodically
-    if (currentTime - lastScanTime > SCAN_INTERVAL_MS) {
+    if (currentTime - lastScanTime >= SCAN_INTERVAL_MS) {
         scanForMemorySegments();
         lastScanTime = currentTime;
     }
@@ -318,8 +318,6 @@ M1MemoryShareTracker::MemoryShareStats M1MemoryShareTracker::getStats() const {
 // Core scanning implementation
 void M1MemoryShareTracker::scanForMemorySegments()
 {
-    DBG("=== [M1MemoryShareTracker] Starting memory segment scan ===");
-    
     // Get search directories using SharedPathUtils (App Group + cross-platform fallbacks)
     auto sharedDirectories = SharedPathUtils::getAllSharedDirectories();
     std::vector<juce::File> searchDirs;
@@ -329,45 +327,25 @@ void M1MemoryShareTracker::scanForMemorySegments()
     {
         searchDirs.push_back(juce::File(dirPath));
     }
-    
-    DBG("[M1MemoryShareTracker] Will search in " + juce::String(searchDirs.size()) + " directories:");
-    
-    int totalActivePanners = 0;
+
     bool foundActiveFiles = false;
     
     for (const auto& dir : searchDirs)
     {
-        DBG("[M1MemoryShareTracker] Checking directory: " + dir.getFullPathName());
-        
         if (!dir.exists())
-        {
-            DBG("[M1MemoryShareTracker] Directory exists: false");
-            DBG("[M1MemoryShareTracker] Directory does not exist, skipping");
             continue;
-        }
-        
-        DBG("[M1MemoryShareTracker] Directory exists: true");
         
         // Look for M1SpatialSystem_*.mem files
         auto memoryFiles = dir.findChildFiles(juce::File::findFiles, false, "M1SpatialSystem_*.mem");
-        
-        DBG("[M1MemoryShareTracker] Found " + juce::String(memoryFiles.size()) + " .mem files in " + dir.getFullPathName());
-        
+
         for (const auto& file : memoryFiles)
         {
             std::string filename = file.getFileNameWithoutExtension().toStdString();
-            
-            DBG("[M1MemoryShareTracker] Processing panner file: " + file.getFileName() + " from " + dir.getFullPathName());
-            
+
             // Skip if filename doesn't contain "M1Panner"
             if (filename.find("M1Panner") == std::string::npos)
-            {
-                DBG("[M1MemoryShareTracker] File does not contain M1Panner identifier");
                 continue;
-            }
-            
-            DBG("[M1MemoryShareTracker] File contains M1Panner identifier");
-            
+
             // Parse segment name and details
             std::string name;
             uint32_t processId = 0;
@@ -376,16 +354,12 @@ void M1MemoryShareTracker::scanForMemorySegments()
             
             if (parsePannerSegmentName(filename, name, processId, memoryAddress, timestamp))
             {
-                DBG("[M1MemoryShareTracker] Parsed panner: " + juce::String(name) + " (PID: " + juce::String(processId) + ")");
-                
                 // PRIMARY CHECK: Is the process still running?
                 // This is more reliable than file modification time
                 bool processAlive = isProcessRunning(processId);
                 
-                if (!processAlive) {
-                    DBG("[M1MemoryShareTracker] Process " + juce::String(processId) + " is not running, skipping");
+                if (!processAlive)
                     continue;
-                }
                 
                 // SECONDARY CHECK: File modification time (only as a sanity check for very old files)
                 auto fileModTime = file.getLastModificationTime().toMilliseconds();
@@ -397,13 +371,9 @@ void M1MemoryShareTracker::scanForMemorySegments()
                 const int64_t MAX_FILE_AGE_MS = 3600000; // 1 hour
                 bool isValid = (fileAge < MAX_FILE_AGE_MS);
                 
-                if (!isValid) {
-                    DBG("[M1MemoryShareTracker] File too old (" + juce::String(fileAge / 60000) + " minutes), skipping");
+                if (!isValid)
                     continue;
-                }
-                
-                DBG("[M1MemoryShareTracker] Process alive and file valid, processing panner");
-                
+
                 // Check if we already have this panner
                 auto existing = findPanner(processId, memoryAddress);
                 if (!existing)
@@ -417,14 +387,11 @@ void M1MemoryShareTracker::scanForMemorySegments()
                     newPanner.memorySegmentName = filename;
                     newPanner.memoryFilePath = file.getFullPathName().toStdString();  // Store full path!
                     newPanner.isActive = true;
-                    
-                    DBG("[M1MemoryShareTracker] Creating panner with path: " + file.getFullPathName());
-                    
+
                     // Try to connect
                     if (connectToPanner(newPanner))
                     {
                         activePanners.emplace_back(std::move(newPanner));
-                        totalActivePanners++;
                         foundActiveFiles = true;
                         DBG("[M1MemoryShareTracker] Connected to new panner: " + name + " (PID: " + std::to_string(processId) + ")");
                     }
@@ -433,7 +400,6 @@ void M1MemoryShareTracker::scanForMemorySegments()
                 {
                     // Update existing panner's last seen time
                     existing->lastUpdateTime = currentTime;
-                    totalActivePanners++;
                     foundActiveFiles = true;
                     
                     // Also try to read latest data
@@ -447,16 +413,12 @@ void M1MemoryShareTracker::scanForMemorySegments()
         // If we found active files in this directory (App Group should be first), 
         // and it's the first directory, we can skip the rest for better performance
         if (foundActiveFiles && &dir == &searchDirs[0]) {
-            DBG("[M1MemoryShareTracker] Found active panners in priority directory, skipping remaining directories");
             break;
         }
     }
     
     // Cleanup old/stale files after scanning
     cleanupStaleMemoryFiles();
-    
-    DBG("[M1MemoryShareTracker] Scan complete. Active panners: " + juce::String(totalActivePanners));
-    DBG("=== [M1MemoryShareTracker] End memory segment scan ===");
 }
 
 bool M1MemoryShareTracker::parsePannerSegmentName(const std::string& filename,
@@ -583,8 +545,6 @@ void M1MemoryShareTracker::cleanupInactivePanners() {
 }
 
 void M1MemoryShareTracker::cleanupStaleMemoryFiles() {
-    DBG("[M1MemoryShareTracker] Starting cleanup of stale memory files");
-    
     auto sharedDirectories = SharedPathUtils::getAllSharedDirectories();
     
     for (const auto& dirPath : sharedDirectories) {
@@ -630,7 +590,6 @@ void M1MemoryShareTracker::cleanupStaleMemoryFiles() {
         }
     }
     
-    DBG("[M1MemoryShareTracker] Cleanup of stale memory files complete");
 }
 
 bool M1MemoryShareTracker::isProcessRunning(uint32_t processId) {

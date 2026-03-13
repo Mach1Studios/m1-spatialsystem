@@ -10,10 +10,52 @@
 
 namespace Mach1 {
 
+namespace
+{
+bool pathExists(const char* path)
+{
+    return access(path, F_OK) == 0;
+}
+
+bool launchHelperApplicationDirectly()
+{
+    constexpr const char* appCandidates[] = {
+        "/Library/Application Support/Mach1/m1-system-helper.app",
+        "/Applications/Mach1 Spatial System/m1-system-helper.app",
+    };
+
+    for (const auto* path : appCandidates)
+    {
+        if (pathExists(path))
+        {
+            const std::string command = "open -g \"" + std::string(path) + "\" >/dev/null 2>&1";
+            if (std::system(command.c_str()) == 0)
+                return true;
+        }
+    }
+
+    constexpr const char* binaryCandidates[] = {
+        "/Library/Application Support/Mach1/m1-system-helper",
+    };
+
+    for (const auto* path : binaryCandidates)
+    {
+        if (pathExists(path))
+        {
+            const std::string command = "\"" + std::string(path) + "\" >/dev/null 2>&1 &";
+            if (std::system(command.c_str()) == 0)
+                return true;
+        }
+    }
+
+    return false;
+}
+}
+
 // Static constants
 const char* const M1SystemHelperManager::SERVICE_LABEL = "com.mach1.spatial.helper";
 const char* const M1SystemHelperManager::SOCKET_PATH = "/tmp/com.mach1.spatial.helper.socket";
-const char* const M1SystemHelperManager::PLIST_PATH = "/Library/LaunchDaemons/com.mach1.spatial.helper.plist";
+const char* const M1SystemHelperManager::PLIST_PATH = "/Library/LaunchAgents/com.mach1.spatial.helper.plist";
 
 M1SystemHelperManager& M1SystemHelperManager::getInstance()
 {
@@ -89,6 +131,14 @@ bool M1SystemHelperManager::isHelperServiceRunning() const
 
 bool M1SystemHelperManager::startHelperService()
 {
+    if (launchHelperApplicationDirectly()) {
+        for (int attempt = 0; attempt < 8; ++attempt) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            if (triggerSocketActivation())
+                return true;
+        }
+    }
+
     return executeLaunchctlCommand("start " + std::string(SERVICE_LABEL));
 }
 

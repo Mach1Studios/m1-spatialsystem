@@ -311,7 +311,12 @@ void ExternalMixerProcessor::setTrackMute(int pluginPort, bool muted) {
 }
 
 void ExternalMixerProcessor::setOutputFormat(int formatMode) {
-    currentEncodeOutputMode = static_cast<Mach1EncodeOutputMode>(formatMode);
+    switch (formatMode) {
+        case 4:  currentEncodeOutputMode = M1Spatial_4; break;
+        case 8:  currentEncodeOutputMode = M1Spatial_8; break;
+        case 14: currentEncodeOutputMode = M1Spatial_14; break;
+        default: currentEncodeOutputMode = static_cast<Mach1EncodeOutputMode>(formatMode); break;
+    }
     
     switch (currentEncodeOutputMode) {
         case M1Spatial_4:  spatialChannelCount = 4;  currentDecodeMode = M1DecodeSpatial_4;  break;

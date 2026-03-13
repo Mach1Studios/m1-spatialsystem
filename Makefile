@@ -1215,7 +1215,7 @@ ifeq ($(detected_OS),Darwin)
 	
 	codesign -v --force -o runtime --entitlements m1-player/Resources/M1-Player.entitlements --sign $(APPLE_CODESIGN_CODE) --timestamp m1-player/build/M1-Player_artefacts/Release/M1-Player.app
 	codesign -v --force -o runtime --entitlements m1-orientationmanager/Resources/entitlements.mac.plist --sign $(APPLE_CODESIGN_CODE) --timestamp m1-orientationmanager/build/m1-orientationmanager_artefacts/m1-orientationmanager
-	codesign -v --force -o runtime --entitlements services/m1-system-helper/entitlements.mac.plist --sign $(APPLE_CODESIGN_CODE) --timestamp services/m1-system-helper/build/m1-system-helper_artefacts/m1-system-helper
+	codesign -v --force -o runtime --entitlements services/m1-system-helper/Resources/macos/entitlements.mac.plist --sign $(APPLE_CODESIGN_CODE) --timestamp services/m1-system-helper/build/m1-system-helper_artefacts/Release/m1-system-helper.app
 	@echo "Applications code signed"
 else ifeq ($(detected_OS),Windows)
 	@echo "Code signing Windows applications with Azure Trusted Signing..."
