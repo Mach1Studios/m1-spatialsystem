@@ -15,7 +15,7 @@
     Features:
     - Wireframe cube/box visualization with X/Y/Z axis labels
     - Reticle/point for each panner derived from azimuth/elevation
-    - Front-facing default camera with top-down view toggle
+    - Top-down default camera with optional 3D orbit view
     - Left-drag orbit (yaw/pitch around center)
     - Mouse wheel zoom
     - Optional shift-drag pan
@@ -63,10 +63,10 @@ struct Camera3D {
     float panX = 0.0f;
     float panY = 0.0f;
     
-    CameraPreset preset = CameraPreset::Front;
+    CameraPreset preset = CameraPreset::TopDown;
     
     void reset() {
-        setPreset(CameraPreset::Front);
+        setPreset(CameraPreset::TopDown);
     }
     
     void setPreset(CameraPreset newPreset) {
@@ -163,6 +163,13 @@ struct PannerReticle {
     int pannerIndex = -1;
     float azimuth = 0.0f;
     float elevation = 0.0f;
+    float diverge = 0.0f;
+    int inputMode = 0;
+    int pannerMode = 0;
+    juce::Point<float> topDownSquarePosition;
+    std::vector<juce::Point<float>> additionalPointPositions;
+    std::vector<Vec3> additionalPointWorldPositions;
+    std::vector<juce::String> additionalPointLabels;
 };
 
 /**
@@ -208,6 +215,7 @@ private:
     
     // Drawing
     void drawToolbar(juce::Graphics& g);
+    void drawTopDownField(juce::Graphics& g);
     void drawWireframeCube(juce::Graphics& g);
     void drawFloorGrid(juce::Graphics& g);
     void drawAxes(juce::Graphics& g);
@@ -216,8 +224,12 @@ private:
     void drawCornerGizmo(juce::Graphics& g);
     void drawPannerReticles(juce::Graphics& g);
     void drawReticle(juce::Graphics& g, const PannerReticle& reticle);
+    void drawAdditionalReticles3D(juce::Graphics& g, const PannerReticle& reticle);
     void drawCameraInfo(juce::Graphics& g);
     void drawListenerPosition(juce::Graphics& g);
+    juce::Rectangle<float> getTopDownFieldBounds() const;
+    juce::Point<float> projectTopDownFieldPoint(const juce::Rectangle<float>& fieldBounds,
+                                                const juce::Point<float>& normalizedPoint) const;
     
     // Line drawing with depth-based alpha
     void drawLine3D(juce::Graphics& g, const Vec3& from, const Vec3& to, 
@@ -282,6 +294,7 @@ private:
     static constexpr float ZOOM_SENSITIVITY = 0.1f;
     static constexpr float MIN_ZOOM = 0.3f;
     static constexpr float MAX_ZOOM = 3.0f;
+    static constexpr float MAX_RETICLE_DISTANCE = 0.85f;
     
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Panner3DViewPanel)
 };

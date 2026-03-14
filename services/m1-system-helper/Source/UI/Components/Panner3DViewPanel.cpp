@@ -13,8 +13,156 @@
 */
 
 #include "Panner3DViewPanel.h"
+#include <Mach1Encode.h>
+#include <limits>
 
 namespace Mach1 {
+
+namespace
+{
+struct Line2D
+{
+    float x, y, x2, y2;
+};
+
+float intersection(const Line2D& a, const Line2D& b)
+{
+    const float precision = std::sqrt(std::numeric_limits<float>::epsilon());
+    const float ax = a.x2 - a.x;
+    const float ay = a.y2 - a.y;
+    const float bx = b.x2 - b.x;
+    const float by = b.y2 - b.y;
+    const float determinant = ax * by - ay * bx;
+
+    if (std::abs(determinant) < precision)
+        return std::numeric_limits<float>::quiet_NaN();
+
+    const float numerator = (b.x - a.x) * by - (b.y - a.y) * bx;
+    return numerator / determinant;
+}
+
+juce::Point<float> intersectionPoint(const Line2D& a, const Line2D& b)
+{
+    const float t = intersection(a, b);
+    return { a.x + (a.x2 - a.x) * t, a.y + (a.y2 - a.y) * t };
+}
+
+juce::Point<float> convertReticleToSquareSpace(float azimuthDeg, float diverge)
+{
+    float x = std::cos(juce::degreesToRadians(-azimuthDeg + 90.0f)) * diverge * std::sqrt(2.0f);
+    float y = std::sin(juce::degreesToRadians(-azimuthDeg + 90.0f)) * diverge * std::sqrt(2.0f);
+
+    if (x > 100.0f)
+    {
+        const auto point = intersectionPoint({ 0.0f, 0.0f, x, y }, { 100.0f, -100.0f, 100.0f, 100.0f });
+        x = point.x;
+        y = point.y;
+    }
+    if (y > 100.0f)
+    {
+        const auto point = intersectionPoint({ 0.0f, 0.0f, x, y }, { -100.0f, 100.0f, 100.0f, 100.0f });
+        x = point.x;
+        y = point.y;
+    }
+    if (x < -100.0f)
+    {
+        const auto point = intersectionPoint({ 0.0f, 0.0f, x, y }, { -100.0f, -100.0f, -100.0f, 100.0f });
+        x = point.x;
+        y = point.y;
+    }
+    if (y < -100.0f)
+    {
+        const auto point = intersectionPoint({ 0.0f, 0.0f, x, y }, { -100.0f, -100.0f, 100.0f, -100.0f });
+        x = point.x;
+        y = point.y;
+    }
+
+    return { juce::jlimit(-1.0f, 1.0f, x / 100.0f),
+             juce::jlimit(-1.0f, 1.0f, -y / 100.0f) };
+}
+
+float getAdditionalReticleSizeMultiplier(int inputMode)
+{
+    switch (static_cast<Mach1EncodeInputMode>(inputMode))
+    {
+        case Mach1EncodeInputMode::Stereo:
+        case Mach1EncodeInputMode::LCR:
+            return 1.0f;
+        case Mach1EncodeInputMode::AFormat:
+            return 2.0f;
+        default:
+            return 1.5f;
+    }
+}
+
+bool usesDirectElevationAxis(int pannerMode)
+{
+    return pannerMode == static_cast<int>(Mach1EncodePannerMode::PeriphonicLinear);
+}
+
+Vec3 convertMach1PointToWorld(const Mach1Point3D& point)
+{
+    // Match the panner overlay mapping:
+    // - point.z = horizontal left/right
+    // - point.x = front/back
+    // - point.y = elevation
+    return { juce::jlimit(-1.0f, 1.0f, static_cast<float>(point.z)),
+             juce::jlimit(-1.0f, 1.0f, static_cast<float>(point.x)),
+             juce::jlimit(-1.0f, 1.0f, static_cast<float>(point.y)) };
+}
+
+void buildAdditionalPointSnapshot(const PannerInfo& panner,
+                                  std::vector<juce::Point<float>>& positions,
+                                  std::vector<Vec3>& worldPositions,
+                                  std::vector<juce::String>& labels)
+{
+    positions.clear();
+    worldPositions.clear();
+    labels.clear();
+
+    if (panner.inputMode <= static_cast<int>(Mach1EncodeInputMode::Mono))
+        return;
+
+    Mach1Encode<float> encode;
+    encode.setInputMode(static_cast<Mach1EncodeInputMode>(
+        juce::jlimit(static_cast<int>(Mach1EncodeInputMode::Mono),
+                     static_cast<int>(Mach1EncodeInputMode::B3OAFUMA),
+                     panner.inputMode)));
+    encode.setOutputMode(static_cast<Mach1EncodeOutputMode>(
+        juce::jlimit(static_cast<int>(Mach1EncodeOutputMode::M1Spatial_4),
+                     static_cast<int>(Mach1EncodeOutputMode::M1Spatial_14),
+                     panner.outputMode)));
+    encode.setPannerMode(static_cast<Mach1EncodePannerMode>(
+        juce::jlimit(static_cast<int>(Mach1EncodePannerMode::IsotropicLinear),
+                     static_cast<int>(Mach1EncodePannerMode::PeriphonicLinear),
+                     panner.pannerMode)));
+    encode.setAzimuthDegrees(panner.azimuth);
+    encode.setElevationDegrees(panner.elevation);
+    encode.setDiverge(panner.diverge / 100.0f);
+    encode.setAutoOrbit(panner.autoOrbit);
+    encode.setOrbitRotationDegrees(panner.stereoOrbitAzimuth);
+    encode.setStereoSpread(juce::jlimit(0.0f, 1.0f, panner.stereoSpread / 100.0f));
+
+    if (encode.getInputChannelsCount() <= 1)
+        return;
+
+    encode.generatePointResults();
+
+    const auto points = encode.getPoints();
+    const auto pointNames = encode.getPointsNames();
+    positions.reserve(points.size());
+    worldPositions.reserve(points.size());
+    labels.reserve(pointNames.size());
+
+    for (size_t i = 0; i < points.size() && i < pointNames.size(); ++i)
+    {
+        positions.push_back({ juce::jlimit(-1.0f, 1.0f, static_cast<float>(points[i].z)),
+                              juce::jlimit(-1.0f, 1.0f, static_cast<float>(-points[i].x)) });
+        worldPositions.push_back(convertMach1PointToWorld(points[i]));
+        labels.push_back(juce::String(pointNames[i]));
+    }
+}
+}
 
 //==============================================================================
 Panner3DViewPanel::Panner3DViewPanel()
@@ -38,13 +186,36 @@ void Panner3DViewPanel::updatePannerData(const std::vector<PannerInfo>& panners)
     {
         PannerReticle reticle;
         
-        // Store raw azimuth/elevation for display
+        // Store raw panner values for display
         reticle.azimuth = panner.azimuth;
         reticle.elevation = panner.elevation;
-        
-        // Convert azimuth/elevation to 3D position using Mach1 AED convention
-        // Place reticles on a unit sphere (radius 0.85 to fit within cube)
-        reticle.position = Vec3::fromAED(panner.azimuth, panner.elevation, 0.85f);
+        reticle.diverge = panner.diverge;
+        reticle.inputMode = panner.inputMode;
+        reticle.pannerMode = panner.pannerMode;
+        reticle.topDownSquarePosition = convertReticleToSquareSpace(panner.azimuth, panner.diverge);
+        buildAdditionalPointSnapshot(panner,
+                                     reticle.additionalPointPositions,
+                                     reticle.additionalPointWorldPositions,
+                                     reticle.additionalPointLabels);
+
+        if (usesDirectElevationAxis(reticle.pannerMode))
+        {
+            // Periphonic mode keeps the panner in the panner's square-space XY field,
+            // with elevation applied directly on Z.
+            reticle.position = {
+                reticle.topDownSquarePosition.x * CUBE_SIZE,
+                -reticle.topDownSquarePosition.y * CUBE_SIZE,
+                juce::jlimit(-1.0f, 1.0f, panner.elevation / 90.0f) * CUBE_SIZE
+            };
+        }
+        else
+        {
+            // Isotropic modes keep the previous spherical elevation behavior in 3D.
+            const float signedDiverge = juce::jlimit(-1.0f, 1.0f, panner.diverge / 100.0f);
+            reticle.position = Vec3::fromAED(panner.azimuth,
+                                             panner.elevation,
+                                             signedDiverge * MAX_RETICLE_DISTANCE);
+        }
         
         // Use panner name or index as label
         reticle.label = panner.name.empty() 
@@ -111,13 +282,22 @@ void Panner3DViewPanel::paint(juce::Graphics& g)
     // Draw toolbar with view buttons
     drawToolbar(g);
     
-    // Draw 3D content
-    drawFloorGrid(g);
-    drawWireframeCube(g);
-    drawListenerPosition(g);
-    drawDirectionLabels(g);
-    drawPannerReticles(g);
-    drawCornerGizmo(g);
+    if (camera.preset == CameraPreset::TopDown)
+    {
+        drawTopDownField(g);
+        drawCornerGizmo(g);
+    }
+    else
+    {
+        // Draw 3D content
+        drawFloorGrid(g);
+        drawWireframeCube(g);
+        drawListenerPosition(g);
+        drawDirectionLabels(g);
+        drawPannerReticles(g);
+        drawCornerGizmo(g);
+    }
+
     drawCameraInfo(g);
     
     // Draw border matching reference design
@@ -127,7 +307,9 @@ void Panner3DViewPanel::paint(juce::Graphics& g)
     // Draw instructions at bottom
     g.setColour(textColour.withAlpha(0.5f));
     g.setFont(juce::Font(10.0f));
-    g.drawText("Drag: orbit | Wheel: zoom | Shift+drag: pan", 
+    g.drawText(camera.preset == CameraPreset::TopDown
+                   ? "Wheel: zoom | Shift+drag: pan"
+                   : "3D drag: orbit | Wheel: zoom | Shift+drag: pan",
                getLocalBounds().removeFromBottom(16), juce::Justification::centred);
 }
 
@@ -186,6 +368,153 @@ void Panner3DViewPanel::resized()
     // Nothing specific needed, paint() recalculates bounds
 }
 
+juce::Rectangle<float> Panner3DViewPanel::getTopDownFieldBounds() const
+{
+    auto contentBounds = getLocalBounds().toFloat();
+    contentBounds.removeFromTop(TOOLBAR_HEIGHT + 22.0f);
+    contentBounds.removeFromBottom(24.0f);
+    contentBounds = contentBounds.reduced(48.0f, 10.0f);
+
+    const float baseSide = juce::jmin(contentBounds.getWidth(), contentBounds.getHeight());
+    const float scaledSide = baseSide * camera.zoom;
+    juce::Rectangle<float> fieldBounds(0.0f, 0.0f, scaledSide, scaledSide);
+    fieldBounds.setCentre(contentBounds.getCentreX() + camera.panX * baseSide,
+                          contentBounds.getCentreY() - camera.panY * baseSide);
+    return fieldBounds;
+}
+
+juce::Point<float> Panner3DViewPanel::projectTopDownFieldPoint(const juce::Rectangle<float>& fieldBounds,
+                                                               const juce::Point<float>& normalizedPoint) const
+{
+    return { fieldBounds.getCentreX() + normalizedPoint.x * fieldBounds.getWidth() * 0.5f,
+             fieldBounds.getCentreY() + normalizedPoint.y * fieldBounds.getHeight() * 0.5f };
+}
+
+void Panner3DViewPanel::drawTopDownField(juce::Graphics& g)
+{
+    const auto fieldBounds = getTopDownFieldBounds();
+    const auto center = fieldBounds.getCentre();
+    const float side = fieldBounds.getWidth();
+    const float minorStep = side / 96.0f;
+    const float majorStep = side / 4.0f;
+
+    g.setColour(gridColour.withAlpha(0.5f));
+    for (int i = 0; i <= 96; ++i)
+    {
+        const float x = fieldBounds.getX() + minorStep * i;
+        const float y = fieldBounds.getY() + minorStep * i;
+        g.drawVerticalLine(juce::roundToInt(x), fieldBounds.getY(), fieldBounds.getBottom());
+        g.drawHorizontalLine(juce::roundToInt(y), fieldBounds.getX(), fieldBounds.getRight());
+    }
+
+    g.setColour(cubeColour.withAlpha(0.85f));
+    for (int i = 1; i < 4; ++i)
+    {
+        const float x = fieldBounds.getX() + majorStep * i;
+        const float y = fieldBounds.getY() + majorStep * i;
+        g.drawVerticalLine(juce::roundToInt(x), fieldBounds.getY(), fieldBounds.getBottom());
+        g.drawHorizontalLine(juce::roundToInt(y), fieldBounds.getX(), fieldBounds.getRight());
+    }
+
+    g.setColour(textColour.withAlpha(0.35f));
+    g.drawRect(fieldBounds, 1.0f);
+    g.drawLine(juce::Line<float>(fieldBounds.getTopLeft(), fieldBounds.getBottomRight()), 1.0f);
+    g.drawLine(juce::Line<float>(fieldBounds.getTopRight(), fieldBounds.getBottomLeft()), 1.0f);
+
+    g.drawEllipse(fieldBounds, 1.0f);
+    g.drawEllipse(fieldBounds.reduced(side * 0.25f), 1.0f);
+
+    g.setColour(textColour.withAlpha(0.7f));
+    g.setFont(juce::Font(9.0f));
+    g.drawText("FRONT", juce::Rectangle<float>(fieldBounds.getCentreX() - 30.0f, fieldBounds.getY() - 18.0f, 60.0f, 14.0f),
+               juce::Justification::centred);
+    g.drawText("BACK", juce::Rectangle<float>(fieldBounds.getCentreX() - 30.0f, fieldBounds.getBottom() + 4.0f, 60.0f, 14.0f),
+               juce::Justification::centred);
+    g.drawText("LEFT", juce::Rectangle<float>(fieldBounds.getX() - 34.0f, fieldBounds.getCentreY() - 7.0f, 30.0f, 14.0f),
+               juce::Justification::centredRight);
+    g.drawText("RIGHT", juce::Rectangle<float>(fieldBounds.getRight() + 4.0f, fieldBounds.getCentreY() - 7.0f, 36.0f, 14.0f),
+               juce::Justification::centredLeft);
+
+    g.setColour(juce::Colours::white.withAlpha(0.65f));
+    g.fillEllipse(center.x - 4.0f, center.y - 4.0f, 8.0f, 8.0f);
+
+    const int expandedReticleIndex = selectedPannerIndex >= 0
+        ? selectedPannerIndex
+        : (reticles.size() == 1 ? 0 : -1);
+
+    auto drawMainReticle = [&](const PannerReticle& reticle)
+    {
+        const bool emphasized = reticle.isSelected || reticle.pannerIndex == expandedReticleIndex;
+        const auto point = projectTopDownFieldPoint(fieldBounds, reticle.topDownSquarePosition);
+        const float hoverBoost = emphasized ? 3.0f : 0.0f;
+        const float elevationSizeBias = 2.0f * (reticle.elevation / 90.0f);
+        const float outerRadius = juce::jmax(5.0f, 10.0f + hoverBoost + elevationSizeBias);
+        const float innerRadius = juce::jmax(3.0f, 8.0f + hoverBoost + elevationSizeBias);
+
+        g.setColour(selectedReticleColour.withAlpha(emphasized ? 1.0f : 0.85f));
+        g.fillEllipse(point.x - outerRadius, point.y - outerRadius, outerRadius * 2.0f, outerRadius * 2.0f);
+        g.setColour(backgroundColour);
+        g.fillEllipse(point.x - innerRadius, point.y - innerRadius, innerRadius * 2.0f, innerRadius * 2.0f);
+        g.setColour(emphasized ? selectedReticleColour : reticle.colour.withAlpha(0.9f));
+        g.fillEllipse(point.x - 6.0f, point.y - 6.0f, 12.0f, 12.0f);
+
+        juce::String labelText = reticle.label;
+        if (emphasized)
+        {
+            labelText += juce::String::formatted(" (%.0f, %.0f, %.0f)",
+                                                 reticle.azimuth,
+                                                 reticle.elevation,
+                                                 reticle.diverge);
+        }
+
+        g.setFont(juce::Font(emphasized ? 10.0f : 9.0f));
+        const float labelWidth = juce::jmax(38.0f, labelText.length() * 5.8f + 8.0f);
+        juce::Rectangle<float> labelBounds(point.x - labelWidth * 0.5f, point.y + outerRadius + 4.0f, labelWidth, 14.0f);
+        g.setColour(labelBackgroundColour);
+        g.fillRoundedRectangle(labelBounds, 2.0f);
+        g.setColour(emphasized ? selectedReticleColour : reticle.colour.withAlpha(0.95f));
+        g.drawText(labelText, labelBounds, juce::Justification::centred);
+    };
+
+    for (const auto& reticle : reticles)
+    {
+        if (!reticle.isSelected)
+            drawMainReticle(reticle);
+    }
+
+    for (const auto& reticle : reticles)
+    {
+        if (reticle.isSelected)
+            drawMainReticle(reticle);
+    }
+
+    if (expandedReticleIndex >= 0 && expandedReticleIndex < static_cast<int>(reticles.size()))
+    {
+        const auto& reticle = reticles[static_cast<size_t>(expandedReticleIndex)];
+        const float additionalMultiplier = getAdditionalReticleSizeMultiplier(reticle.inputMode);
+        const float elevationSizeBias = 2.0f * (reticle.elevation / 90.0f);
+
+        g.setFont(juce::Font(11.0f + elevationSizeBias));
+        for (size_t i = 0; i < reticle.additionalPointPositions.size() && i < reticle.additionalPointLabels.size(); ++i)
+        {
+            const auto point = projectTopDownFieldPoint(fieldBounds, reticle.additionalPointPositions[i]);
+            const float innerRadius = juce::jmax(2.0f, 8.0f * additionalMultiplier + elevationSizeBias);
+            const float midRadius = juce::jmax(innerRadius + 1.0f, 10.0f * additionalMultiplier + 3.0f + elevationSizeBias);
+            const float outerRadius = juce::jmax(midRadius + 1.0f, 12.0f * additionalMultiplier + 5.0f + elevationSizeBias);
+
+            g.setColour(reticle.colour.withAlpha(0.9f));
+            g.drawEllipse(point.x - innerRadius, point.y - innerRadius, innerRadius * 2.0f, innerRadius * 2.0f, 1.0f);
+            g.drawEllipse(point.x - outerRadius, point.y - outerRadius, outerRadius * 2.0f, outerRadius * 2.0f, 1.0f);
+
+            g.setColour(selectedReticleColour.withAlpha(0.95f));
+            g.drawEllipse(point.x - midRadius, point.y - midRadius, midRadius * 2.0f, midRadius * 2.0f, 1.5f);
+
+            const auto labelBounds = juce::Rectangle<float>(point.x - 20.0f, point.y - outerRadius - 12.0f, 40.0f, 12.0f);
+            g.drawText(reticle.additionalPointLabels[i], labelBounds, juce::Justification::centred);
+        }
+    }
+}
+
 //==============================================================================
 void Panner3DViewPanel::mouseDown(const juce::MouseEvent& e)
 {
@@ -227,6 +556,11 @@ void Panner3DViewPanel::mouseDown(const juce::MouseEvent& e)
         isPanning = true;
         isDragging = false;
     }
+    else if (camera.preset == CameraPreset::TopDown)
+    {
+        isDragging = false;
+        isPanning = false;
+    }
     else
     {
         isDragging = true;
@@ -243,17 +577,13 @@ void Panner3DViewPanel::mouseDrag(const juce::MouseEvent& e)
     {
         // Orbit camera - switch to custom preset
         camera.preset = CameraPreset::Custom;
-        // Standard orbit: drag right = rotate view right (yaw increases)
+        // Keep the orbit in the front hemisphere so left/right never flips.
         camera.yaw += delta.x * ORBIT_SENSITIVITY;
         camera.pitch += delta.y * ORBIT_SENSITIVITY;
-        
-        // Clamp pitch to avoid gimbal lock
+
+        camera.yaw = juce::jlimit(-85.0f, 85.0f, camera.yaw);
         camera.pitch = juce::jlimit(-89.0f, 89.0f, camera.pitch);
-        
-        // Wrap yaw
-        if (camera.yaw > 180.0f) camera.yaw -= 360.0f;
-        if (camera.yaw < -180.0f) camera.yaw += 360.0f;
-        
+
         repaint();
     }
     else if (isPanning)
@@ -537,6 +867,10 @@ void Panner3DViewPanel::drawDirectionLabels(juce::Graphics& g)
 
 void Panner3DViewPanel::drawPannerReticles(juce::Graphics& g)
 {
+    const int expandedReticleIndex = selectedPannerIndex >= 0
+        ? selectedPannerIndex
+        : (reticles.size() == 1 ? 0 : -1);
+
     // Sort reticles by depth (back to front) for proper occlusion
     std::vector<std::pair<float, size_t>> sortedIndices;
     for (size_t i = 0; i < reticles.size(); ++i)
@@ -551,12 +885,75 @@ void Panner3DViewPanel::drawPannerReticles(juce::Graphics& g)
     // Draw reticles back to front
     for (const auto& [depth, idx] : sortedIndices)
     {
+        juce::ignoreUnused(depth);
         drawReticle(g, reticles[idx]);
+    }
+
+    if (expandedReticleIndex >= 0 && expandedReticleIndex < static_cast<int>(reticles.size()))
+        drawAdditionalReticles3D(g, reticles[static_cast<size_t>(expandedReticleIndex)]);
+}
+
+void Panner3DViewPanel::drawAdditionalReticles3D(juce::Graphics& g, const PannerReticle& reticle)
+{
+    if (reticle.additionalPointWorldPositions.empty()
+        || reticle.additionalPointWorldPositions.size() != reticle.additionalPointLabels.size())
+        return;
+
+    std::vector<std::pair<float, size_t>> sortedAdditionalPoints;
+    sortedAdditionalPoints.reserve(reticle.additionalPointWorldPositions.size());
+    for (size_t i = 0; i < reticle.additionalPointWorldPositions.size(); ++i)
+        sortedAdditionalPoints.emplace_back(getDepth(reticle.additionalPointWorldPositions[i]), i);
+
+    std::sort(sortedAdditionalPoints.begin(), sortedAdditionalPoints.end(),
+              [](const auto& a, const auto& b) { return a.first < b.first; });
+
+    const float sizeMultiplier = getAdditionalReticleSizeMultiplier(reticle.inputMode);
+
+    for (const auto& [pointDepth, pointIndex] : sortedAdditionalPoints)
+    {
+        const auto& worldPoint = reticle.additionalPointWorldPositions[pointIndex];
+        const auto pointScreenPos = project(worldPoint);
+        const float pointDepthFactor = juce::jmap(pointDepth, -2.0f, 2.0f, 0.7f, 1.25f);
+        const float pointAlpha = juce::jmap(pointDepth, -2.0f, 2.0f, 0.45f, 0.95f);
+        const float pointRadius = juce::jmax(3.0f, RETICLE_RADIUS * 0.5f * sizeMultiplier * pointDepthFactor);
+
+        const Vec3 floorPoint { worldPoint.x, worldPoint.y, 0.0f };
+        const auto floorScreenPos = project(floorPoint);
+
+        g.setColour(reticle.colour.withAlpha(pointAlpha * 0.22f));
+        g.drawLine(pointScreenPos.x, pointScreenPos.y, floorScreenPos.x, floorScreenPos.y, 0.8f);
+
+        g.setColour(reticle.colour.withAlpha(pointAlpha * 0.9f));
+        g.drawEllipse(pointScreenPos.x - pointRadius * 1.45f,
+                      pointScreenPos.y - pointRadius * 1.45f,
+                      pointRadius * 2.9f,
+                      pointRadius * 2.9f,
+                      1.0f);
+        g.setColour(selectedReticleColour.withAlpha(pointAlpha));
+        g.drawEllipse(pointScreenPos.x - pointRadius,
+                      pointScreenPos.y - pointRadius,
+                      pointRadius * 2.0f,
+                      pointRadius * 2.0f,
+                      1.25f);
+        g.fillEllipse(pointScreenPos.x - pointRadius * 0.4f,
+                      pointScreenPos.y - pointRadius * 0.4f,
+                      pointRadius * 0.8f,
+                      pointRadius * 0.8f);
+
+        g.setFont(juce::Font(8.0f * pointDepthFactor * camera.zoom));
+        g.setColour(selectedReticleColour.withAlpha(pointAlpha));
+        g.drawText(reticle.additionalPointLabels[pointIndex],
+                   juce::Rectangle<float>(pointScreenPos.x - 12.0f,
+                                          pointScreenPos.y - pointRadius - 12.0f,
+                                          24.0f,
+                                          10.0f),
+                   juce::Justification::centred);
     }
 }
 
 void Panner3DViewPanel::drawReticle(juce::Graphics& g, const PannerReticle& reticle)
 {
+
     auto screenPos = project(reticle.position);
     float depth = getDepth(reticle.position);
     
@@ -602,7 +999,10 @@ void Panner3DViewPanel::drawReticle(juce::Graphics& g, const PannerReticle& reti
     juce::String labelText = reticle.label;
     if (reticle.isSelected)
     {
-        labelText += juce::String::formatted(" (%.0f, %.0f)", reticle.azimuth, reticle.elevation);
+        labelText += juce::String::formatted(" (%.0f, %.0f, %.0f)",
+                                             reticle.azimuth,
+                                             reticle.elevation,
+                                             reticle.diverge);
     }
     
     float labelWidth = labelText.length() * 5.5f + 6;
@@ -624,8 +1024,8 @@ void Panner3DViewPanel::drawCameraInfo(juce::Graphics& g)
     juce::String viewName;
     switch (camera.preset)
     {
-        case CameraPreset::Front:   viewName = "Front View"; break;
-        case CameraPreset::TopDown: viewName = "Top-Down View"; break;
+        case CameraPreset::Front:   viewName = "3D View"; break;
+        case CameraPreset::TopDown: viewName = "Top View"; break;
         case CameraPreset::Side:    viewName = "Side View"; break;
         case CameraPreset::Back:    viewName = "Back View"; break;
         case CameraPreset::Custom:  viewName = "Custom"; break;
@@ -657,6 +1057,22 @@ int Panner3DViewPanel::findReticleAtPoint(juce::Point<int> screenPos)
     // Skip toolbar area
     if (screenPos.y < TOOLBAR_HEIGHT)
         return -1;
+
+    if (camera.preset == CameraPreset::TopDown)
+    {
+        const auto fieldBounds = getTopDownFieldBounds();
+        for (int i = static_cast<int>(reticles.size()) - 1; i >= 0; --i)
+        {
+            const auto projected = projectTopDownFieldPoint(fieldBounds, reticles[static_cast<size_t>(i)].topDownSquarePosition);
+            const float dist = std::sqrt(std::pow(projected.x - screenPos.x, 2) +
+                                         std::pow(projected.y - screenPos.y, 2));
+
+            if (dist < 16.0f)
+                return i;
+        }
+
+        return -1;
+    }
     
     // Search in reverse depth order (front reticles first)
     std::vector<std::pair<float, int>> sortedByDepth;

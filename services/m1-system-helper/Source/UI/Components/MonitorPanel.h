@@ -60,10 +60,14 @@ private:
     juce::Colour trackColour{0xFF858585};
     juce::Colour disabledColour{0xFF3F3F3F};
 
-    static constexpr int BOTTOM_BAR_HEIGHT = 42;
-    static constexpr int MENU_BUTTON_WIDTH = 118;
-    static constexpr int MENU_BUTTON_HEIGHT = 24;
-    static constexpr int ORIENTATION_SECTION_MIN_HEIGHT = 220;
+    static constexpr int BOTTOM_BAR_HEIGHT = 20;
+    static constexpr int MENU_BUTTON_WIDTH = 108;
+    static constexpr int MENU_BUTTON_HEIGHT = 20;
+    static constexpr int ORIENTATION_SECTION_MIN_HEIGHT = 170;
+    static constexpr int CONTROL_SECTION_MIN_WIDTH = 240;
+    static constexpr int CONTROL_SECTION_MAX_WIDTH = 320;
+    static constexpr int MENU_COLUMN_WIDTH = 126;
+    static constexpr int MAX_YAW_DIAMETER = 178;
     
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MonitorPanel)
 };

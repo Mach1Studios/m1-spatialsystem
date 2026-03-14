@@ -159,9 +159,9 @@ void SessionMainComponent::setupLayout()
     
     // Right panel layout: [3D View] [Resizer] [Monitor]
     // Reference shows 3D view larger than monitor
-    rightPanelLayout.setItemLayout(0, 100, -1.0, -0.60);  // 3D View: 60%
+    rightPanelLayout.setItemLayout(0, 100, -1.0, -0.66);  // 3D View: 66%
     rightPanelLayout.setItemLayout(1, 3, 3, 3);           // Thinner resizer
-    rightPanelLayout.setItemLayout(2, 80, -0.5, -0.40);   // Monitor: 40%
+    rightPanelLayout.setItemLayout(2, 80, -0.45, -0.34);  // Monitor: 34%
     
     // Create resizer bars - thinner/more subtle
     mainTimelineResizer = std::make_unique<juce::StretchableLayoutResizerBar>(

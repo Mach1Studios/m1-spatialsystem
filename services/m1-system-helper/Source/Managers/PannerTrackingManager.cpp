@@ -14,6 +14,7 @@
 #include "M1MemoryShareTracker.h"
 #include "OSCPannerTracker.h"
 #include "../Common/TypesForDataExchange.h"
+#include <Mach1Encode.h>
 
 // Platform-specific includes for process checking
 #ifdef JUCE_MAC
@@ -24,6 +25,23 @@
 #endif
 
 namespace Mach1 {
+
+namespace
+{
+int resolveMemorySharePannerMode(const MemorySharePannerInfo& info)
+{
+    const bool isotropic = info.parameters.getBool(M1SystemHelperParameterIDs::ISOTROPIC_MODE, true);
+    const bool equalpower = info.parameters.getBool(M1SystemHelperParameterIDs::EQUALPOWER_MODE, false);
+
+    if (equalpower)
+        return static_cast<int>(Mach1EncodePannerMode::IsotropicEqualPower);
+
+    if (isotropic)
+        return static_cast<int>(Mach1EncodePannerMode::IsotropicLinear);
+
+    return static_cast<int>(Mach1EncodePannerMode::PeriphonicLinear);
+}
+}
 
 PannerTrackingManager::PannerTrackingManager(std::shared_ptr<EventSystem> events)
     : eventSystem(std::move(events))
@@ -245,6 +263,7 @@ void PannerTrackingManager::mergeTrackingResults() {
                 existingPanner.currentBufferId = foundPanner.currentBufferId;
                 existingPanner.inputMode = foundPanner.inputMode;
                 existingPanner.outputMode = foundPanner.outputMode;
+                existingPanner.pannerMode = foundPanner.pannerMode;
                 existingPanner.autoOrbit = foundPanner.autoOrbit;
                 existingPanner.state = foundPanner.state;
                 existingPanner.color = foundPanner.color;
@@ -463,6 +482,7 @@ PannerInfo PannerTrackingManager::convertFromMemoryShare(const MemorySharePanner
     // Modes
     panner.inputMode = info.getInputMode();
     panner.outputMode = info.getOutputMode();
+    panner.pannerMode = resolveMemorySharePannerMode(info);
     panner.autoOrbit = info.getAutoOrbit();
     panner.state = info.getState();
     

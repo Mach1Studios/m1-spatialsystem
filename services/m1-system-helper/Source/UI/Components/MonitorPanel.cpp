@@ -49,7 +49,7 @@ public:
 
         const auto bounds = getLocalBounds().toFloat();
         g.setColour(colour);
-        g.setFont(juce::Font(11.0f));
+        g.setFont(juce::Font(10.0f));
 
         auto textBounds = bounds.reduced(0.0f, 2.0f);
         if (showsArrow)
@@ -107,6 +107,12 @@ public:
         const auto centre = dialBounds.getCentre();
         const float radius = dialBounds.getWidth() * 0.5f;
         const auto activeColour = isEnabled() ? accentColour : disabledColour;
+        const float outerInset = juce::jmax(2.5f, radius * (5.0f / 135.0f));
+        const float minorTickInset = juce::jmax(6.0f, radius * (12.0f / 135.0f));
+        const float majorTickInset = juce::jmax(11.0f, radius * (24.0f / 135.0f));
+        const float pointerOuterInset = juce::jmax(4.0f, radius * (7.0f / 135.0f));
+        const float arcThickness = juce::jmax(1.75f, radius * (2.5f / 135.0f));
+        const float pointerThickness = juce::jmax(2.0f, radius * (3.0f / 135.0f));
 
         g.setColour(dialFaceColour.withAlpha(alpha));
         g.fillEllipse(dialBounds);
@@ -115,8 +121,8 @@ public:
         for (int i = 0; i < 8 * 4; ++i)
         {
             const float angle = (juce::MathConstants<float>::twoPi / (8.0f * 4.0f)) * (float) i;
-            const float startL = radius - 12.0f;
-            const float endL = radius - 5.0f;
+            const float startL = radius - minorTickInset;
+            const float endL = radius - outerInset;
 
             const juce::Point<float> start(centre.x + std::cos(angle) * startL,
                                            centre.y + std::sin(angle) * startL);
@@ -128,8 +134,8 @@ public:
         for (int i = 0; i < 8; ++i)
         {
             const float angle = (juce::MathConstants<float>::twoPi / 8.0f) * (float) i;
-            const float startL = radius - 24.0f;
-            const float endL = radius - 5.0f;
+            const float startL = radius - majorTickInset;
+            const float endL = radius - outerInset;
 
             const juce::Point<float> start(centre.x + std::cos(angle) * startL,
                                            centre.y + std::sin(angle) * startL);
@@ -159,26 +165,32 @@ public:
                                                centre.y + std::sin(angle0 - 0.01f) * (radius - 1.0f));
             const juce::Point<float> lineEnd(centre.x + std::cos(angle1 + 0.01f) * (radius - 1.0f),
                                              centre.y + std::sin(angle1 + 0.01f) * (radius - 1.0f));
-            g.drawLine({ lineStart, lineEnd }, 2.5f);
+            g.drawLine({ lineStart, lineEnd }, arcThickness);
         }
 
         const float centralLineInnerRadius = radius * (25.0f / 135.0f);
         const juce::Point<float> centralLineStart(centre.x + std::cos(angle) * centralLineInnerRadius,
                                                   centre.y + std::sin(angle) * centralLineInnerRadius);
-        const juce::Point<float> centralLineEnd(centre.x + std::cos(angle) * (radius - 7.0f),
-                                                centre.y + std::sin(angle) * (radius - 7.0f));
-        g.drawLine({ centralLineStart, centralLineEnd }, 3.0f);
+        const juce::Point<float> centralLineEnd(centre.x + std::cos(angle) * (radius - pointerOuterInset),
+                                                centre.y + std::sin(angle) * (radius - pointerOuterInset));
+        g.drawLine({ centralLineStart, centralLineEnd }, pointerThickness);
 
         g.setColour(textColour.withAlpha(alpha));
-        g.setFont(juce::Font(11.0f));
+        g.setFont(juce::Font(juce::jlimit(9.0f, 11.0f, radius * 0.12f)));
         g.drawText("YAW",
-                   juce::Rectangle<float>(centre.x - 40.0f, dialBounds.getY() + dialBounds.getHeight() * 0.25f - 8.0f, 80.0f, 18.0f).toNearestInt(),
+                   juce::Rectangle<float>(centre.x - radius * 0.42f,
+                                          dialBounds.getY() + dialBounds.getHeight() * 0.25f - radius * 0.08f,
+                                          radius * 0.84f,
+                                          juce::jmax(14.0f, radius * 0.18f)).toNearestInt(),
                    juce::Justification::centred,
                    true);
 
-        g.setFont(juce::Font(14.0f));
+        g.setFont(juce::Font(juce::jlimit(11.0f, 14.0f, radius * 0.16f)));
         g.drawText(formatAngle(getValue()),
-                   juce::Rectangle<float>(centre.x - 60.0f, centre.y - 10.0f, 120.0f, 22.0f).toNearestInt(),
+                   juce::Rectangle<float>(centre.x - radius * 0.62f,
+                                          centre.y - radius * 0.09f,
+                                          radius * 1.24f,
+                                          juce::jmax(18.0f, radius * 0.22f)).toNearestInt(),
                    juce::Justification::centred,
                    true);
     }
@@ -226,11 +238,11 @@ public:
         const float alpha = isEnabled() ? 1.0f : 0.35f;
         const auto bounds = getLocalBounds().toFloat();
         const auto activeColour = isEnabled() ? accentColour : disabledColour;
-        constexpr float ellipseRadius = 5.0f;
-        constexpr float labelWidth = 40.0f;
-        constexpr float labelHeight = 30.0f;
+        const float ellipseRadius = juce::jlimit(3.5f, 5.0f, juce::jmin(bounds.getWidth(), bounds.getHeight()) * 0.05f);
+        constexpr float labelWidth = 36.0f;
+        constexpr float labelHeight = 24.0f;
 
-        g.setFont(juce::Font(11.0f));
+        g.setFont(juce::Font(10.0f));
 
         if (orientation == AxisOrientation::Vertical)
         {
@@ -248,11 +260,11 @@ public:
 
             g.setColour(textColour.withAlpha(alpha));
             g.drawText(label,
-                       juce::Rectangle<float>(trackX - 60.0f, posY, labelWidth, labelHeight).toNearestInt(),
+                       juce::Rectangle<float>(trackX - 52.0f, posY, labelWidth, labelHeight).toNearestInt(),
                        juce::Justification::centred,
                        true);
             g.drawText(formatAngle(getValue()),
-                       juce::Rectangle<float>(trackX + 15.0f, posY, labelWidth, labelHeight).toNearestInt(),
+                       juce::Rectangle<float>(trackX + 12.0f, posY, labelWidth, labelHeight).toNearestInt(),
                        juce::Justification::centred,
                        true);
 
@@ -276,11 +288,11 @@ public:
 
             g.setColour(textColour.withAlpha(alpha));
             g.drawText(label,
-                       juce::Rectangle<float>(posX + 3.0f, trackY - 35.0f, labelWidth, labelHeight).toNearestInt(),
+                       juce::Rectangle<float>(posX + 2.0f, trackY - 29.0f, labelWidth, labelHeight).toNearestInt(),
                        juce::Justification::centred,
                        true);
             g.drawText(formatAngle(getValue()),
-                       juce::Rectangle<float>(posX + 3.0f, trackY + 22.0f, labelWidth, labelHeight).toNearestInt(),
+                       juce::Rectangle<float>(posX + 2.0f, trackY + 16.0f, labelWidth, labelHeight).toNearestInt(),
                        juce::Justification::centred,
                        true);
 
@@ -369,22 +381,22 @@ void MonitorPanel::paint(juce::Graphics& g)
 
     const int dividerY = getHeight() - BOTTOM_BAR_HEIGHT;
     g.setColour(dividerColour);
-    g.drawHorizontalLine((float) dividerY, 24.0f, (float) getWidth() - 24.0f);
+    g.drawHorizontalLine(dividerY, 24.0f, (float) getWidth() - 24.0f);
 
     if (currentState.monitors.empty())
     {
         g.setColour(dimTextColour.withAlpha(0.9f));
         g.setFont(juce::Font(12.0f));
         g.drawText("No active monitor instances connected",
-                   getLocalBounds().withTrimmedBottom(BOTTOM_BAR_HEIGHT).reduced(24, 20),
-                   juce::Justification::centredBottom,
+                   getLocalBounds().removeFromBottom(BOTTOM_BAR_HEIGHT).reduced(24, 6),
+                   juce::Justification::centred,
                    true);
     }
 }
 
 void MonitorPanel::resized()
 {
-    auto bounds = getLocalBounds().reduced(16, 14);
+    auto bounds = getLocalBounds().reduced(14, 12);
 
     if (embeddedMonitor != nullptr)
     {
@@ -392,27 +404,36 @@ void MonitorPanel::resized()
         return;
     }
 
-    auto bottomBar = bounds.removeFromBottom(BOTTOM_BAR_HEIGHT);
-    settingsButton->setBounds(juce::Rectangle<int>(MENU_BUTTON_WIDTH, MENU_BUTTON_HEIGHT)
-                                  .withCentre({ getWidth() / 2, bottomBar.getCentreY() + 2 }));
-    monitorButton->setBounds(juce::Rectangle<int>(MENU_BUTTON_WIDTH, MENU_BUTTON_HEIGHT)
-                                 .withCentre({ bottomBar.getRight() - MENU_BUTTON_WIDTH / 2, bottomBar.getCentreY() + 2 }));
-
+    bounds.removeFromBottom(BOTTOM_BAR_HEIGHT);
     bounds.removeFromBottom(8);
-    if (bounds.getHeight() < ORIENTATION_SECTION_MIN_HEIGHT)
-        bounds.setHeight(ORIENTATION_SECTION_MIN_HEIGHT);
 
-    auto rightColumn = bounds.removeFromRight(juce::jmin(190, juce::jmax(160, bounds.getWidth() / 3)));
-    auto yawArea = bounds.reduced(6, 0);
+    const int controlSectionWidth = juce::jlimit(CONTROL_SECTION_MIN_WIDTH,
+                                                 CONTROL_SECTION_MAX_WIDTH,
+                                                 juce::roundToInt(bounds.getWidth() * 0.46f));
+    auto controlSection = bounds.removeFromRight(controlSectionWidth);
+    auto menuColumn = controlSection.removeFromRight(MENU_COLUMN_WIDTH);
+    auto sliderColumn = controlSection.reduced(2, 0);
+    auto yawArea = bounds.reduced(4, 0);
 
-    const int yawSize = juce::jmin(yawArea.getWidth(), yawArea.getHeight());
+    const int yawSize = juce::jmin(MAX_YAW_DIAMETER,
+                                   juce::jmin(yawArea.getWidth(), yawArea.getHeight()));
     yawSlider->setBounds(juce::Rectangle<int>(yawSize, yawSize).withCentre(yawArea.getCentre()));
 
-    auto pitchArea = rightColumn.removeFromTop(juce::roundToInt(rightColumn.getHeight() * 0.58f));
-    pitchSlider->setBounds(pitchArea.reduced(8, 12));
+    auto pitchArea = sliderColumn.removeFromTop(juce::roundToInt(sliderColumn.getHeight() * 0.62f));
+    pitchSlider->setBounds(pitchArea.reduced(10, 8));
 
-    rightColumn.removeFromTop(6);
-    rollSlider->setBounds(rightColumn.reduced(8, 6));
+    sliderColumn.removeFromTop(10);
+    rollSlider->setBounds(sliderColumn.reduced(10, 10));
+
+    const int buttonStackHeight = MENU_BUTTON_HEIGHT * 2 + 18;
+    auto menuStack = juce::Rectangle<int>(MENU_BUTTON_WIDTH,
+                                          buttonStackHeight)
+                         .withCentre({ menuColumn.getCentreX(), controlSection.getCentreY() });
+
+    settingsButton->setBounds(juce::Rectangle<int>(MENU_BUTTON_WIDTH, MENU_BUTTON_HEIGHT)
+                                  .withPosition(menuStack.getX(), menuStack.getY()));
+    monitorButton->setBounds(juce::Rectangle<int>(MENU_BUTTON_WIDTH, MENU_BUTTON_HEIGHT)
+                                 .withPosition(menuStack.getX(), menuStack.getBottom() - MENU_BUTTON_HEIGHT));
 }
 
 void MonitorPanel::setMonitorComponent(juce::Component* monitorComponent)

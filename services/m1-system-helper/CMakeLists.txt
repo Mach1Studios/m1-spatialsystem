@@ -72,7 +72,8 @@ target_compile_definitions(${CMAKE_PROJECT_NAME}
     JUCE_APPLICATION_VERSION_STRING="$<TARGET_PROPERTY:${CMAKE_PROJECT_NAME},JUCE_VERSION>"
     JUCE_WEB_BROWSER=0
     JUCE_VST3_CAN_REPLACE_VST2=0
-    JUCE_DISPLAY_SPLASH_SCREEN=0)
+    JUCE_DISPLAY_SPLASH_SCREEN=0
+    GUI_APP=1)
 
 # Disable compiler extensions for the project targets (e.g. use -std=c++17 instead of -std=gnu++17).
 get_property(project_targets DIRECTORY "${PROJECT_SOURCE_DIR}" PROPERTY BUILDSYSTEM_TARGETS)
