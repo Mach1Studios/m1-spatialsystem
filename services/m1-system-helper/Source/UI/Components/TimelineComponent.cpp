@@ -15,7 +15,7 @@ TimelineComponent::TimelineComponent()
     tooltipLabel = std::make_unique<juce::Label>("tooltip", "");
     tooltipLabel->setFont(juce::Font(10.0f));
     tooltipLabel->setColour(juce::Label::textColourId, textColour);
-    tooltipLabel->setColour(juce::Label::backgroundColourId, juce::Colours::black.withAlpha(0.8f));
+    tooltipLabel->setColour(juce::Label::backgroundColourId, HelperUIColours::background.withAlpha(0.8f));
     tooltipLabel->setJustificationType(juce::Justification::centred);
     tooltipLabel->setVisible(false);
     addAndMakeVisible(tooltipLabel.get());

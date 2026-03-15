@@ -112,20 +112,20 @@ private:
     };
     
     // Styling - matching reference design
-    juce::Colour backgroundColour{0xFF0D0D0D};
-    juce::Colour headerColour{0xFF141414};
-    juce::Colour textColour{0xFFCCCCCC};
-    juce::Colour selectedRowColour{0xFF2A2A2A};           // Dark gray for selection
-    juce::Colour memoryShareIndicatorColour{0xFF939393}; // Gray for indicators
-    juce::Colour oscIndicatorColour{0xFFFF9800};          // Orange for OSC
-    juce::Colour editableColour{0xFFCCCCCC};              // Same as text - subtle
-    juce::Colour streamingColour{0xFF939393};             // Gray for streaming
-    juce::Colour nativeColour{0xFF939393};                // Gray for active native
-    juce::Colour offlineColour{0xFF666666};               // Gray for offline
-    juce::Colour expiredColour{0xFFFF4444};               // Red for expired
-    juce::Colour staleColour{0xFFFFAA00};                 // Amber for stale
-    juce::Colour rowAlternateColour{0xFF111111};          // Slight alternate row color
-    juce::Colour borderColour{0xFF2A2A2A};                // Subtle borders
+    juce::Colour backgroundColour{HelperUIColours::background};
+    juce::Colour headerColour{HelperUIColours::toolbar};
+    juce::Colour textColour{HelperUIColours::text};
+    juce::Colour selectedRowColour{HelperUIColours::backgroundAlt};
+    juce::Colour memoryShareIndicatorColour{HelperUIColours::active};
+    juce::Colour oscIndicatorColour{HelperUIColours::osc};
+    juce::Colour editableColour{HelperUIColours::text};
+    juce::Colour streamingColour{HelperUIColours::active};
+    juce::Colour nativeColour{HelperUIColours::active};
+    juce::Colour offlineColour{HelperUIColours::inactive};
+    juce::Colour expiredColour{HelperUIColours::error};
+    juce::Colour staleColour{HelperUIColours::warning};
+    juce::Colour rowAlternateColour{HelperUIColours::gridMinor};
+    juce::Colour borderColour{HelperUIColours::border};
     
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(InputTracklistComponent)
 };
@@ -143,12 +143,12 @@ public:
         setJustificationType(juce::Justification::centredLeft);
         
         // Styling
-        setColour(juce::Label::textColourId, juce::Colour(0xFFE0E0E0));
+        setColour(juce::Label::textColourId, HelperUIColours::text);
         setColour(juce::Label::backgroundColourId, juce::Colours::transparentBlack);
         setColour(juce::Label::outlineColourId, juce::Colours::transparentBlack);
-        setColour(juce::TextEditor::textColourId, juce::Colour(0xFFE0E0E0));
-        setColour(juce::TextEditor::backgroundColourId, juce::Colour(0xFF2A2A2A));
-        setColour(juce::TextEditor::highlightColourId, juce::Colour(0xFF4CAF50));
+        setColour(juce::TextEditor::textColourId, HelperUIColours::text);
+        setColour(juce::TextEditor::backgroundColourId, HelperUIColours::backgroundAlt);
+        setColour(juce::TextEditor::highlightColourId, HelperUIColours::accent);
     }
     
     int getRow() const { return rowIndex; }

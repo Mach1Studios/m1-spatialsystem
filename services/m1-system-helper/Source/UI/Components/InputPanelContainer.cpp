@@ -134,16 +134,16 @@ void InputPanelContainer::updateButtonStates()
     listViewButton->setColour(juce::TextButton::buttonColourId, 
                               isListView ? buttonActiveColour : buttonColour);
     listViewButton->setColour(juce::TextButton::textColourOnId, 
-                              isListView ? juce::Colour(0xFF0D0D0D) : textColour);
+                              isListView ? HelperUIColours::accentText : textColour);
     listViewButton->setColour(juce::TextButton::textColourOffId, 
-                              isListView ? juce::Colour(0xFF0D0D0D) : textColour);
+                              isListView ? HelperUIColours::accentText : textColour);
     
     mixerViewButton->setColour(juce::TextButton::buttonColourId, 
                                !isListView ? buttonActiveColour : buttonColour);
     mixerViewButton->setColour(juce::TextButton::textColourOnId, 
-                               !isListView ? juce::Colour(0xFF0D0D0D) : textColour);
+                               !isListView ? HelperUIColours::accentText : textColour);
     mixerViewButton->setColour(juce::TextButton::textColourOffId, 
-                               !isListView ? juce::Colour(0xFF0D0D0D) : textColour);
+                               !isListView ? HelperUIColours::accentText : textColour);
     
     listViewButton->repaint();
     mixerViewButton->repaint();

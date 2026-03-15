@@ -411,15 +411,38 @@ void OSCHandler::handlePannerSettings(const juce::OSCMessage& message) {
             
             clientManager->sendToClientsOfType(forwardMsg, ClientType::Player);
             
-            // Debug output
-            if (message.size() >= 9) {
-                DBG("[OSCHandler] Panner settings - Port: " + std::to_string(port) + 
-                    ", State: " + std::to_string(state) + 
-                    ", Input Mode: " + std::to_string(message[4].getInt32()) + 
-                    ", Azimuth: " + std::to_string(message[5].getFloat32()) + 
-                    ", Elevation: " + std::to_string(message[6].getFloat32()) + 
-                    ", Diverge: " + std::to_string(message[7].getFloat32()) + 
-                    ", Gain: " + std::to_string(message[8].getFloat32()));
+            // Debug output. Support both legacy and current payload layouts so
+            // logging never trips JUCE's OSC type asserts during mixed-version runs.
+            if (message.size() >= 10 && message[4].isInt32()) {
+                const bool hasOutputMode = message.size() >= 12 && message[5].isInt32();
+                const int outputMode = hasOutputMode ? message[5].getInt32() : -1;
+                const int azimuthIndex = hasOutputMode ? 6 : 5;
+                const int elevationIndex = hasOutputMode ? 7 : 6;
+                const int divergeIndex = hasOutputMode ? 8 : 7;
+                const int gainIndex = hasOutputMode ? 9 : 8;
+                const int pannerModeIndex = hasOutputMode ? 10 : 9;
+
+                if (message.size() > pannerModeIndex
+                    && message[azimuthIndex].isFloat32()
+                    && message[elevationIndex].isFloat32()
+                    && message[divergeIndex].isFloat32()
+                    && message[gainIndex].isFloat32()
+                    && message[pannerModeIndex].isInt32()) {
+                    juce::String debugMessage = "[OSCHandler] Panner settings - Port: "
+                        + juce::String(port)
+                        + ", State: " + juce::String(state)
+                        + ", Input Mode: " + juce::String(message[4].getInt32());
+
+                    if (hasOutputMode)
+                        debugMessage += ", Output Mode: " + juce::String(outputMode);
+
+                    debugMessage += ", Panner Mode: " + juce::String(message[pannerModeIndex].getInt32())
+                        + ", Azimuth: " + juce::String(message[azimuthIndex].getFloat32(), 2)
+                        + ", Elevation: " + juce::String(message[elevationIndex].getFloat32(), 2)
+                        + ", Diverge: " + juce::String(message[divergeIndex].getFloat32(), 2)
+                        + ", Gain: " + juce::String(message[gainIndex].getFloat32(), 2);
+                    DBG(debugMessage);
+                }
             }
         } else {
             DBG("[OSCHandler] Invalid panner settings message size: " + 

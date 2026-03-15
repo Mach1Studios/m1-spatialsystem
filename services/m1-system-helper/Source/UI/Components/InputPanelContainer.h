@@ -78,14 +78,14 @@ private:
     static constexpr int TOOLBAR_HEIGHT = 28;
     
     // Styling - matching reference design
-    juce::Colour backgroundColour{0xFF0D0D0D};
-    juce::Colour toolbarColour{0xFF141414};
-    juce::Colour buttonColour{0xFF1F1F1F};
-    juce::Colour buttonActiveColour{0xFF939393};  // Gray for active state
-    juce::Colour textColour{0xFFCCCCCC};
-    juce::Colour headerTextColour{0xFF808080};    // Dimmer header text
-    juce::Colour separatorColour{0xFF2A2A2A};
-    juce::Colour borderColour{0xFF2A2A2A};
+    juce::Colour backgroundColour{HelperUIColours::background};
+    juce::Colour toolbarColour{HelperUIColours::toolbar};
+    juce::Colour buttonColour{HelperUIColours::gridMajor};
+    juce::Colour buttonActiveColour{HelperUIColours::active};
+    juce::Colour textColour{HelperUIColours::text};
+    juce::Colour headerTextColour{HelperUIColours::textApp};
+    juce::Colour separatorColour{HelperUIColours::separator};
+    juce::Colour borderColour{HelperUIColours::border};
     
     // Update button states
     void updateButtonStates();

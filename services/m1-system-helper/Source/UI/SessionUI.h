@@ -108,8 +108,8 @@ private:
     std::unique_ptr<juce::StretchableLayoutResizerBar> view3DMonitorResizer;
     
     // Styling - matching reference design
-    juce::Colour backgroundColour{0xFF0D0D0D};      // Very dark background
-    juce::Colour resizerColour{0xFF1A1A1A};         // Subtle resizer
+    juce::Colour backgroundColour{HelperUIColours::background};
+    juce::Colour resizerColour{HelperUIColours::separator};
     
     // Debug mode
     bool m_debugFakeBlocks = false;

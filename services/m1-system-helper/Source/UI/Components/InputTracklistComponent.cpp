@@ -22,8 +22,8 @@ InputTracklistComponent::InputTracklistComponent()
     table->setColour(juce::TableListBox::textColourId, textColour);
     table->setColour(juce::TableListBox::outlineColourId, borderColour);
     table->setColour(juce::TableHeaderComponent::backgroundColourId, headerColour);
-    table->setColour(juce::TableHeaderComponent::textColourId, juce::Colour(0xFF808080));
-    table->setColour(juce::TableHeaderComponent::highlightColourId, juce::Colour(0xFF1F1F1F));
+    table->setColour(juce::TableHeaderComponent::textColourId, HelperUIColours::textApp);
+    table->setColour(juce::TableHeaderComponent::highlightColourId, HelperUIColours::gridMajor);
     table->getHeader().setStretchToFitActive(true);
     table->setMultipleSelectionEnabled(false);
     table->setRowHeight(22);  // Compact rows like reference

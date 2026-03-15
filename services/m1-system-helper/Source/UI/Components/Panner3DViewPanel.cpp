@@ -13,8 +13,8 @@
 */
 
 #include "Panner3DViewPanel.h"
-#include <Mach1Encode.h>
 #include <limits>
+#include <unordered_set>
 
 namespace Mach1 {
 
@@ -95,11 +95,6 @@ float getAdditionalReticleSizeMultiplier(int inputMode)
     }
 }
 
-bool usesDirectElevationAxis(int pannerMode)
-{
-    return pannerMode == static_cast<int>(Mach1EncodePannerMode::PeriphonicLinear);
-}
-
 Vec3 convertMach1PointToWorld(const Mach1Point3D& point)
 {
     // Match the panner overlay mapping:
@@ -111,7 +106,16 @@ Vec3 convertMach1PointToWorld(const Mach1Point3D& point)
              juce::jlimit(-1.0f, 1.0f, static_cast<float>(point.y)) };
 }
 
-void buildAdditionalPointSnapshot(const PannerInfo& panner,
+uint64_t getPannerEncoderKey(const PannerInfo& panner)
+{
+    if (panner.processId != 0 || panner.port != 0)
+        return (static_cast<uint64_t>(panner.processId) << 32) | static_cast<uint32_t>(panner.port);
+
+    return static_cast<uint64_t>(std::hash<std::string>{}(panner.name));
+}
+
+void buildAdditionalPointSnapshot(Mach1Encode<float>& encode,
+                                  const PannerInfo& panner,
                                   std::vector<juce::Point<float>>& positions,
                                   std::vector<Vec3>& worldPositions,
                                   std::vector<juce::String>& labels)
@@ -123,7 +127,6 @@ void buildAdditionalPointSnapshot(const PannerInfo& panner,
     if (panner.inputMode <= static_cast<int>(Mach1EncodeInputMode::Mono))
         return;
 
-    Mach1Encode<float> encode;
     encode.setInputMode(static_cast<Mach1EncodeInputMode>(
         juce::jlimit(static_cast<int>(Mach1EncodeInputMode::Mono),
                      static_cast<int>(Mach1EncodeInputMode::B3OAFUMA),
@@ -180,6 +183,7 @@ Panner3DViewPanel::~Panner3DViewPanel()
 void Panner3DViewPanel::updatePannerData(const std::vector<PannerInfo>& panners)
 {
     reticles.clear();
+    std::unordered_set<uint64_t> activeEncoderKeys;
     
     int index = 0;
     for (const auto& panner : panners)
@@ -193,29 +197,26 @@ void Panner3DViewPanel::updatePannerData(const std::vector<PannerInfo>& panners)
         reticle.inputMode = panner.inputMode;
         reticle.pannerMode = panner.pannerMode;
         reticle.topDownSquarePosition = convertReticleToSquareSpace(panner.azimuth, panner.diverge);
-        buildAdditionalPointSnapshot(panner,
+        const auto encoderKey = getPannerEncoderKey(panner);
+        activeEncoderKeys.insert(encoderKey);
+        auto& encoder = pannerEncoders[encoderKey];
+        if (encoder == nullptr)
+            encoder = std::make_unique<Mach1Encode<float>>();
+
+        buildAdditionalPointSnapshot(*encoder,
+                                     panner,
                                      reticle.additionalPointPositions,
                                      reticle.additionalPointWorldPositions,
                                      reticle.additionalPointLabels);
 
-        if (usesDirectElevationAxis(reticle.pannerMode))
-        {
-            // Periphonic mode keeps the panner in the panner's square-space XY field,
-            // with elevation applied directly on Z.
-            reticle.position = {
-                reticle.topDownSquarePosition.x * CUBE_SIZE,
-                -reticle.topDownSquarePosition.y * CUBE_SIZE,
-                juce::jlimit(-1.0f, 1.0f, panner.elevation / 90.0f) * CUBE_SIZE
-            };
-        }
-        else
-        {
-            // Isotropic modes keep the previous spherical elevation behavior in 3D.
-            const float signedDiverge = juce::jlimit(-1.0f, 1.0f, panner.diverge / 100.0f);
-            reticle.position = Vec3::fromAED(panner.azimuth,
-                                             panner.elevation,
-                                             signedDiverge * MAX_RETICLE_DISTANCE);
-        }
+        // The main reticle should always follow the panner's direct XYZ-style field
+        // placement, regardless of isotropic/periphonic mode. Only the additional
+        // channel reticles should reflect the current Mach1Encode mode math.
+        reticle.position = {
+            reticle.topDownSquarePosition.x * CUBE_SIZE,
+            -reticle.topDownSquarePosition.y * CUBE_SIZE,
+            juce::jlimit(-1.0f, 1.0f, panner.elevation / 90.0f) * CUBE_SIZE
+        };
         
         // Use panner name or index as label
         reticle.label = panner.name.empty() 
@@ -226,7 +227,7 @@ void Panner3DViewPanel::updatePannerData(const std::vector<PannerInfo>& panners)
         if (panner.isMemoryShareBased) {
             reticle.colour = reticleColour;  // Gray
         } else {
-            reticle.colour = juce::Colour(0xFFFF9800);  // Orange for OSC
+            reticle.colour = HelperUIColours::osc;
         }
         
         reticle.isSelected = (index == selectedPannerIndex);
@@ -234,6 +235,14 @@ void Panner3DViewPanel::updatePannerData(const std::vector<PannerInfo>& panners)
         
         reticles.push_back(reticle);
         index++;
+    }
+
+    for (auto it = pannerEncoders.begin(); it != pannerEncoders.end();)
+    {
+        if (activeEncoderKeys.find(it->first) == activeEncoderKeys.end())
+            it = pannerEncoders.erase(it);
+        else
+            ++it;
     }
     
     repaint();
@@ -282,21 +291,13 @@ void Panner3DViewPanel::paint(juce::Graphics& g)
     // Draw toolbar with view buttons
     drawToolbar(g);
     
-    if (camera.preset == CameraPreset::TopDown)
-    {
-        drawTopDownField(g);
-        drawCornerGizmo(g);
-    }
-    else
-    {
-        // Draw 3D content
+    // TOP and 3D share the same renderer; TOP is simply the fixed top-down camera preset.
         drawFloorGrid(g);
         drawWireframeCube(g);
         drawListenerPosition(g);
         drawDirectionLabels(g);
         drawPannerReticles(g);
         drawCornerGizmo(g);
-    }
 
     drawCameraInfo(g);
     
@@ -325,7 +326,7 @@ void Panner3DViewPanel::drawToolbar(juce::Graphics& g)
     g.drawHorizontalLine(TOOLBAR_HEIGHT - 1, 0, (float)getWidth());
     
     // Section title "SOUNDFIELD DISPLAY" like the reference
-    g.setColour(juce::Colour(0xFF808080));
+    g.setColour(HelperUIColours::textApp);
     g.setFont(juce::Font(11.0f, juce::Font::bold));
     g.drawText("SOUNDFIELD DISPLAY", toolbarArea.withLeft(10), juce::Justification::centredLeft);
     
@@ -350,7 +351,7 @@ void Panner3DViewPanel::drawToolbar(juce::Graphics& g)
     bool isFront = (camera.preset == CameraPreset::Front);
     g.setColour(isFront ? buttonActiveColour : buttonColour);
     g.fillRoundedRectangle(frontViewButtonBounds.toFloat(), 2.0f);
-    g.setColour(isFront ? juce::Colour(0xFF0D0D0D) : textColour);
+    g.setColour(isFront ? HelperUIColours::accentText : textColour);
     g.drawText("3D", frontViewButtonBounds, juce::Justification::centred);
     
     // Top-Down button
@@ -359,7 +360,7 @@ void Panner3DViewPanel::drawToolbar(juce::Graphics& g)
     bool isTopDown = (camera.preset == CameraPreset::TopDown);
     g.setColour(isTopDown ? buttonActiveColour : buttonColour);
     g.fillRoundedRectangle(topDownButtonBounds.toFloat(), 2.0f);
-    g.setColour(isTopDown ? juce::Colour(0xFF0D0D0D) : textColour);
+    g.setColour(isTopDown ? HelperUIColours::accentText : textColour);
     g.drawText("TOP", topDownButtonBounds, juce::Justification::centred);
 }
 
@@ -746,7 +747,7 @@ void Panner3DViewPanel::drawListenerPosition(juce::Graphics& g)
     
     // Draw listener icon (small filled circle)
     float listenerRadius = 4.0f * camera.zoom;
-    g.setColour(juce::Colour(0xFFFFFFFF).withAlpha(0.6f));
+    g.setColour(HelperUIColours::active.withAlpha(0.6f));
     g.fillEllipse(centerPos.x - listenerRadius, centerPos.y - listenerRadius,
                   listenerRadius * 2, listenerRadius * 2);
     
@@ -773,7 +774,7 @@ void Panner3DViewPanel::drawCornerGizmo(juce::Graphics& g)
     const float cy = TOOLBAR_HEIGHT + margin + axisLen + 4;
     const float bgRadius = axisLen + 6;
     
-    g.setColour(juce::Colour(0x25000000));
+    g.setColour(HelperUIColours::background.withAlpha(0.15f));
     g.fillEllipse(cx - bgRadius, cy - bgRadius, bgRadius * 2, bgRadius * 2);
     
     Vec3 xDir = rotateByCamera(Vec3{1, 0, 0});
@@ -1058,22 +1059,6 @@ int Panner3DViewPanel::findReticleAtPoint(juce::Point<int> screenPos)
     if (screenPos.y < TOOLBAR_HEIGHT)
         return -1;
 
-    if (camera.preset == CameraPreset::TopDown)
-    {
-        const auto fieldBounds = getTopDownFieldBounds();
-        for (int i = static_cast<int>(reticles.size()) - 1; i >= 0; --i)
-        {
-            const auto projected = projectTopDownFieldPoint(fieldBounds, reticles[static_cast<size_t>(i)].topDownSquarePosition);
-            const float dist = std::sqrt(std::pow(projected.x - screenPos.x, 2) +
-                                         std::pow(projected.y - screenPos.y, 2));
-
-            if (dist < 16.0f)
-                return i;
-        }
-
-        return -1;
-    }
-    
     // Search in reverse depth order (front reticles first)
     std::vector<std::pair<float, int>> sortedByDepth;
     for (int i = 0; i < static_cast<int>(reticles.size()); ++i)

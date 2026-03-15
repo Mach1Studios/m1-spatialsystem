@@ -521,6 +521,7 @@ PannerInfo PannerTrackingManager::convertFromOSC(const M1RegisteredPlugin& plugi
     
     // Modes
     panner.inputMode = plugin.inputMode;
+    panner.outputMode = plugin.outputMode;
     panner.pannerMode = plugin.pannerMode;
     panner.autoOrbit = plugin.autoOrbit;
     

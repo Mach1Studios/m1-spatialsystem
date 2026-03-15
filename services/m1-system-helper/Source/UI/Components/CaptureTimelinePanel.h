@@ -17,6 +17,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include "../../Common/Common.h"
 #include "../../Core/CaptureEngine.h"
 #include "../../Core/CoverageModel.h"
 #include "FlatButtonLookAndFeel.h"
@@ -113,19 +114,19 @@ private:
     std::unique_ptr<juce::ToggleButton> m_autoZoomToggle;
     
     // Colors - matching reference design
-    juce::Colour m_backgroundColour{0xFF0D0D0D};
-    juce::Colour m_toolbarColour{0xFF141414};
-    juce::Colour m_timelineBackgroundColour{0xFF111111};
-    juce::Colour m_coverageColour{0xFF939393};         // Gray for captured intervals
-    juce::Colour m_partialDropoutColour{0xFFFFAA00};   // Amber for partial dropout
-    juce::Colour m_totalDropoutColour{0xFFFF4444};     // Red for total dropout
-    juce::Colour m_playheadColour{0xFFFFFFFF};         // White for playhead
-    juce::Colour m_rulerColour{0xFF333333};
-    juce::Colour m_textColour{0xFFCCCCCC};
-    juce::Colour m_headerTextColour{0xFF808080};       // Dimmer header text
-    juce::Colour m_borderColour{0xFF2A2A2A};
-    juce::Colour m_buttonColour{0xFF1F1F1F};
-    juce::Colour m_buttonActiveColour{0xFF939393};     // Gray for active state
+    juce::Colour m_backgroundColour{HelperUIColours::background};
+    juce::Colour m_toolbarColour{HelperUIColours::toolbar};
+    juce::Colour m_timelineBackgroundColour{HelperUIColours::gridMinor};
+    juce::Colour m_coverageColour{HelperUIColours::active};
+    juce::Colour m_partialDropoutColour{HelperUIColours::warning};
+    juce::Colour m_totalDropoutColour{HelperUIColours::error};
+    juce::Colour m_playheadColour{HelperUIColours::accent};
+    juce::Colour m_rulerColour{HelperUIColours::gridMajor};
+    juce::Colour m_textColour{HelperUIColours::text};
+    juce::Colour m_headerTextColour{HelperUIColours::textApp};
+    juce::Colour m_borderColour{HelperUIColours::border};
+    juce::Colour m_buttonColour{HelperUIColours::gridMajor};
+    juce::Colour m_buttonActiveColour{HelperUIColours::active};
     
     // Drawing methods
     void drawHeader(juce::Graphics& g);

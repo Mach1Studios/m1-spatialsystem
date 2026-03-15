@@ -305,8 +305,8 @@ InputMixerComponent::InputMixerComponent()
     viewport = std::make_unique<juce::Viewport>();
     viewport->setViewedComponent(stripContainer.get(), false);
     viewport->setScrollBarsShown(false, true);  // Only horizontal scrollbar
-    viewport->getHorizontalScrollBar().setColour(juce::ScrollBar::thumbColourId, juce::Colour(0xFF606060));
-    viewport->getHorizontalScrollBar().setColour(juce::ScrollBar::trackColourId, juce::Colour(0xFF303030));
+    viewport->getHorizontalScrollBar().setColour(juce::ScrollBar::thumbColourId, HelperUIColours::textDim);
+    viewport->getHorizontalScrollBar().setColour(juce::ScrollBar::trackColourId, HelperUIColours::gridMajor);
     addAndMakeVisible(viewport.get());
 }
 
@@ -368,7 +368,7 @@ void InputMixerComponent::paint(juce::Graphics& g)
     // Draw message if no panners
     if (pannerData.empty())
     {
-        g.setColour(juce::Colour(0xFF606060));
+        g.setColour(HelperUIColours::textDim);
         g.setFont(juce::Font(12.0f));
         g.drawText("No panners connected", getLocalBounds(), juce::Justification::centred);
     }

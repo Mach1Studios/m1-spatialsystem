@@ -252,10 +252,10 @@ void SessionMainComponent::updateFromManager()
 
 SessionUI::MyMenuBarModel::MyMenuBarModel()
 {
-    // Set up dummy menu for macOS compatibility
-    juce::PopupMenu dummyMenu;
-    dummyMenu.addItem("Dummy", [](){});
-    juce::MenuBarModel::setMacMainMenu(this, &dummyMenu);
+    // Register the model without passing a temporary PopupMenu pointer.
+    // AppKit may consult the extra Apple menu items long after this constructor
+    // returns, so handing it a stack object can leave dangling state.
+    juce::MenuBarModel::setMacMainMenu(this);
 }
 
 SessionUI::MyMenuBarModel::~MyMenuBarModel()
@@ -428,7 +428,7 @@ void SessionUI::showSessionWindow()
         // Create the window with darker background matching reference
         sessionWindow = std::make_unique<SessionDocumentWindow>(
             "Mach1 Spatial System",
-            juce::Colour(0xFF0D0D0D),  // Very dark background
+            HelperUIColours::background,
             juce::DocumentWindow::allButtons);
         
         sessionWindow->setContentNonOwned(mainComponent.get(), false);

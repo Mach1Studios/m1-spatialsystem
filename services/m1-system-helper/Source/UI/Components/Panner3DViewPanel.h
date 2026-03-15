@@ -27,9 +27,11 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include <Mach1Encode.h>
 #include "../../Managers/PannerTrackingManager.h"
 #include <vector>
 #include <functional>
+#include <unordered_map>
 
 namespace Mach1 {
 
@@ -248,6 +250,7 @@ private:
     
     // Data
     std::vector<PannerReticle> reticles;
+    std::unordered_map<uint64_t, std::unique_ptr<Mach1Encode<float>>> pannerEncoders;
     int selectedPannerIndex = -1;
     
     // Camera state
@@ -266,25 +269,25 @@ private:
     static constexpr int TOOLBAR_HEIGHT = 28;
     
     // Styling - matching reference design
-    juce::Colour backgroundColour{0xFF0D0D0D};
-    juce::Colour cubeColour{0xFF333333};
-    juce::Colour gridColour{0xFF1A1A1A};
-    juce::Colour floorGridColour{0xFF222222};
+    juce::Colour backgroundColour{HelperUIColours::background};
+    juce::Colour cubeColour{HelperUIColours::gridMajor};
+    juce::Colour gridColour{HelperUIColours::gridMinor};
+    juce::Colour floorGridColour{HelperUIColours::gridMinor};
     
     // Axis colors (muted gray to match UI style)
-    juce::Colour axisXColour{0xFF6B6B6B};  // X (left/right)
-    juce::Colour axisYColour{0xFF6B6B6B};  // Y (front/back)
-    juce::Colour axisZColour{0xFF6B6B6B};  // Z (up/down)
+    juce::Colour axisXColour{HelperUIColours::textApp};  // X (left/right)
+    juce::Colour axisYColour{HelperUIColours::textApp};  // Y (front/back)
+    juce::Colour axisZColour{HelperUIColours::textApp};  // Z (up/down)
     
-    juce::Colour reticleColour{0xFF939393};
-    juce::Colour selectedReticleColour{0xFFFFAA00};  // m1-yellow
-    juce::Colour textColour{0xFFCCCCCC};
-    juce::Colour labelBackgroundColour{0xDD0D0D0D};
-    juce::Colour buttonColour{0xFF1F1F1F};
-    juce::Colour buttonHoverColour{0xFF2A2A2A};
-    juce::Colour buttonActiveColour{0xFF939393};
-    juce::Colour toolbarColour{0xFF141414};
-    juce::Colour borderColour{0xFF2A2A2A};
+    juce::Colour reticleColour{HelperUIColours::active};
+    juce::Colour selectedReticleColour{HelperUIColours::accent};
+    juce::Colour textColour{HelperUIColours::text};
+    juce::Colour labelBackgroundColour{HelperUIColours::background};
+    juce::Colour buttonColour{HelperUIColours::gridMajor};
+    juce::Colour buttonHoverColour{HelperUIColours::gridEmphasis};
+    juce::Colour buttonActiveColour{HelperUIColours::active};
+    juce::Colour toolbarColour{HelperUIColours::toolbar};
+    juce::Colour borderColour{HelperUIColours::border};
     
     // Configuration
     static constexpr float CUBE_SIZE = 1.0f;

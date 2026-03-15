@@ -1,6 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include "../../Common/Common.h"
 #include <functional>
 #include <vector>
 
@@ -51,14 +52,14 @@ private:
 
     juce::Component* embeddedMonitor = nullptr;
 
-    juce::Colour dialFaceColour{juce::Colour::fromRGBA(68, 68, 68, 51)};
-    juce::Colour dividerColour{juce::Colour::fromRGBA(68, 68, 68, 178)};
-    juce::Colour guideColour{0xFFBEBEBE};
-    juce::Colour textColour{0xFF5D5D5D};
-    juce::Colour dimTextColour{0xFF5D5D5D};
-    juce::Colour accentColour{0xFFFFC61E};
-    juce::Colour trackColour{0xFF858585};
-    juce::Colour disabledColour{0xFF3F3F3F};
+    juce::Colour dialFaceColour{HelperUIColours::gridMinor};
+    juce::Colour dividerColour{HelperUIColours::border};
+    juce::Colour guideColour{HelperUIColours::active};
+    juce::Colour textColour{HelperUIColours::textDim};
+    juce::Colour dimTextColour{HelperUIColours::textDim};
+    juce::Colour accentColour{HelperUIColours::accent};
+    juce::Colour trackColour{HelperUIColours::textApp};
+    juce::Colour disabledColour{HelperUIColours::inactive};
 
     static constexpr int BOTTOM_BAR_HEIGHT = 20;
     static constexpr int MENU_BUTTON_WIDTH = 108;

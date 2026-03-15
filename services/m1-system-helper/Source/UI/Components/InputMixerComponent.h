@@ -82,19 +82,19 @@ private:
     juce::Rectangle<float> gainReadoutBounds;
     
     // Styling - matching reference design
-    juce::Colour backgroundColour{0xFF141414};
-    juce::Colour meterBackgroundColour{0xFF0D0D0D};
-    juce::Colour meterGreenColour{0xFF939393};        // Gray for meters
-    juce::Colour meterYellowColour{0xFFFFAA00};       // Amber
-    juce::Colour meterRedColour{0xFFFF4444};          // Red
-    juce::Colour faderTrackColour{0xFF2A2A2A};
-    juce::Colour faderThumbColour{0xFFCCCCCC};
-    juce::Colour textColour{0xFFCCCCCC};
-    juce::Colour dimTextColour{0xFF666666};
-    juce::Colour selectedColour{0xFFFFAA00};          // Amber for selection
-    juce::Colour memShareColour{0xFF939393};          // Gray for indicators
-    juce::Colour oscColour{0xFFFF9800};
-    juce::Colour borderColour{0xFF2A2A2A};
+    juce::Colour backgroundColour{HelperUIColours::toolbar};
+    juce::Colour meterBackgroundColour{HelperUIColours::background};
+    juce::Colour meterGreenColour{HelperUIColours::success};
+    juce::Colour meterYellowColour{HelperUIColours::warning};
+    juce::Colour meterRedColour{HelperUIColours::error};
+    juce::Colour faderTrackColour{HelperUIColours::backgroundAlt};
+    juce::Colour faderThumbColour{HelperUIColours::text};
+    juce::Colour textColour{HelperUIColours::text};
+    juce::Colour dimTextColour{HelperUIColours::textDim};
+    juce::Colour selectedColour{HelperUIColours::accent};
+    juce::Colour memShareColour{HelperUIColours::active};
+    juce::Colour oscColour{HelperUIColours::osc};
+    juce::Colour borderColour{HelperUIColours::border};
     
     // Interaction state
     bool isDraggingFader = false;
@@ -150,8 +150,8 @@ private:
     static constexpr int HEADER_HEIGHT = 0;  // No header, container has toolbar
     
     // Styling - matching reference design
-    juce::Colour backgroundColour{0xFF0D0D0D};
-    juce::Colour separatorColour{0xFF1A1A1A};
+    juce::Colour backgroundColour{HelperUIColours::background};
+    juce::Colour separatorColour{HelperUIColours::separator};
     
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(InputMixerComponent)
 };

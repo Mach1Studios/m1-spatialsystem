@@ -114,13 +114,13 @@ private:
     juce::Rectangle<int> timeLabelBounds;
     
     // Styling
-    juce::Colour backgroundColour{0xFF1A1A1A};
-    juce::Colour timelineColour{0xFF404040};
-    juce::Colour acknowledgedBufferColour{0xFFFFFFFF};  // White for acknowledged
-    juce::Colour missingBufferColour{0xFFFF0000};       // Red for missing
-    juce::Colour playheadColour{0xFF00FF00};            // Green for playhead
-    juce::Colour selectedBufferColour{0xFF0078D4};      // Blue for selection
-    juce::Colour textColour{0xFFE0E0E0};
+    juce::Colour backgroundColour{HelperUIColours::background};
+    juce::Colour timelineColour{HelperUIColours::gridMajor};
+    juce::Colour acknowledgedBufferColour{HelperUIColours::active};
+    juce::Colour missingBufferColour{HelperUIColours::error};
+    juce::Colour playheadColour{HelperUIColours::accent};
+    juce::Colour selectedBufferColour{HelperUIColours::warning};
+    juce::Colour textColour{HelperUIColours::text};
     
     // Configuration
     static constexpr int BUFFER_LINE_WIDTH = 2;

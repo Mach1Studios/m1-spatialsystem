@@ -35,7 +35,7 @@ CaptureTimelinePanel::CaptureTimelinePanel()
     m_lockRangeButton->setColour(juce::TextButton::buttonColourId, m_buttonColour);
     m_lockRangeButton->setColour(juce::TextButton::textColourOffId, m_textColour);
     m_lockRangeButton->setColour(juce::TextButton::buttonOnColourId, m_buttonActiveColour);
-    m_lockRangeButton->setColour(juce::TextButton::textColourOnId, juce::Colour(0xFF0D0D0D));
+    m_lockRangeButton->setColour(juce::TextButton::textColourOnId, HelperUIColours::accentText);
     m_lockRangeButton->setClickingTogglesState(true);
     m_lockRangeButton->onClick = [this]() {
         m_rangeLocked = m_lockRangeButton->getToggleState();
@@ -68,7 +68,7 @@ CaptureTimelinePanel::CaptureTimelinePanel()
     m_fillGapsToggle->setLookAndFeel(&m_flatButtonLookAndFeel);
     m_fillGapsToggle->setColour(juce::ToggleButton::textColourId, m_textColour);
     m_fillGapsToggle->setColour(juce::ToggleButton::tickColourId, m_textColour);
-    m_fillGapsToggle->setColour(juce::ToggleButton::tickDisabledColourId, juce::Colour(0xFF666666));
+    m_fillGapsToggle->setColour(juce::ToggleButton::tickDisabledColourId, HelperUIColours::inactive);
     m_fillGapsToggle->onClick = [this]() {
         m_fillGapsOnly = m_fillGapsToggle->getToggleState();
         // TODO: Implement fill-gaps-only capture mode
@@ -79,7 +79,7 @@ CaptureTimelinePanel::CaptureTimelinePanel()
     m_autoZoomToggle->setLookAndFeel(&m_flatButtonLookAndFeel);
     m_autoZoomToggle->setColour(juce::ToggleButton::textColourId, m_textColour);
     m_autoZoomToggle->setColour(juce::ToggleButton::tickColourId, m_textColour);
-    m_autoZoomToggle->setColour(juce::ToggleButton::tickDisabledColourId, juce::Colour(0xFF666666));
+    m_autoZoomToggle->setColour(juce::ToggleButton::tickDisabledColourId, HelperUIColours::inactive);
     m_autoZoomToggle->setToggleState(true, juce::dontSendNotification);
     m_autoZoomToggle->onClick = [this]() {
         m_autoZoom = m_autoZoomToggle->getToggleState();
@@ -287,7 +287,7 @@ void CaptureTimelinePanel::drawHeader(juce::Graphics& g)
                    juce::Justification::centredRight);
         
         // Draw capture indicator (red dot when capturing - like a record indicator)
-        g.setColour(juce::Colour(0xFFFF4444));
+        g.setColour(HelperUIColours::error);
         g.fillEllipse(m_headerBounds.getRight() - 20.0f, m_headerBounds.getCentreY() - 4.0f, 8.0f, 8.0f);
     }
     

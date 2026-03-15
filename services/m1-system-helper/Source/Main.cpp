@@ -297,11 +297,20 @@ public:
         
         if (debugFakePannerCount > 0)
         {
-            DBG("[M1SystemHelper] Creating " + juce::String(debugFakePannerCount) + " fake panners for testing");
-            fakePannerSimulator = std::make_unique<Mach1::FakePannerSimulator>(
-                Mach1::M1SystemHelperService::getInstance().getPannerTrackingManager(),
-                debugFakePannerCount
-            );
+            // Defer fake-panner timer creation until the message loop is fully
+            // running. Creating JUCE timers during app initialisation can upset
+            // AppKit's startup state on macOS.
+            juce::MessageManager::callAsync([this]()
+            {
+                if (fakePannerSimulator != nullptr || debugFakePannerCount <= 0)
+                    return;
+
+                DBG("[M1SystemHelper] Creating " + juce::String(debugFakePannerCount) + " fake panners for testing");
+                fakePannerSimulator = std::make_unique<Mach1::FakePannerSimulator>(
+                    Mach1::M1SystemHelperService::getInstance().getPannerTrackingManager(),
+                    debugFakePannerCount
+                );
+            });
         }
         
         if (!keepAlive)
@@ -344,9 +353,13 @@ public:
         }
     }
     
-    void anotherInstanceStarted(const juce::String&) override { 
-        DBG("[M1SystemHelper] Another instance started, quitting");
-        quit(); 
+    void anotherInstanceStarted(const juce::String& commandLine) override {
+        juce::ignoreUnused(commandLine);
+
+        // The already-running tray helper should remain alive when macOS delivers
+        // a reopen/open-files event or when a second launch attempt occurs. Quitting
+        // from this callback can abort AppKit while NSApplication is still starting.
+        DBG("[M1SystemHelper] Another launch request received; keeping existing instance alive");
     }
 
 private:

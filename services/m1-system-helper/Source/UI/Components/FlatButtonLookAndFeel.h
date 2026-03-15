@@ -7,6 +7,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include "../../Common/Common.h"
 
 namespace Mach1 {
 
@@ -20,15 +21,15 @@ public:
     FlatButtonLookAndFeel()
     {
         // Set default colors
-        setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF1F1F1F));
-        setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xFF939393));
-        setColour(juce::TextButton::textColourOffId, juce::Colour(0xFFCCCCCC));
-        setColour(juce::TextButton::textColourOnId, juce::Colour(0xFF0D0D0D));
+        setColour(juce::TextButton::buttonColourId, HelperUIColours::gridMajor);
+        setColour(juce::TextButton::buttonOnColourId, HelperUIColours::active);
+        setColour(juce::TextButton::textColourOffId, HelperUIColours::text);
+        setColour(juce::TextButton::textColourOnId, HelperUIColours::accentText);
         
         // Toggle button colors
-        setColour(juce::ToggleButton::textColourId, juce::Colour(0xFFCCCCCC));
-        setColour(juce::ToggleButton::tickColourId, juce::Colour(0xFFCCCCCC));
-        setColour(juce::ToggleButton::tickDisabledColourId, juce::Colour(0xFF666666));
+        setColour(juce::ToggleButton::textColourId, HelperUIColours::text);
+        setColour(juce::ToggleButton::tickColourId, HelperUIColours::text);
+        setColour(juce::ToggleButton::tickDisabledColourId, HelperUIColours::inactive);
     }
     
     void drawButtonBackground(juce::Graphics& g,
@@ -107,15 +108,15 @@ public:
     {
         auto bounds = juce::Rectangle<float>(x, y, w, h);
         
-        g.setColour(juce::Colour(0xFF1F1F1F));
+        g.setColour(HelperUIColours::gridMajor);
         g.fillRoundedRectangle(bounds, 2.0f);
         
-        g.setColour(juce::Colour(0xFF3A3A3A));
+        g.setColour(HelperUIColours::border);
         g.drawRoundedRectangle(bounds, 2.0f, 1.0f);
         
         if (ticked)
         {
-            auto tickColour = isEnabled ? juce::Colour(0xFFCCCCCC) : juce::Colour(0xFF666666);
+            auto tickColour = isEnabled ? HelperUIColours::text : HelperUIColours::inactive;
             g.setColour(tickColour);
             
             auto tickBounds = bounds.reduced(3.0f);
