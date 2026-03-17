@@ -130,6 +130,7 @@ public:
     
     // Debug mode
     void setDebugFakeBlocks(bool enabled) { m_debugFakeBlocks = enabled; }
+    void showStatusWindow();
 
     // SystemTrayIconComponent overrides
     void mouseDown(const juce::MouseEvent& event) override;
@@ -148,6 +149,7 @@ private:
     // Icon management
     void updateTrayIcon();
     juce::Image createTrayIcon(bool isActive);
+    void loadTrayIcon();
     
     // Components
     PannerTrackingManager& pannerManager;
@@ -163,6 +165,7 @@ private:
     bool lastOSCStatus;
     bool isMenuTimer = false;  // Flag to distinguish menu vs data timers
     bool m_debugFakeBlocks = false;  // Debug mode for fake block generation
+    juce::Image trayIconSource;
     
     // MenuBarModel for macOS compatibility
     class MyMenuBarModel : public juce::MenuBarModel

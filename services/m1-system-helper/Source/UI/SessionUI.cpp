@@ -5,6 +5,7 @@
 */
 
 #include "SessionUI.h"
+#include "BinaryData.h"
 
 namespace Mach1 {
 
@@ -278,8 +279,10 @@ SessionUI::SessionUI(PannerTrackingManager& manager, ClientManager& clientManage
       m_debugFakeBlocks(debugFakeBlocks)
 {
     DBG("[SessionUI] Constructor started - using timer-based system tray");
-    
+
+    loadTrayIcon();
     updateStatus();
+    setIconTooltip("Mach1 Spatial System Helper");
     
     // Keep tray status reasonably fresh without rebuilding native tray assets every 100ms.
     startTimer(kTrayStatusUpdateIntervalMs);
@@ -294,6 +297,12 @@ SessionUI::~SessionUI()
     mainComponent = nullptr;
     sessionWindow = nullptr;
     trayMenu = nullptr;
+}
+
+void SessionUI::showStatusWindow()
+{
+    juce::Process::makeForegroundProcess();
+    showSessionWindow();
 }
 
 void SessionUI::mouseDown(const juce::MouseEvent& event)
@@ -514,22 +523,57 @@ void SessionUI::updateTrayIcon()
     
     auto icon = createTrayIcon(isActive);
     setIconImage(icon, icon);
+    setIconTooltip("Mach1 Spatial System Helper");
 }
 
 juce::Image SessionUI::createTrayIcon(bool isActive)
 {
-    juce::Image icon(juce::Image::ARGB, 32, 32, true);
-    juce::Graphics g(icon);
-    
+    loadTrayIcon();
+
+    if (trayIconSource.isValid())
+    {
+        constexpr int outputSize = 64;
+        constexpr int glyphSize = 80;
+
+        juce::Image icon(juce::Image::ARGB, outputSize, outputSize, true);
+        auto scaled = trayIconSource.rescaled(glyphSize, glyphSize, juce::Graphics::highResamplingQuality);
+        const int offsetX = (outputSize - glyphSize) / 2;
+        const int offsetY = (outputSize - glyphSize) / 2;
+        const float targetAlpha = isActive ? 1.0f : 0.55f;
+
+        for (int y = 0; y < scaled.getHeight(); ++y)
+        {
+            for (int x = 0; x < scaled.getWidth(); ++x)
+            {
+                const auto pixel = scaled.getPixelAt(x, y);
+                if (pixel.getFloatAlpha() <= 0.0f || pixel.getPerceivedBrightness() < 0.2f)
+                    continue;
+
+                icon.setPixelAt(offsetX + x, offsetY + y,
+                                juce::Colours::white.withAlpha(pixel.getFloatAlpha() * targetAlpha));
+            }
+        }
+
+        return icon;
+    }
+
+    juce::Image fallback(juce::Image::ARGB, 32, 32, true);
+    juce::Graphics g(fallback);
+
     g.fillAll(juce::Colours::transparentBlack);
-    g.setColour(isActive ? juce::Colours::green : juce::Colours::grey);
+    g.setColour(isActive ? juce::Colours::white : juce::Colours::white.withAlpha(0.55f));
     g.setFont(24.0f);
-    
-    // Draw "M1" for Mach1
-    juce::String text = "M1";
-    g.drawText(text, 0, 0, 32, 32, juce::Justification::centred, true);
-    
-    return icon;
+    g.drawText("M1", 0, 0, 32, 32, juce::Justification::centred, true);
+
+    return fallback;
+}
+
+void SessionUI::loadTrayIcon()
+{
+    if (trayIconSource.isValid())
+        return;
+
+    trayIconSource = juce::ImageFileFormat::loadFrom(BinaryData::icon_png, BinaryData::icon_pngSize);
 }
 
 } // namespace Mach1

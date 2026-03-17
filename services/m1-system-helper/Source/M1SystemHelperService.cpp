@@ -66,6 +66,19 @@ M1SystemHelperService& M1SystemHelperService::getInstance() {
     return instance;
 }
 
+void M1SystemHelperService::ensureSessionUICreated()
+{
+    if (!showSessionUI || sessionUI || !pannerTrackingManager || !clientManager || !oscHandler)
+        return;
+
+    sessionUI = std::make_unique<SessionUI>(*pannerTrackingManager, *clientManager, *oscHandler, debugFakeBlocks);
+    sessionUI->setVisible(true);
+    DBG("[M1SystemHelperService] Created system tray icon on main thread");
+
+    if (debugFakeBlocks)
+        DBG("[M1SystemHelperService] Debug fake blocks enabled");
+}
+
 void M1SystemHelperService::initialise() {
     // Start panner tracking manager
     if (pannerTrackingManager) {
@@ -76,18 +89,25 @@ void M1SystemHelperService::initialise() {
     // Schedule system tray icon creation on the main thread if enabled
     if (showSessionUI && pannerTrackingManager) {
         juce::MessageManager::callAsync([this]() {
-            if (pannerTrackingManager && showSessionUI) {
-                sessionUI = std::make_unique<SessionUI>(*pannerTrackingManager, *clientManager, *oscHandler, debugFakeBlocks);
-                sessionUI->setVisible(true);  // Shows system tray icon
-                DBG("[M1SystemHelperService] Created system tray icon on main thread");
-                if (debugFakeBlocks) {
-                    DBG("[M1SystemHelperService] Debug fake blocks enabled");
-                }
-            }
+            ensureSessionUICreated();
         });
     }
     
     startTimer(TRACKING_UPDATE_INTERVAL_MS); // Keep helper state responsive
+}
+
+void M1SystemHelperService::revealSessionWindow()
+{
+    if (!showSessionUI)
+        return;
+
+    juce::MessageManager::callAsync([this]()
+    {
+        ensureSessionUICreated();
+
+        if (sessionUI)
+            sessionUI->showStatusWindow();
+    });
 }
 
 void M1SystemHelperService::timerCallback() {

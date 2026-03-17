@@ -21,6 +21,7 @@ public:
     void start();
     void initialise();
     void shutdown();
+    void revealSessionWindow();
     
     // Debug mode control
     void setDebugFakeBlocks(bool enabled) { debugFakeBlocks = enabled; }
@@ -43,6 +44,7 @@ private:
     ~M1SystemHelperService() override;
     
     void timerCallback() override;
+    void ensureSessionUICreated();
     
 private:
     std::shared_ptr<EventSystem> eventSystem;

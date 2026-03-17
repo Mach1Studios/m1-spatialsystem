@@ -287,6 +287,7 @@ public:
         parseFakePannersFlag(commandLine);
         parseDebugFakeBlocksFlag(commandLine);
         parseKeepAliveFlag(commandLine);
+        parseShowWindowFlag(commandLine);
         
         SocketActivationHandler::setupSocketActivation();
         
@@ -294,6 +295,9 @@ public:
             Mach1::M1SystemHelperService::getInstance().setDebugFakeBlocks(true);
         
         Mach1::M1SystemHelperService::getInstance().initialise();
+
+        if (showWindowOnLaunch)
+            Mach1::M1SystemHelperService::getInstance().revealSessionWindow();
         
         if (debugFakePannerCount > 0)
         {
@@ -354,12 +358,13 @@ public:
     }
     
     void anotherInstanceStarted(const juce::String& commandLine) override {
-        juce::ignoreUnused(commandLine);
-
         // The already-running tray helper should remain alive when macOS delivers
         // a reopen/open-files event or when a second launch attempt occurs. Quitting
         // from this callback can abort AppKit while NSApplication is still starting.
         DBG("[M1SystemHelper] Another launch request received; keeping existing instance alive");
+
+        if (commandLine.contains("--show-window"))
+            Mach1::M1SystemHelperService::getInstance().revealSessionWindow();
     }
 
 private:
@@ -430,6 +435,21 @@ private:
             }
         }
     }
+
+    void parseShowWindowFlag(const juce::String& commandLine)
+    {
+        juce::StringArray args;
+        args.addTokens(commandLine, " ", "\"");
+        for (int i = 0; i < args.size(); ++i)
+        {
+            if (args[i] == "--show-window")
+            {
+                showWindowOnLaunch = true;
+                DBG("[M1SystemHelper] Show-window mode enabled");
+                break;
+            }
+        }
+    }
     
     static constexpr int AUTO_QUIT_CHECK_INTERVAL_MS = 10000; // Check every 10s
     static constexpr juce::int64 AUTO_QUIT_TIMEOUT_MS = 300000; // 5 minutes with no panners
@@ -437,6 +457,7 @@ private:
     int debugFakePannerCount = 0;
     bool debugFakeBlocks = false;
     bool keepAlive = false;
+    bool showWindowOnLaunch = false;
     juce::int64 lastPannerSeenTime = 0;
     std::unique_ptr<Mach1::FakePannerSimulator> fakePannerSimulator;
 };

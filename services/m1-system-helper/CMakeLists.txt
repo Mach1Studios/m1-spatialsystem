@@ -66,6 +66,11 @@ juce_add_gui_app(${CMAKE_PROJECT_NAME}
 # add required flags
 juce_generate_juce_header(${CMAKE_PROJECT_NAME})
 
+juce_add_binary_data(M1SystemHelperAssets
+    SOURCES
+        ${CMAKE_CURRENT_SOURCE_DIR}/Resources/icon.png
+)
+
 target_compile_definitions(${CMAKE_PROJECT_NAME}
     PUBLIC 
     JUCE_APPLICATION_NAME_STRING="$<TARGET_PROPERTY:${CMAKE_PROJECT_NAME},JUCE_PROJECT_NAME>"
@@ -107,6 +112,7 @@ target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags
         juce::juce_recommended_warning_flags
+        M1SystemHelperAssets
         juce::juce_core
         juce::juce_data_structures
         juce::juce_events
