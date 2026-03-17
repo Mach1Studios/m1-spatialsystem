@@ -1,6 +1,5 @@
 #include "M1SystemHelperManager.h"
 #include <iostream>
-#include <sstream>
 #include <cstdlib>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -21,7 +20,6 @@ bool launchHelperApplicationDirectly()
 {
     constexpr const char* appCandidates[] = {
         "/Library/Application Support/Mach1/m1-system-helper.app",
-        "/Applications/Mach1 Spatial System/m1-system-helper.app",
     };
 
     for (const auto* path : appCandidates)

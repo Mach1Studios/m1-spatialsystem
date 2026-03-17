@@ -1,4 +1,4 @@
-#! /bin/sh
+#! /bin/bash
 
 # MACH1 SPATIAL SYSTEM
 # Uninstall 2.x.x Mach1 Spatial System
@@ -11,6 +11,7 @@ sudo pkill -f "M1-"
 
 # Remove main application directories
 sudo /bin/rm -rf /Applications/Mach1
+sudo /bin/rm -rf /Applications/Mach1\ Spatial\ System
 sudo /bin/rm -rf /Library/Application\ Support/Mach1
 
 # Unload launch agents
@@ -29,19 +30,20 @@ done
 sudo /bin/rm -f /Library/LaunchAgents/com.mach1.spatial.*.plist
 
 # Remove Application Support files
-/bin/rm -rf ~/Library/Application\ Support/Mach1
-/bin/rm -rf ~/Library/Application\ Support/M1-*
+/bin/rm -rf "$HOME/Library/Application Support/Mach1"
+/bin/rm -rf "$HOME/Library/Application Support/M1-"*
+/bin/rm -rf "$HOME/Library/Application Support/Mach1 Spatial System"
 
 # Remove plugins
 PLUGIN_PATHS=(
     "/Library/Application Support/Avid/Audio/Plug-Ins/M1-Monitor.aaxplugin"
     "/Library/Application Support/Avid/Audio/Plug-Ins/M1-Panner.aaxplugin"
-    "~/Library/Audio/Plug-Ins/Components/M1-Monitor.component"
-    "~/Library/Audio/Plug-Ins/Components/M1-Panner.component"
-    "~/Library/Audio/Plug-Ins/VST/M1-Monitor.vst"
-    "~/Library/Audio/Plug-Ins/VST/M1-Panner.vst"
-    "~/Library/Audio/Plug-Ins/VST3/M1-Monitor.vst3"
-    "~/Library/Audio/Plug-Ins/VST3/M1-Panner.vst3"
+    "$HOME/Library/Audio/Plug-Ins/Components/M1-Monitor.component"
+    "$HOME/Library/Audio/Plug-Ins/Components/M1-Panner.component"
+    "$HOME/Library/Audio/Plug-Ins/VST/M1-Monitor.vst"
+    "$HOME/Library/Audio/Plug-Ins/VST/M1-Panner.vst"
+    "$HOME/Library/Audio/Plug-Ins/VST3/M1-Monitor.vst3"
+    "$HOME/Library/Audio/Plug-Ins/VST3/M1-Panner.vst3"
 )
 
 for plugin in "${PLUGIN_PATHS[@]}"; do
@@ -49,15 +51,15 @@ for plugin in "${PLUGIN_PATHS[@]}"; do
 done
 
 # Remove cache and preferences
-/bin/rm -rf ~/Library/Caches/com.mach1.*
-/bin/rm -rf ~/Library/Preferences/com.mach1.*
-/bin/rm -rf ~/Library/Saved\ Application\ State/com.mach1.*
+/bin/rm -rf "$HOME"/Library/Caches/com.mach1.*
+/bin/rm -rf "$HOME"/Library/Preferences/com.mach1.*
+/bin/rm -rf "$HOME"/Library/Saved\ Application\ State/com.mach1.*
 
 # Remove runtime files
-/bin/rm -rf ~/Library/Application\ Support/M1-Transcoder
-/bin/rm -rf ~/Library/Application\ Support/M1-Notifier
-/bin/rm -f ~/Library/Application\ Support/M1-Monitor.settings
-/bin/rm -f ~/Library/Application\ Support/M1-Panner.settings
+/bin/rm -rf "$HOME/Library/Application Support/M1-Transcoder"
+/bin/rm -rf "$HOME/Library/Application Support/M1-Notifier"
+/bin/rm -f "$HOME/Library/Application Support/M1-Monitor.settings"
+/bin/rm -f "$HOME/Library/Application Support/M1-Panner.settings"
 
 # Forget all Mach1 packages
 IDENTIFIERS=(

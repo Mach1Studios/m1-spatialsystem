@@ -531,6 +531,19 @@ package: update-versions-internal build docs-build codesign notarize installer-p
 ARTIFACTS_BUCKET ?= mach1-build-artifacts
 CI_ARTIFACTS_DIR ?= ci-artifacts
 
+# Release artifact path resolution
+# CI packaging preserves the native contents of each *_artefacts directory, while
+# local builds may emit app/binary payloads at slightly different depths depending
+# on generator and target type. Resolve the paths once so signing/notarization and
+# package-from-ci can use the same locations.
+MAC_PLAYER_APP_PATH := $(or $(firstword $(wildcard m1-player/build/M1-Player_artefacts/Release/M1-Player.app)),m1-player/build/M1-Player_artefacts/Release/M1-Player.app)
+MAC_PLAYER_APP_DIR := $(patsubst %/,%,$(dir $(MAC_PLAYER_APP_PATH)))
+MAC_ORIENTATION_BIN_PATH := $(or $(firstword $(wildcard m1-orientationmanager/build/m1-orientationmanager_artefacts/m1-orientationmanager)),m1-orientationmanager/build/m1-orientationmanager_artefacts/Release/m1-orientationmanager)
+MAC_HELPER_APP_PATH := $(or $(firstword $(wildcard services/m1-system-helper/build/m1-system-helper_artefacts/m1-system-helper.app)),services/m1-system-helper/build/m1-system-helper_artefacts/Release/m1-system-helper.app)
+WIN_PLAYER_EXE_PATH := $(or $(firstword $(wildcard m1-player/build/M1-Player_artefacts/Release/M1-Player.exe)),m1-player/build/M1-Player_artefacts/M1-Player.exe)
+WIN_ORIENTATION_EXE_PATH := $(or $(firstword $(wildcard m1-orientationmanager/build/m1-orientationmanager_artefacts/Release/m1-orientationmanager.exe)),m1-orientationmanager/build/m1-orientationmanager_artefacts/m1-orientationmanager.exe)
+WIN_HELPER_EXE_PATH := $(or $(firstword $(wildcard services/m1-system-helper/build/m1-system-helper_artefacts/Release/m1-system-helper.exe)),services/m1-system-helper/build/m1-system-helper_artefacts/m1-system-helper.exe)
+
 package-from-ci: download-ci-artifacts sign-aax-local installer-pkg-from-ci
 	@echo ""
 	@echo "========================================"
@@ -646,8 +659,8 @@ ifeq ($(detected_OS),Darwin)
 	if [ -d "$(CI_ARTIFACTS_DIR)/$$ARCH_DIR/m1-system-helper" ]; then \
 		ditto "$(CI_ARTIFACTS_DIR)/$$ARCH_DIR/m1-system-helper" "services/m1-system-helper/build/m1-system-helper_artefacts"; \
 	fi; \
-	if [ -d "m1-player/build/M1-Player_artefacts/Release/M1-Player.app" ]; then \
-		codesign --verify --deep --strict --verbose=2 "m1-player/build/M1-Player_artefacts/Release/M1-Player.app"; \
+	if [ -d "$(MAC_PLAYER_APP_PATH)" ]; then \
+		codesign --verify --deep --strict --verbose=2 "$(MAC_PLAYER_APP_PATH)"; \
 	fi; \
 	echo "Artifacts installed for $$ARCH_DIR"
 endif
@@ -1211,26 +1224,26 @@ ifeq ($(detected_OS),Darwin)
 	@echo "Code signing applications..."
 	# Sign bundled libraries and plugins inside M1-Player.app first (required for notarization)
 	# This signs all dylibs in Contents (Frameworks and PlugIns) with the same identity
-	find m1-player/build/M1-Player_artefacts/Release/M1-Player.app/Contents -type f -name "*.dylib" -exec codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp -o runtime {} \;
+	find "$(MAC_PLAYER_APP_PATH)/Contents" -type f -name "*.dylib" -exec codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp -o runtime {} \;
 	
-	codesign -v --force -o runtime --entitlements m1-player/Resources/M1-Player.entitlements --sign $(APPLE_CODESIGN_CODE) --timestamp m1-player/build/M1-Player_artefacts/Release/M1-Player.app
-	codesign -v --force -o runtime --entitlements m1-orientationmanager/Resources/entitlements.mac.plist --sign $(APPLE_CODESIGN_CODE) --timestamp m1-orientationmanager/build/m1-orientationmanager_artefacts/m1-orientationmanager
-	codesign -v --force -o runtime --entitlements services/m1-system-helper/Resources/macos/entitlements.mac.plist --sign $(APPLE_CODESIGN_CODE) --timestamp services/m1-system-helper/build/m1-system-helper_artefacts/Release/m1-system-helper.app
+	codesign -v --force -o runtime --entitlements m1-player/Resources/M1-Player.entitlements --sign $(APPLE_CODESIGN_CODE) --timestamp "$(MAC_PLAYER_APP_PATH)"
+	codesign -v --force -o runtime --entitlements m1-orientationmanager/Resources/entitlements.mac.plist --sign $(APPLE_CODESIGN_CODE) --timestamp "$(MAC_ORIENTATION_BIN_PATH)"
+	codesign -v --force -o runtime --entitlements services/m1-system-helper/Resources/macos/entitlements.mac.plist --sign $(APPLE_CODESIGN_CODE) --timestamp "$(MAC_HELPER_APP_PATH)"
 	@echo "Applications code signed"
 else ifeq ($(detected_OS),Windows)
 	@echo "Code signing Windows applications with Azure Trusted Signing..."
-	@if exist "m1-player\build\M1-Player_artefacts\Release\M1-Player.exe" ( \
-		powershell -ExecutionPolicy Bypass -File installer\win\sign-file.ps1 -FilePath "m1-player\build\M1-Player_artefacts\Release\M1-Player.exe" \
+	@if exist "$(subst /,\,$(WIN_PLAYER_EXE_PATH))" ( \
+		powershell -ExecutionPolicy Bypass -File installer\win\sign-file.ps1 -FilePath "$(subst /,\,$(WIN_PLAYER_EXE_PATH))" \
 	) else ( \
 		echo "SKIP: M1-Player not found" \
 	)
-	@if exist "m1-orientationmanager\build\m1-orientationmanager_artefacts\Release\m1-orientationmanager.exe" ( \
-		powershell -ExecutionPolicy Bypass -File installer\win\sign-file.ps1 -FilePath "m1-orientationmanager\build\m1-orientationmanager_artefacts\Release\m1-orientationmanager.exe" \
+	@if exist "$(subst /,\,$(WIN_ORIENTATION_EXE_PATH))" ( \
+		powershell -ExecutionPolicy Bypass -File installer\win\sign-file.ps1 -FilePath "$(subst /,\,$(WIN_ORIENTATION_EXE_PATH))" \
 	) else ( \
 		echo "SKIP: m1-orientationmanager not found" \
 	)
-	@if exist "services\m1-system-helper\build\m1-system-helper_artefacts\Release\m1-system-helper.exe" ( \
-		powershell -ExecutionPolicy Bypass -File installer\win\sign-file.ps1 -FilePath "services\m1-system-helper\build\m1-system-helper_artefacts\Release\m1-system-helper.exe" \
+	@if exist "$(subst /,\,$(WIN_HELPER_EXE_PATH))" ( \
+		powershell -ExecutionPolicy Bypass -File installer\win\sign-file.ps1 -FilePath "$(subst /,\,$(WIN_HELPER_EXE_PATH))" \
 	) else ( \
 		echo "SKIP: m1-system-helper not found" \
 	)
@@ -1333,9 +1346,9 @@ endif
 notarize:
 ifeq ($(detected_OS),Darwin)
 	# m1-player
-	ditto -c -k --keepParent "$(PWD)/m1-player/build/M1-Player_artefacts/Release/M1-Player.app" "$(PWD)/m1-player/build/M1-Player_artefacts/Release/M1-Player.app.zip"
+	ditto -c -k --keepParent "$(PWD)/$(MAC_PLAYER_APP_PATH)" "$(PWD)/$(MAC_PLAYER_APP_DIR)/M1-Player.app.zip"
 	#cd "m1-player/build/M1-Player_artefacts" && zip -qr M1-Player.app.zip M1-Player.app -x "*.DS_Store"
-	./installer/osx/macos_utilities.sh -f M1-Player -e .app -z .zip -p m1-player/build/M1-Player_artefacts/Release -k 'notarize-app' --apple-id $(APPLE_USERNAME) --apple-app-pass $(ALTOOL_APPPASS) -t $(APPLE_TEAM_CODE)
+	./installer/osx/macos_utilities.sh -f M1-Player -e .app -z .zip -p "$(MAC_PLAYER_APP_DIR)" -k 'notarize-app' --apple-id $(APPLE_USERNAME) --apple-app-pass $(ALTOOL_APPPASS) -t $(APPLE_TEAM_CODE)
 	# m1-orientationmanager
 	#ditto -c -k --keepParent "$(PWD)/m1-orientationmanager/build/m1-orientationmanager_artefacts/m1-orientationmanager" "$(PWD)/m1-orientationmanager/build/m1-orientationmanager_artefacts/m1-orientationmanager.zip"
 	#cd "m1-orientationmanager/build/m1-orientationmanager_artefacts" && zip -qr m1-orientationmanager.zip m1-orientationmanager -x "*.DS_Store"
