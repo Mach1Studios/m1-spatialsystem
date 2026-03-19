@@ -5,11 +5,46 @@
 namespace Mach1 {
 namespace {
 
+constexpr double kReferenceDragSpeed = 250.0;
+constexpr double kFineTuneDragMultiplier = 50.0;
+constexpr int kCompactPanelMinWidth = 380;
+constexpr int kCompactPanelMinHeight = 130;
+constexpr int kPopupItemHeight = 20;
+
 juce::String formatAngle(double value)
 {
     const double displayValue = std::abs(value) < 0.05 ? 0.0 : value;
     return juce::String(displayValue, 1)
         + juce::String::charToString(static_cast<juce::juce_wchar>(0x00B0));
+}
+
+double getEffectiveDragSpeed(const juce::ModifierKeys& modifiers)
+{
+    auto speed = kReferenceDragSpeed;
+    if (modifiers.isShiftDown() || modifiers.isCtrlDown() || modifiers.isCommandDown())
+        speed *= kFineTuneDragMultiplier;
+
+    return speed;
+}
+
+double wrapValue(double value, double minimum, double maximum)
+{
+    const auto range = maximum - minimum;
+    if (range <= 0.0)
+        return value;
+
+    while (value > maximum)
+        value -= range;
+
+    while (value < minimum)
+        value += range;
+
+    return value;
+}
+
+bool shouldUseCompactMonitorView(const juce::Component& component)
+{
+    return component.getWidth() < kCompactPanelMinWidth || component.getHeight() < kCompactPanelMinHeight;
 }
 
 juce::String formatChannelCountLabel(int channelCount)
@@ -21,6 +56,87 @@ juce::String formatChannelCountLabel(int channelCount)
         case 14: return "M1Spatial-14";
         default: return juce::String(channelCount) + " channels";
     }
+}
+
+class MonitorPopupLookAndFeel : public juce::LookAndFeel_V4
+{
+public:
+    juce::Font getPopupMenuFont() override
+    {
+        return { 10.0f };
+    }
+
+    void drawPopupMenuBackground(juce::Graphics& g, int width, int height) override
+    {
+        g.fillAll(HelperUIColours::background);
+        g.setColour(HelperUIColours::active);
+        g.drawRect(0, 0, width, height, 1);
+    }
+
+    void drawPopupMenuItem(juce::Graphics& g,
+                           const juce::Rectangle<int>& area,
+                           bool isSeparator,
+                           bool isActive,
+                           bool isHighlighted,
+                           bool isTicked,
+                           bool hasSubMenu,
+                           const juce::String& text,
+                           const juce::String& shortcutKeyText,
+                           const juce::Drawable* icon,
+                           const juce::Colour* const textColourToUse) override
+    {
+        juce::ignoreUnused(icon, shortcutKeyText, textColourToUse);
+
+        if (isSeparator)
+        {
+            g.setColour(HelperUIColours::active.withAlpha(0.55f));
+            g.drawHorizontalLine(area.getCentreY(), (float) area.getX() + 6.0f, (float) area.getRight() - 6.0f);
+            return;
+        }
+
+        const auto itemBounds = area.reduced(2, 1);
+        const bool isSelected = isHighlighted || isTicked;
+
+        if (isSelected)
+        {
+            g.setColour(HelperUIColours::active);
+            g.fillRect(itemBounds);
+        }
+
+        g.setColour((isActive ? (isSelected ? HelperUIColours::background : HelperUIColours::text)
+                              : HelperUIColours::inactive)
+                        .withAlpha(isActive ? 1.0f : 0.4f));
+        g.setFont(getPopupMenuFont());
+        g.drawText(text, itemBounds.reduced(8, 0), juce::Justification::centredLeft, true);
+
+        if (hasSubMenu)
+        {
+            juce::Path triangle;
+            const auto centreX = (float) itemBounds.getRight() - 8.0f;
+            const auto centreY = (float) itemBounds.getCentreY();
+            triangle.startNewSubPath(centreX - 3.0f, centreY - 4.0f);
+            triangle.lineTo(centreX + 2.0f, centreY);
+            triangle.lineTo(centreX - 3.0f, centreY + 4.0f);
+            triangle.closeSubPath();
+            g.fillPath(triangle);
+        }
+    }
+
+    void getIdealPopupMenuItemSize(const juce::String& text,
+                                   bool isSeparator,
+                                   int standardMenuItemHeight,
+                                   int& idealWidth,
+                                   int& idealHeight) override
+    {
+        juce::LookAndFeel_V4::getIdealPopupMenuItemSize(text, isSeparator, standardMenuItemHeight, idealWidth, idealHeight);
+        idealHeight = isSeparator ? 8 : juce::jmax(standardMenuItemHeight, kPopupItemHeight);
+    }
+};
+
+MonitorPopupLookAndFeel& getMonitorPopupLookAndFeel()
+{
+    static MonitorPopupLookAndFeel lookAndFeel;
+    return lookAndFeel;
 }
 
 class MonitorMenuButton : public juce::Button
@@ -96,6 +212,7 @@ public:
         setScrollWheelEnabled(false);
         setDoubleClickReturnValue(true, 0.0);
         setMouseDragSensitivity(250);
+        setMouseCursor(juce::MouseCursor::PointingHandCursor);
     }
 
     void paint(juce::Graphics& g) override
@@ -195,12 +312,47 @@ public:
                    true);
     }
 
+    void mouseDown(const juce::MouseEvent& event) override
+    {
+        if (!isEnabled())
+            return;
+
+        isDragging = true;
+        previousDragPosition = event.position;
+    }
+
+    void mouseDrag(const juce::MouseEvent& event) override
+    {
+        if (!isEnabled() || !isDragging)
+            return;
+
+        const auto deltaY = (double) previousDragPosition.y - (double) event.position.y;
+        previousDragPosition = event.position;
+
+        auto nextValue = getValue() + (deltaY / getEffectiveDragSpeed(event.mods)) * (getMaximum() - getMinimum());
+        nextValue = wrapValue(nextValue, getMinimum(), getMaximum());
+        setValue(nextValue, juce::sendNotificationSync);
+    }
+
+    void mouseUp(const juce::MouseEvent&) override
+    {
+        isDragging = false;
+    }
+
+    void mouseDoubleClick(const juce::MouseEvent&) override
+    {
+        if (isEnabled())
+            setValue(0.0, juce::sendNotificationSync);
+    }
+
 private:
     juce::Colour dialFaceColour;
     juce::Colour guideColour;
     juce::Colour accentColour;
     juce::Colour textColour;
     juce::Colour disabledColour;
+    bool isDragging = false;
+    juce::Point<float> previousDragPosition;
 };
 
 class ReferenceAxisSlider : public juce::Slider
@@ -231,6 +383,7 @@ public:
         setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
         setScrollWheelEnabled(false);
         setDoubleClickReturnValue(true, 0.0);
+        setMouseCursor(juce::MouseCursor::PointingHandCursor);
     }
 
     void paint(juce::Graphics& g) override
@@ -260,11 +413,11 @@ public:
 
             g.setColour(textColour.withAlpha(alpha));
             g.drawText(label,
-                       juce::Rectangle<float>(trackX - 52.0f, posY, labelWidth, labelHeight).toNearestInt(),
+                       juce::Rectangle<float>(trackX - 50.0f, posY - 7.0f, labelWidth, labelHeight).toNearestInt(),
                        juce::Justification::centred,
                        true);
             g.drawText(formatAngle(getValue()),
-                       juce::Rectangle<float>(trackX + 12.0f, posY, labelWidth, labelHeight).toNearestInt(),
+                       juce::Rectangle<float>(trackX + 12.0f, posY - 7.0f, labelWidth, labelHeight).toNearestInt(),
                        juce::Justification::centred,
                        true);
 
@@ -292,7 +445,7 @@ public:
                        juce::Justification::centred,
                        true);
             g.drawText(formatAngle(getValue()),
-                       juce::Rectangle<float>(posX + 2.0f, trackY + 16.0f, labelWidth, labelHeight).toNearestInt(),
+                       juce::Rectangle<float>(posX + 2.0f, trackY + 2.0f, labelWidth, labelHeight).toNearestInt(),
                        juce::Justification::centred,
                        true);
 
@@ -302,6 +455,41 @@ public:
         }
     }
 
+    void mouseDown(const juce::MouseEvent& event) override
+    {
+        if (!isEnabled())
+            return;
+
+        isDragging = true;
+        previousDragPosition = event.position;
+    }
+
+    void mouseDrag(const juce::MouseEvent& event) override
+    {
+        if (!isEnabled() || !isDragging)
+            return;
+
+        const auto deltaPixels = orientation == AxisOrientation::Vertical
+                                     ? ((double) previousDragPosition.y - (double) event.position.y)
+                                     : ((double) event.position.x - (double) previousDragPosition.x);
+        previousDragPosition = event.position;
+
+        auto nextValue = getValue() + (deltaPixels / getEffectiveDragSpeed(event.mods)) * (getMaximum() - getMinimum());
+        nextValue = juce::jlimit(getMinimum(), getMaximum(), nextValue);
+        setValue(nextValue, juce::sendNotificationSync);
+    }
+
+    void mouseUp(const juce::MouseEvent&) override
+    {
+        isDragging = false;
+    }
+
+    void mouseDoubleClick(const juce::MouseEvent&) override
+    {
+        if (isEnabled())
+            setValue(0.0, juce::sendNotificationSync);
+    }
+
 private:
     AxisOrientation orientation;
     juce::String label;
@@ -309,6 +497,8 @@ private:
     juce::Colour accentColour;
     juce::Colour textColour;
     juce::Colour disabledColour;
+    bool isDragging = false;
+    juce::Point<float> previousDragPosition;
 };
 
 } // namespace
@@ -317,9 +507,9 @@ MonitorPanel::MonitorPanel()
 {
     setOpaque(false);
 
-    settingsButton = std::make_unique<MonitorMenuButton>("settingsButton", "SETTINGS", dimTextColour, guideColour);
-    settingsButton->onClick = [this]() { showSettingsMenu(); };
-    addAndMakeVisible(settingsButton.get());
+    decodeModeButton = std::make_unique<MonitorMenuButton>("decodeModeButton", "DECODE MODE", dimTextColour, guideColour);
+    decodeModeButton->onClick = [this]() { showSettingsMenu(); };
+    addAndMakeVisible(decodeModeButton.get());
 
     monitorButton = std::make_unique<MonitorMenuButton>("monitorButton", "MONITOR", dimTextColour, guideColour);
     monitorButton->onClick = [this]() { showMonitorMenu(); };
@@ -379,18 +569,33 @@ void MonitorPanel::paint(juce::Graphics& g)
     if (embeddedMonitor != nullptr)
         return;
 
-    const int dividerY = getHeight() - BOTTOM_BAR_HEIGHT;
+    // Left border divider (match Panner3DViewPanel style)
     g.setColour(dividerColour);
-    g.drawHorizontalLine(dividerY, 24.0f, (float) getWidth() - 24.0f);
+    g.drawVerticalLine(0, 0.0f, static_cast<float>(getHeight()));
+
+    auto footer = getLocalBounds().removeFromBottom(BOTTOM_BAR_HEIGHT).reduced(10, 0);
 
     if (currentState.monitors.empty())
     {
-        g.setColour(dimTextColour.withAlpha(0.9f));
-        g.setFont(juce::Font(12.0f));
+        g.setColour(textColour.withAlpha(0.5f));
+        g.setFont(juce::Font(10.0f));
         g.drawText("No active monitor instances connected",
-                   getLocalBounds().removeFromBottom(BOTTOM_BAR_HEIGHT).reduced(24, 6),
+                   footer,
                    juce::Justification::centred,
                    true);
+        return;
+    }
+
+    if (shouldUseCompactMonitorView(*this))
+    {
+        g.setColour(textColour.withAlpha(0.5f));
+        g.setFont(juce::Font(10.0f));
+        const auto activeMonitorPort = getActiveMonitorPort();
+        juce::String line = "Expand to edit monitor  |  ";
+        if (activeMonitorPort != 0)
+            line += "Mon " + juce::String(activeMonitorPort) + "  ";
+        line += formatChannelCountLabel(currentState.channelCount);
+        g.drawText(line, footer, juce::Justification::centred, true);
     }
 }
 
@@ -405,7 +610,17 @@ void MonitorPanel::resized()
     }
 
     bounds.removeFromBottom(BOTTOM_BAR_HEIGHT);
-    bounds.removeFromBottom(8);
+    bounds.removeFromBottom(4);
+
+    const bool useCompactView = shouldUseCompactMonitorView(*this);
+    decodeModeButton->setVisible(!useCompactView);
+    monitorButton->setVisible(!useCompactView);
+    yawSlider->setVisible(!useCompactView);
+    pitchSlider->setVisible(!useCompactView);
+    rollSlider->setVisible(!useCompactView);
+
+    if (useCompactView)
+        return;
 
     const int controlSectionWidth = juce::jlimit(CONTROL_SECTION_MIN_WIDTH,
                                                  CONTROL_SECTION_MAX_WIDTH,
@@ -422,18 +637,15 @@ void MonitorPanel::resized()
     auto pitchArea = sliderColumn.removeFromTop(juce::roundToInt(sliderColumn.getHeight() * 0.62f));
     pitchSlider->setBounds(pitchArea.reduced(10, 8));
 
-    sliderColumn.removeFromTop(10);
-    rollSlider->setBounds(sliderColumn.reduced(10, 10));
+    sliderColumn.removeFromTop(6);
+    rollSlider->setBounds(sliderColumn.reduced(10, 6));
 
-    const int buttonStackHeight = MENU_BUTTON_HEIGHT * 2 + 18;
-    auto menuStack = juce::Rectangle<int>(MENU_BUTTON_WIDTH,
-                                          buttonStackHeight)
-                         .withCentre({ menuColumn.getCentreX(), controlSection.getCentreY() });
-
-    settingsButton->setBounds(juce::Rectangle<int>(MENU_BUTTON_WIDTH, MENU_BUTTON_HEIGHT)
-                                  .withPosition(menuStack.getX(), menuStack.getY()));
-    monitorButton->setBounds(juce::Rectangle<int>(MENU_BUTTON_WIDTH, MENU_BUTTON_HEIGHT)
-                                 .withPosition(menuStack.getX(), menuStack.getBottom() - MENU_BUTTON_HEIGHT));
+    const int menuBtnX = menuColumn.getX() + (menuColumn.getWidth() - MENU_BUTTON_WIDTH) / 2;
+    const int menuBtnTop = menuColumn.getY();
+    constexpr int menuBtnGap = 6;
+    decodeModeButton->setBounds(menuBtnX, menuBtnTop, MENU_BUTTON_WIDTH, MENU_BUTTON_HEIGHT);
+    monitorButton->setBounds(menuBtnX, menuBtnTop + MENU_BUTTON_HEIGHT + menuBtnGap,
+                             MENU_BUTTON_WIDTH, MENU_BUTTON_HEIGHT);
 }
 
 void MonitorPanel::setMonitorComponent(juce::Component* monitorComponent)
@@ -447,7 +659,7 @@ void MonitorPanel::setMonitorComponent(juce::Component* monitorComponent)
         addAndMakeVisible(embeddedMonitor);
 
     const bool usingEmbeddedMonitor = embeddedMonitor != nullptr;
-    settingsButton->setVisible(!usingEmbeddedMonitor);
+    decodeModeButton->setVisible(!usingEmbeddedMonitor);
     monitorButton->setVisible(!usingEmbeddedMonitor);
     yawSlider->setVisible(!usingEmbeddedMonitor);
     pitchSlider->setVisible(!usingEmbeddedMonitor);
@@ -468,7 +680,7 @@ void MonitorPanel::updateState(const MonitorPanelState& state)
 
     suppressCallbacks = false;
 
-    settingsButton->setTooltip("Output format: " + formatChannelCountLabel(currentState.channelCount));
+    decodeModeButton->setTooltip("Output format: " + formatChannelCountLabel(currentState.channelCount));
 
     const int activeMonitorPort = getActiveMonitorPort();
     monitorButton->setTooltip(activeMonitorPort != 0
@@ -496,6 +708,7 @@ void MonitorPanel::showMonitorMenu()
         return;
 
     juce::PopupMenu menu;
+    menu.setLookAndFeel(&getMonitorPopupLookAndFeel());
     const int activeMonitorPort = getActiveMonitorPort();
 
     for (const auto& monitor : currentState.monitors)
@@ -505,7 +718,9 @@ void MonitorPanel::showMonitorMenu()
         menu.addItem(monitor.port, label, true, monitor.port == activeMonitorPort);
     }
 
-    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(monitorButton.get()),
+    menu.showMenuAsync(juce::PopupMenu::Options()
+                           .withTargetComponent(monitorButton.get())
+                           .withStandardItemHeight(kPopupItemHeight),
                        [safeThis = juce::Component::SafePointer<MonitorPanel>(this)](int result) {
                            if (safeThis != nullptr && result != 0 && safeThis->onActiveMonitorSelected)
                                safeThis->onActiveMonitorSelected(result);
@@ -515,11 +730,14 @@ void MonitorPanel::showMonitorMenu()
 void MonitorPanel::showSettingsMenu()
 {
     juce::PopupMenu menu;
+    menu.setLookAndFeel(&getMonitorPopupLookAndFeel());
     menu.addItem(4, "M1Spatial-4", true, currentState.channelCount == 4);
     menu.addItem(8, "M1Spatial-8", true, currentState.channelCount == 8);
     menu.addItem(14, "M1Spatial-14", true, currentState.channelCount == 14);
 
-    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(settingsButton.get()),
+    menu.showMenuAsync(juce::PopupMenu::Options()
+                           .withTargetComponent(decodeModeButton.get())
+                           .withStandardItemHeight(kPopupItemHeight),
                        [safeThis = juce::Component::SafePointer<MonitorPanel>(this)](int result) {
                            if (safeThis != nullptr && result != 0 && safeThis->onOutputChannelCountChanged)
                                safeThis->onOutputChannelCountChanged(result);
@@ -528,7 +746,7 @@ void MonitorPanel::showSettingsMenu()
 
 void MonitorPanel::setControlsEnabled(bool enabled)
 {
-    settingsButton->setEnabled(enabled);
+    decodeModeButton->setEnabled(enabled);
     monitorButton->setEnabled(enabled);
     yawSlider->setEnabled(enabled);
     pitchSlider->setEnabled(enabled);

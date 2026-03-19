@@ -44,7 +44,7 @@ private:
     MonitorPanelState currentState;
     bool suppressCallbacks = false;
 
-    std::unique_ptr<juce::Button> settingsButton;
+    std::unique_ptr<juce::Button> decodeModeButton;
     std::unique_ptr<juce::Button> monitorButton;
     std::unique_ptr<juce::Slider> yawSlider;
     std::unique_ptr<juce::Slider> pitchSlider;
@@ -61,7 +61,7 @@ private:
     juce::Colour trackColour{HelperUIColours::textApp};
     juce::Colour disabledColour{HelperUIColours::inactive};
 
-    static constexpr int BOTTOM_BAR_HEIGHT = 20;
+    static constexpr int BOTTOM_BAR_HEIGHT = 14;
     static constexpr int MENU_BUTTON_WIDTH = 108;
     static constexpr int MENU_BUTTON_HEIGHT = 20;
     static constexpr int ORIENTATION_SECTION_MIN_HEIGHT = 170;
