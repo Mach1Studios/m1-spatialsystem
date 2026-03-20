@@ -414,6 +414,19 @@ ifeq ($(detected_OS),Darwin)
 		echo "" && \
 		cd .. && cmake m1-player -Bm1-player/build-dev -G "Xcode" -DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF; \
 	fi
+else ifeq ($(detected_OS),Windows)
+	@echo "Configuring m1-player (dev)..."
+	-cmake m1-player -Bm1-player/build-dev -DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF
+	@if not exist "m1-player\build-dev\vlc-install\lib\libvlc.lib" ( \
+		echo. & \
+		echo VLC libraries not found. Run build_vlc.ps1 to download VLC SDK... & \
+		echo. & \
+		powershell -ExecutionPolicy Bypass -File m1-player\build_vlc.ps1 -BuildDir build-dev & \
+		echo. & \
+		echo VLC setup complete! Reconfiguring CMake... & \
+		echo. & \
+		cmake m1-player -Bm1-player/build-dev -DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF \
+	)
 else
 	@echo "Configuring m1-player (dev)..."
 	cmake m1-player -Bm1-player/build-dev -DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF || true
@@ -822,7 +835,11 @@ list-ci-builds:
 # Clean CI artifacts
 clean-ci-artifacts:
 	@echo "Cleaning CI artifacts..."
-	rm -rf $(CI_ARTIFACTS_DIR)
+ifeq ($(detected_OS),Windows)
+	@if exist "$(CI_ARTIFACTS_DIR)" rmdir /s /q "$(CI_ARTIFACTS_DIR)"
+else
+	rm -rf "$(CI_ARTIFACTS_DIR)"
+endif
 	@echo "CI artifacts cleaned"
 
 # =============================================================================
@@ -923,6 +940,19 @@ ifeq ($(detected_OS),Darwin)
 		echo "" && \
 		cd .. && cmake m1-player -Bm1-player/build -G "Xcode" -DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF; \
 	fi
+else ifeq ($(detected_OS),Windows)
+	@echo "Configuring m1-player (release)..."
+	-cmake m1-player -Bm1-player/build -DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF
+	@if not exist "m1-player\build\vlc-install\lib\libvlc.lib" ( \
+		echo. & \
+		echo VLC libraries not found. Run build_vlc.ps1 to download VLC SDK... & \
+		echo. & \
+		powershell -ExecutionPolicy Bypass -File m1-player\build_vlc.ps1 -BuildDir build & \
+		echo. & \
+		echo VLC setup complete! Reconfiguring CMake... & \
+		echo. & \
+		cmake m1-player -Bm1-player/build -DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF \
+	)
 else
 	@echo "Configuring m1-player (release)..."
 	cmake m1-player -Bm1-player/build -DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF || true
@@ -1026,6 +1056,18 @@ ifeq ($(detected_OS),Darwin)
 		echo "Run 'make configure' or 'make dev-player' first."; \
 		exit 1; \
 	fi
+else ifeq ($(detected_OS),Windows)
+	@if exist "m1-player\build-dev" ( \
+		echo Using development build directory (build-dev) & \
+		powershell -ExecutionPolicy Bypass -File m1-player\build_vlc.ps1 -BuildDir build-dev \
+	) else if exist "m1-player\build" ( \
+		echo Using release build directory (build) & \
+		powershell -ExecutionPolicy Bypass -File m1-player\build_vlc.ps1 -BuildDir build \
+	) else ( \
+		echo Error: Neither m1-player\build nor m1-player\build-dev found. & \
+		echo Run 'make configure' or 'make dev-player' first. & \
+		exit /b 1 \
+	)
 else
 	@if [ -d "m1-player/build-dev" ]; then \
 		echo "Using development build directory (build-dev)"; \
