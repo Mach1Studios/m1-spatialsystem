@@ -540,6 +540,8 @@ MAC_PLAYER_APP_PATH := $(or $(firstword $(wildcard m1-player/build/M1-Player_art
 MAC_PLAYER_APP_DIR := $(patsubst %/,%,$(dir $(MAC_PLAYER_APP_PATH)))
 MAC_ORIENTATION_BIN_PATH := $(or $(firstword $(wildcard m1-orientationmanager/build/m1-orientationmanager_artefacts/m1-orientationmanager)),m1-orientationmanager/build/m1-orientationmanager_artefacts/Release/m1-orientationmanager)
 MAC_HELPER_APP_PATH := $(or $(firstword $(wildcard services/m1-system-helper/build/m1-system-helper_artefacts/m1-system-helper.app)),services/m1-system-helper/build/m1-system-helper_artefacts/Release/m1-system-helper.app)
+MAC_MONITOR_ENTITLEMENTS := m1-monitor/Resources/entitlements.mac.plist
+MAC_PANNER_ENTITLEMENTS := m1-panner/Resources/entitlements.mac.plist
 WIN_PLAYER_EXE_PATH := $(or $(firstword $(wildcard m1-player/build/M1-Player_artefacts/Release/M1-Player.exe)),m1-player/build/M1-Player_artefacts/M1-Player.exe)
 WIN_ORIENTATION_EXE_PATH := $(or $(firstword $(wildcard m1-orientationmanager/build/m1-orientationmanager_artefacts/Release/m1-orientationmanager.exe)),m1-orientationmanager/build/m1-orientationmanager_artefacts/m1-orientationmanager.exe)
 WIN_HELPER_EXE_PATH := $(or $(firstword $(wildcard services/m1-system-helper/build/m1-system-helper_artefacts/Release/m1-system-helper.exe)),services/m1-system-helper/build/m1-system-helper_artefacts/m1-system-helper.exe)
@@ -677,7 +679,7 @@ ifeq ($(detected_OS),Darwin)
 		echo "Signing M1-Monitor AAX..."; \
 		AAX_PATH=$$(find m1-monitor/build -name "M1-Monitor.aaxplugin" -type d | head -1); \
 		if [ -n "$$AAX_PATH" ]; then \
-			codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp "$$AAX_PATH"; \
+			codesign --force --sign $(APPLE_CODESIGN_CODE) --entitlements $(MAC_MONITOR_ENTITLEMENTS) --timestamp "$$AAX_PATH"; \
 			$(WRAPTOOL) sign --verbose --account $(PACE_ACCOUNT) --wcguid "$(MONITOR_FREE_GUID)" \
 				--signid $(APPLE_CODESIGN_ID) --in "$$AAX_PATH" --out "$$AAX_PATH" --autoinstall on; \
 			echo "M1-Monitor AAX signed"; \
@@ -689,7 +691,7 @@ ifeq ($(detected_OS),Darwin)
 		echo "Signing M1-Panner AAX..."; \
 		AAX_PATH=$$(find m1-panner/build -name "M1-Panner.aaxplugin" -type d | head -1); \
 		if [ -n "$$AAX_PATH" ]; then \
-			codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp "$$AAX_PATH"; \
+			codesign --force --sign $(APPLE_CODESIGN_CODE) --entitlements $(MAC_PANNER_ENTITLEMENTS) --timestamp "$$AAX_PATH"; \
 			$(WRAPTOOL) sign --verbose --account $(PACE_ACCOUNT) --wcguid "$(PANNER_FREE_GUID)" \
 				--signid $(APPLE_CODESIGN_ID) --in "$$AAX_PATH" --out "$$AAX_PATH" --autoinstall on; \
 			echo "M1-Panner AAX signed"; \
@@ -1144,9 +1146,9 @@ endif
 codesign-aax:
 ifeq ($(detected_OS),Darwin)
 	@echo "Code signing AAX plugins..."
-	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-monitor/build/M1-Monitor_artefacts/AAX/M1-Monitor.aaxplugin
+	codesign --force --sign $(APPLE_CODESIGN_CODE) --entitlements $(MAC_MONITOR_ENTITLEMENTS) --timestamp m1-monitor/build/M1-Monitor_artefacts/AAX/M1-Monitor.aaxplugin
 	$(WRAPTOOL) sign --verbose --account $(PACE_ACCOUNT) --wcguid "$(MONITOR_FREE_GUID)" --signid $(APPLE_CODESIGN_ID) --in m1-monitor/build/M1-Monitor_artefacts/AAX/M1-Monitor.aaxplugin --out m1-monitor/build/M1-Monitor_artefacts/AAX/M1-Monitor.aaxplugin --autoinstall on
-	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-panner/build/M1-Panner_artefacts/AAX/M1-Panner.aaxplugin
+	codesign --force --sign $(APPLE_CODESIGN_CODE) --entitlements $(MAC_PANNER_ENTITLEMENTS) --timestamp m1-panner/build/M1-Panner_artefacts/AAX/M1-Panner.aaxplugin
 	$(WRAPTOOL) sign --verbose --account $(PACE_ACCOUNT) --wcguid "$(PANNER_FREE_GUID)" --signid $(APPLE_CODESIGN_ID) --in m1-panner/build/M1-Panner_artefacts/AAX/M1-Panner.aaxplugin --out m1-panner/build/M1-Panner_artefacts/AAX/M1-Panner.aaxplugin --autoinstall on
 	@echo "AAX plugins code signed"
 else ifeq ($(detected_OS),Windows)
@@ -1185,16 +1187,16 @@ endif
 codesign-vst:
 ifeq ($(detected_OS),Darwin)
 	@echo "Code signing VST plugins..."
-	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-monitor/build/M1-Monitor_artefacts/VST/M1-Monitor.vst
-	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-panner/build/M1-Panner_artefacts/VST/M1-Panner.vst
+	codesign --force --sign $(APPLE_CODESIGN_CODE) --entitlements $(MAC_MONITOR_ENTITLEMENTS) --timestamp m1-monitor/build/M1-Monitor_artefacts/VST/M1-Monitor.vst
+	codesign --force --sign $(APPLE_CODESIGN_CODE) --entitlements $(MAC_PANNER_ENTITLEMENTS) --timestamp m1-panner/build/M1-Panner_artefacts/VST/M1-Panner.vst
 	@echo "VST plugins code signed"
 endif
 
 codesign-vst3:
 ifeq ($(detected_OS),Darwin)
 	@echo "Code signing VST3 plugins..."
-	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-monitor/build/M1-Monitor_artefacts/VST3/M1-Monitor.vst3
-	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-panner/build/M1-Panner_artefacts/VST3/M1-Panner.vst3
+	codesign --force --sign $(APPLE_CODESIGN_CODE) --entitlements $(MAC_MONITOR_ENTITLEMENTS) --timestamp m1-monitor/build/M1-Monitor_artefacts/VST3/M1-Monitor.vst3
+	codesign --force --sign $(APPLE_CODESIGN_CODE) --entitlements $(MAC_PANNER_ENTITLEMENTS) --timestamp m1-panner/build/M1-Panner_artefacts/VST3/M1-Panner.vst3
 	@echo "VST3 plugins code signed"
 else ifeq ($(detected_OS),Windows)
 	@echo "Code signing VST3 plugins with Azure Trusted Signing..."
@@ -1214,8 +1216,8 @@ endif
 codesign-au:
 ifeq ($(detected_OS),Darwin)
 	@echo "Code signing AU plugins..."
-	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-monitor/build/M1-Monitor_artefacts/AU/M1-Monitor.component
-	codesign --force --sign $(APPLE_CODESIGN_CODE) --timestamp m1-panner/build/M1-Panner_artefacts/AU/M1-Panner.component
+	codesign --force --sign $(APPLE_CODESIGN_CODE) --entitlements $(MAC_MONITOR_ENTITLEMENTS) --timestamp m1-monitor/build/M1-Monitor_artefacts/AU/M1-Monitor.component
+	codesign --force --sign $(APPLE_CODESIGN_CODE) --entitlements $(MAC_PANNER_ENTITLEMENTS) --timestamp m1-panner/build/M1-Panner_artefacts/AU/M1-Panner.component
 	@echo "AU plugins code signed"
 endif
 

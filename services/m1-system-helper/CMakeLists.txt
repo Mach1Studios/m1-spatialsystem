@@ -47,6 +47,7 @@ add_subdirectory(../../m1-player/Modules/m1-sdk/libmach1spatial "${CMAKE_CURRENT
 # PLUGIN/APP NAME & ID  (for dynamic naming schemes)
 set(CUSTOM_BUNDLE_ID "com.mach1.spatial.helper")
 set(CUSTOM_APP_CODE "M1SW")
+set(MACH1_SHARED_APP_GROUP_ID "group.com.mach1.spatial.shared")
 
 # add the plugin targets
 juce_add_gui_app(${CMAKE_PROJECT_NAME}
@@ -54,8 +55,8 @@ juce_add_gui_app(${CMAKE_PROJECT_NAME}
                 COMPANY_NAME "Mach1"
                 COMPANY_WEBSITE "https://mach1.tech"
                 COMPANY_EMAIL "whatsup@mach1.tech"
-                ICON_BIG "${CMAKE_CURRENT_SOURCE_DIR}/../../installer/resources/icon.png"
-                ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/../../installer/resources/icon.png"
+                ICON_BIG "${CMAKE_CURRENT_SOURCE_DIR}/Resources/icon.png"
+                ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/Resources/icon.png"
                 PLUGIN_MANUFACTURER_CODE "Mac1"
                 PLUGIN_CODE ${CUSTOM_APP_CODE}
                 BUNDLE_ID ${CUSTOM_BUNDLE_ID}
@@ -78,6 +79,7 @@ target_compile_definitions(${CMAKE_PROJECT_NAME}
     JUCE_WEB_BROWSER=0
     JUCE_VST3_CAN_REPLACE_VST2=0
     JUCE_DISPLAY_SPLASH_SCREEN=0
+    MACH1_SHARED_APP_GROUP_ID="${MACH1_SHARED_APP_GROUP_ID}"
     GUI_APP=1)
 
 # Disable compiler extensions for the project targets (e.g. use -std=c++17 instead of -std=gnu++17).

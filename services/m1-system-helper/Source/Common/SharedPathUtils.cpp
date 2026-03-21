@@ -5,12 +5,20 @@
 // Note: Foundation framework integration is temporarily disabled
 // Will be properly implemented in Objective-C++ files
 
+#ifndef MACH1_SHARED_APP_GROUP_ID
+#define MACH1_SHARED_APP_GROUP_ID "group.com.mach1.spatial.shared"
+#endif
+
 namespace Mach1 {
 
 #ifdef __APPLE__
 // Forward declaration for Objective-C++ implementation in SharedPathUtils.mm
 extern std::string getAppGroupContainerImpl(const std::string& groupIdentifier);
 #endif
+
+namespace {
+constexpr const char* kSharedAppGroupId = MACH1_SHARED_APP_GROUP_ID;
+}
 
 std::string SharedPathUtils::getSharedMemoryDirectory() {
     auto directories = getAllSharedDirectories();
@@ -30,7 +38,7 @@ std::vector<std::string> SharedPathUtils::getAllSharedDirectories() {
         };
 
         // Priority 1: App Group container (macOS sandboxed)
-        std::string appGroupPath = getAppGroupContainer("group.com.mach1.spatial.shared");
+        std::string appGroupPath = getAppGroupContainer(kSharedAppGroupId);
         if (!appGroupPath.empty())
             appendUnique(appGroupPath + "/Library/Caches/M1-Panner");
 
