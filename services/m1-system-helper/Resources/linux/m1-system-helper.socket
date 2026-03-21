@@ -1,0 +1,21 @@
+[Unit]
+Description=Mach1 Spatial System Helper Socket
+Documentation=https://docs.mach1.tech/
+PartOf=m1-system-helper.service
+
+[Socket]
+ListenStream=/tmp/m1-system-helper.socket
+SocketUser=root
+SocketGroup=root
+SocketMode=0666
+
+# Socket activation settings
+Accept=false
+MaxConnections=10
+KeepAlive=true
+
+# Remove socket file on stop
+RemoveOnStop=true
+
+[Install]
+WantedBy=sockets.target 

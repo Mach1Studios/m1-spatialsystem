@@ -1,0 +1,33 @@
+[Unit]
+Description=Mach1 Spatial System Helper
+Documentation=https://docs.mach1.tech/
+After=network.target
+Requires=m1-system-helper.socket
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/m1-system-helper
+User=root
+Group=root
+
+# On-demand service configuration
+Restart=no
+KillMode=mixed
+TimeoutStopSec=30
+
+# Resource limits for efficiency
+MemoryMax=50M
+CPUQuota=10%
+
+# Security settings
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/tmp /var/log
+
+# Auto-exit when inactive (systemd will restart on socket activation)
+RuntimeMaxSec=300
+
+[Install]
+WantedBy=multi-user.target
+Also=m1-system-helper.socket 

@@ -64,18 +64,45 @@ void PluginManager::updatePluginSettings(int port, const juce::OSCMessage& messa
         if (message[3].isColour()) {
             it->color = message[3].getColour();
         }
+
+        const bool hasOutputMode = message.size() >= 12 && message[5].isInt32();
         it->inputMode = message[4].getInt32();
-        it->azimuth = message[5].getFloat32();
-        it->elevation = message[6].getFloat32();
-        it->diverge = message[7].getFloat32();
-        it->gain = message[8].getFloat32();
-        it->pannerMode = message[9].getInt32();
-        
-        // Optional stereo properties
-        if (message.size() >= 13) {
-            it->autoOrbit = message[10].getInt32();
-            it->stOrbitAzimuth = message[11].getInt32();
-            it->stSpread = message[12].getFloat32();
+
+        if (hasOutputMode) {
+            it->outputMode = message[5].getInt32();
+            it->azimuth = message[6].getFloat32();
+            it->elevation = message[7].getFloat32();
+            it->diverge = message[8].getFloat32();
+            it->gain = message[9].getFloat32();
+            it->pannerMode = message[10].getInt32();
+
+            // Optional stereo properties; gain compensation occupies slot 11.
+            if (message.size() >= 15) {
+                it->autoOrbit = message[12].getInt32();
+                it->stOrbitAzimuth = message[13].getFloat32();
+                it->stSpread = message[14].getFloat32();
+            } else {
+                it->autoOrbit = false;
+                it->stOrbitAzimuth = 0.0f;
+                it->stSpread = 0.0f;
+            }
+        } else {
+            it->azimuth = message[5].getFloat32();
+            it->elevation = message[6].getFloat32();
+            it->diverge = message[7].getFloat32();
+            it->gain = message[8].getFloat32();
+            it->pannerMode = message[9].getInt32();
+
+            // Legacy payloads do not provide output mode and place stereo fields one slot earlier.
+            if (message.size() >= 14) {
+                it->autoOrbit = message[11].getInt32();
+                it->stOrbitAzimuth = message[12].getFloat32();
+                it->stSpread = message[13].getFloat32();
+            } else {
+                it->autoOrbit = false;
+                it->stOrbitAzimuth = 0.0f;
+                it->stSpread = 0.0f;
+            }
         }
         
         it->isPannerPlugin = true;  // Mark as panner plugin

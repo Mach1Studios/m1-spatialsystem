@@ -1,6 +1,6 @@
 [Setup]
 AppName=Mach1 Spatial System
-AppVersion=2.2.20260310
+AppVersion=2.3.20260317
 AppPublisher=Mach1
 DefaultDirName={pf64}\Mach1
 DisableProgramGroupPage=yes
@@ -27,7 +27,7 @@ Name: vst2; Description: VST2; Types: full
 Name: vst3; Description: VST3; Types: full custom default
 Name: m1player; Description: M1-Player; Types: full custom default
 Name: m1transcoder; Description: M1-Transcoder; Types: full default custom; Flags: fixed
-Name: m1services; Description: M1 Background Services; Types: full default custom; Flags: fixed
+Name: m1services; Description: M1 Helper Apps and Services; Types: full default custom; Flags: fixed
 
 [UninstallDelete]
 Name: {app}; Type: filesandordirs
@@ -56,7 +56,7 @@ Source: "service_setup.bat"; DestDir: "{commonappdata}\Mach1"; Components: m1ser
 Source: "service_stopper.bat"; DestDir: "{commonappdata}\Mach1"; Components: m1services; Flags: noencryption ignoreversion
 Source: "service_uninstall.bat"; DestDir: "{commonappdata}\Mach1"; Components: m1services; Flags: noencryption ignoreversion
 Source: "..\..\m1-orientationmanager\build\M1-orientationmanager_artefacts\Release\m1-orientationmanager.exe"; Excludes: "ffmpeg*.zip,*.exp,*m1-orientationmanager.lib,*av*.dll,postproc*.dll,sw*.dll"; DestDir: "{commonappdata}\Mach1"; Components: m1services; Flags: ignoreversion recursesubdirs createallsubdirs; BeforeInstall: StopServices
-Source: "..\..\services\m1-system-helper\build\M1-system-helper_artefacts\Release\m1-system-helper.exe"; DestDir: "{commonappdata}\Mach1"; Components: m1services; Flags: ignoreversion recursesubdirs createallsubdirs;
+Source: "..\..\services\m1-system-helper\build\M1-system-helper_artefacts\Release\m1-system-helper.exe"; DestDir: "{app}"; Components: m1services; Flags: ignoreversion recursesubdirs createallsubdirs;
 Source: "..\resources\settings.json"; DestDir: "{commonappdata}\Mach1"; Components: m1services; Flags: ignoreversion recursesubdirs createallsubdirs; BeforeInstall: StopServices
 
 ; Documentation files
@@ -65,7 +65,7 @@ Source: "..\resources\docs\dist\*"; Excludes: "*cloudfront-function.js"; DestDir
 [Run]
 Filename: "{commonappdata}\Mach1\service_stopper.bat"; Parameters: "install"; Flags: runascurrentuser runhidden; StatusMsg: "Stopping any existing services..."
 Filename: "{app}\download_ffmpeg.bat"; Parameters: "install"; Flags: postinstall runascurrentuser runhidden; StatusMsg: "Downloading required ffmpeg libs..."
-Filename: "{commonappdata}\Mach1\service_setup.bat"; Parameters: "install"; Flags: postinstall runascurrentuser runhidden; StatusMsg: "Setting up and starting the services..."
+Filename: "{commonappdata}\Mach1\service_setup.bat"; Parameters: "install"; Flags: postinstall runascurrentuser runhidden; StatusMsg: "Configuring helper apps and services..."
 
 [UninstallRun]
 Filename: "{commonappdata}\Mach1\service_uninstall.bat"; Parameters: ""; Flags: runascurrentuser runhidden; 
@@ -77,6 +77,7 @@ WelcomeLabel1=Mach1 Spatial System
 [Icons]
 Name: "{group}\M1-Player"; Filename: "{app}\M1-Player.exe"; Components: m1player
 Name: "{group}\M1-Transcoder"; Filename: "{app}\M1-Transcoder.exe"; Components: m1transcoder
+Name: "{group}\M1-System-Helper"; Filename: "{app}\m1-system-helper.exe"; Components: m1services
 Name: "{group}\Documentation"; Filename: "{app}\Docs\index.html"; Comment: "Open Mach1 Spatial System Documentation"
 Name: "{group}\Uninstall"; Filename: "{uninstallexe}"
 
