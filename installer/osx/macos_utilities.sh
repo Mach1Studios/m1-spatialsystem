@@ -70,16 +70,46 @@ if [[ $# -gt 0 && -n ${1-} ]]; then
     /usr/bin/tail -1 "$1"
 fi
 
+should_retry_notarization() {
+    local output_file="$1"
+    local output
+    output="$(<"${output_file}")"
+
+    case "${output}" in
+        *"NSURLErrorDomain Code=-1009"*|*"NSURLErrorDomain Code=-1001"*|*"The Internet connection appears to be offline"*|*"network connection was lost"*|*"timed out"*|*"Connection timed out"*|*"Could not resolve host"*|*"statusCode: 502"*|*"statusCode: 503"*|*"statusCode: 504"*|*"Service Unavailable"*|*"temporarily unavailable"*)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
 echo "Notarizing: ${PATH}/${NAME}${EXT}..."
 
 NOTARY_JSON="$(/usr/bin/mktemp)"
+NOTARY_MAX_ATTEMPTS="${NOTARY_MAX_ATTEMPTS:-4}"
+NOTARY_RETRY_DELAY_SECONDS="${NOTARY_RETRY_DELAY_SECONDS:-20}"
 
-if ! /usr/bin/xcrun notarytool submit --wait --timeout 15m --output-format json --keychain-profile "${KEYCHAINPROFILE}" --apple-id "${APPLE_ID}" --password "${APPLE_APP_PASS}" --team-id "${APPLE_TEAM}" "${PATH}/${NAME}${EXT}${ZIP}" > "${NOTARY_JSON}" 2>&1; then
+attempt=1
+while true; do
+    if /usr/bin/xcrun notarytool submit --wait --timeout 15m --output-format json --keychain-profile "${KEYCHAINPROFILE}" --apple-id "${APPLE_ID}" --password "${APPLE_APP_PASS}" --team-id "${APPLE_TEAM}" "${PATH}/${NAME}${EXT}${ZIP}" > "${NOTARY_JSON}" 2>&1; then
+        break
+    fi
+
     /bin/cat "${NOTARY_JSON}"
-    /bin/rm -f "${NOTARY_JSON}"
-    echo "Notarization did not complete successfully; skipping stapling."
-    exit 1
-fi
+
+    if (( attempt >= NOTARY_MAX_ATTEMPTS )) || ! should_retry_notarization "${NOTARY_JSON}"; then
+        /bin/rm -f "${NOTARY_JSON}"
+        echo "Notarization did not complete successfully; skipping stapling."
+        exit 1
+    fi
+
+    retry_delay=$((NOTARY_RETRY_DELAY_SECONDS * attempt))
+    echo "Transient notarization failure; retrying in ${retry_delay}s (attempt ${attempt}/${NOTARY_MAX_ATTEMPTS})..."
+    /bin/sleep "${retry_delay}"
+    attempt=$((attempt + 1))
+done
 
 /bin/cat "${NOTARY_JSON}"
 NOTARY_STATUS="$(/usr/bin/python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["status"])' "${NOTARY_JSON}")"
