@@ -879,7 +879,11 @@ test-ci-build:
 	@echo "  5. Package artifacts"
 	@echo ""
 	@echo "Press Ctrl+C to cancel, or wait 5 seconds..."
+ifeq ($(detected_OS),Windows)
+	@powershell -NoProfile -Command "Start-Sleep -Seconds 5"
+else
 	@sleep 5
+endif
 	@echo ""
 	$(MAKE) clean
 	$(MAKE) configure
