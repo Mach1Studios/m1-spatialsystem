@@ -253,15 +253,19 @@ void SessionMainComponent::updateFromManager()
 
 SessionUI::MyMenuBarModel::MyMenuBarModel()
 {
+#if JUCE_MAC
     // Register the model without passing a temporary PopupMenu pointer.
     // AppKit may consult the extra Apple menu items long after this constructor
     // returns, so handing it a stack object can leave dangling state.
     juce::MenuBarModel::setMacMainMenu(this);
+#endif
 }
 
 SessionUI::MyMenuBarModel::~MyMenuBarModel()
 {
+#if JUCE_MAC
     juce::MenuBarModel::setMacMainMenu(nullptr);
+#endif
 }
 
 //==============================================================================
@@ -337,12 +341,25 @@ void SessionUI::timerCallback()
             // Use MessageManager::callAsync like the working example
             juce::MessageManager::callAsync([this]()
             {
+#if JUCE_MAC
                 DBG("[SessionUI] Async callback - calling showDropdownMenu");
-                showDropdownMenu(*trayMenu);
+                this->showDropdownMenu(*trayMenu);
                 DBG("[SessionUI] showDropdownMenu call completed");
                 
                 // Restart regular data timer after menu interaction
                 startTimer(kTrayStatusUpdateIntervalMs);
+#else
+                DBG("[SessionUI] Async callback - calling PopupMenu::showMenuAsync");
+                trayMenu->showMenuAsync(juce::PopupMenu::Options(),
+                                    [safeThis = juce::Component::SafePointer<SessionUI>(this)](int)
+                                    {
+                                        if (safeThis != nullptr)
+                                        {
+                                            safeThis->trayMenu.reset();
+                                            safeThis->startTimer(kTrayStatusUpdateIntervalMs);
+                                        }
+                                    });
+#endif
             });
         }
         else
