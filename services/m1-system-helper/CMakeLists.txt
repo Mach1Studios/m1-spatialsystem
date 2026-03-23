@@ -82,6 +82,10 @@ target_compile_definitions(${CMAKE_PROJECT_NAME}
     MACH1_SHARED_APP_GROUP_ID="${MACH1_SHARED_APP_GROUP_ID}"
     GUI_APP=1)
 
+if(WIN32)
+    target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE M1_STATIC)
+endif()
+
 # Disable compiler extensions for the project targets (e.g. use -std=c++17 instead of -std=gnu++17).
 get_property(project_targets DIRECTORY "${PROJECT_SOURCE_DIR}" PROPERTY BUILDSYSTEM_TARGETS)
 set_target_properties(${project_targets} PROPERTIES CXX_EXTENSIONS OFF)

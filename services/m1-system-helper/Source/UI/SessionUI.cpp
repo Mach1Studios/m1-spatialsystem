@@ -337,21 +337,25 @@ void SessionUI::timerCallback()
         if (trayMenu)
         {
             DBG("[SessionUI] Using MessageManager::callAsync approach");
+            auto safeThis = juce::Component::SafePointer<SessionUI>(this);
             
             // Use MessageManager::callAsync like the working example
-            juce::MessageManager::callAsync([this]()
+            juce::MessageManager::callAsync([safeThis]()
             {
+                if (safeThis == nullptr)
+                    return;
+
 #if JUCE_MAC
                 DBG("[SessionUI] Async callback - calling showDropdownMenu");
-                this->showDropdownMenu(*trayMenu);
+                safeThis->showDropdownMenu(*safeThis->trayMenu);
                 DBG("[SessionUI] showDropdownMenu call completed");
                 
                 // Restart regular data timer after menu interaction
-                startTimer(kTrayStatusUpdateIntervalMs);
+                safeThis->startTimer(kTrayStatusUpdateIntervalMs);
 #else
                 DBG("[SessionUI] Async callback - calling PopupMenu::showMenuAsync");
-                trayMenu->showMenuAsync(juce::PopupMenu::Options(),
-                                    [safeThis = juce::Component::SafePointer<SessionUI>(this)](int)
+                safeThis->trayMenu->showMenuAsync(juce::PopupMenu::Options(),
+                                    [safeThis](int)
                                     {
                                         if (safeThis != nullptr)
                                         {
