@@ -1697,6 +1697,7 @@ ifeq ($(detected_OS),Darwin)
 	echo ""; \
 	echo "Deployed $$UPLOADED installer(s) to s3://mach1-releases/$$version/"; \
 	echo "REMINDER: Update the Avid Store Submission per version update!"
+	echo "REMINDER: Run 'make deploy-installer' to deploy the installers to S3"
 else ifeq ($(detected_OS),Windows)
 	@echo "### DEPLOYING TO S3 ###"
 	@if not exist "installer\win\Output\Mach1 Spatial System Installer.exe" ( \
