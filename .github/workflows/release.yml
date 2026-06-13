@@ -683,7 +683,8 @@ jobs:
   # =============================================================================
   build-windows:
     if: ${{ github.event.inputs.build_windows != 'false' }}
-    runs-on: windows-latest
+    # Pin until SimpleBLE is updated for the VS 2026 toolchain used by windows-latest.
+    runs-on: windows-2022
     timeout-minutes: 180
     
     env:
