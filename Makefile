@@ -41,6 +41,7 @@ help:
 	@echo "  make codesign                         - Sign all binaries (macOS/Windows)"
 	@echo "  make codesign-vst3                    - Sign VST3 plugins only"
 	@echo "  make codesign-apps                    - Sign applications only"
+	@echo "  make test-aax-ci                      - Verify and validate macOS CI AAX artifacts"
 	@echo "  make test-azure-signing               - Test Azure Trusted Signing setup (Windows)"
 	@echo "  make verify-win-signing               - Verify all Windows signatures including installer"
 	@echo ""
@@ -143,8 +144,8 @@ else
 	@echo "Version updates are not supported on Windows"
 endif
 
-.PHONY: test-aax-monitor test-aax-panner test-aax-plugins test-aax-release
-.PHONY: verify-aax-signing diagnose-aax
+.PHONY: test-aax-monitor test-aax-panner test-aax-plugins test-aax-release test-aax-ci
+.PHONY: verify-aax-signing verify-aax-ci-signing diagnose-aax
 .PHONY: test-ci-build test-ci-build-player-only test-ci-yaml
 .PHONY: test-ci-act-arm
 .PHONY: package-from-ci download-ci-artifacts install-arch-artifacts sign-aax-local installer-pkg-from-ci
@@ -543,6 +544,10 @@ package: update-versions-internal build docs-build codesign notarize installer-p
 #
 ARTIFACTS_BUCKET ?= mach1-build-artifacts
 CI_ARTIFACTS_DIR ?= ci-artifacts
+AAX_VALIDATOR_TIMEOUT ?= 300
+CI_AAX_PLUGIN_PATHS := \
+	m1-monitor/build/M1-Monitor_artefacts/AAX/M1-Monitor.aaxplugin \
+	m1-panner/build/M1-Panner_artefacts/AAX/M1-Panner.aaxplugin
 
 # Release artifact path resolution
 # CI packaging preserves the native contents of each *_artefacts directory, while
@@ -692,24 +697,34 @@ ifeq ($(detected_OS),Darwin)
 		echo "Signing M1-Monitor AAX..."; \
 		AAX_PATH=$$(find m1-monitor/build -name "M1-Monitor.aaxplugin" -type d | head -1); \
 		if [ -n "$$AAX_PATH" ]; then \
-			codesign --force --sign $(APPLE_CODESIGN_CODE) --entitlements $(MAC_MONITOR_ENTITLEMENTS) --timestamp "$$AAX_PATH"; \
+			codesign --force --sign $(APPLE_CODESIGN_CODE) --entitlements $(MAC_MONITOR_ENTITLEMENTS) --timestamp "$$AAX_PATH" || \
+				(echo "ERROR: Apple codesigning failed for M1-Monitor AAX" && exit 1); \
 			$(WRAPTOOL) sign --verbose --account $(PACE_ACCOUNT) --wcguid "$(MONITOR_FREE_GUID)" \
-				--signid $(APPLE_CODESIGN_ID) --in "$$AAX_PATH" --out "$$AAX_PATH" --autoinstall on; \
+				--signid $(APPLE_CODESIGN_ID) --in "$$AAX_PATH" --out "$$AAX_PATH" --autoinstall on || \
+				(echo "ERROR: PACE signing failed for M1-Monitor AAX" && exit 1); \
+			$(WRAPTOOL) verify --verbose --in "$$AAX_PATH" || \
+				(echo "ERROR: PACE verification failed for M1-Monitor AAX" && exit 1); \
 			echo "M1-Monitor AAX signed"; \
 		else \
-			echo "M1-Monitor.aaxplugin not found"; \
+			echo "ERROR: M1-Monitor.aaxplugin not found"; \
+			exit 1; \
 		fi; \
 	fi
 	@if [ -d "m1-panner/build/M1-Panner_artefacts/AAX" ] || [ -d "m1-panner/build/AAX" ]; then \
 		echo "Signing M1-Panner AAX..."; \
 		AAX_PATH=$$(find m1-panner/build -name "M1-Panner.aaxplugin" -type d | head -1); \
 		if [ -n "$$AAX_PATH" ]; then \
-			codesign --force --sign $(APPLE_CODESIGN_CODE) --entitlements $(MAC_PANNER_ENTITLEMENTS) --timestamp "$$AAX_PATH"; \
+			codesign --force --sign $(APPLE_CODESIGN_CODE) --entitlements $(MAC_PANNER_ENTITLEMENTS) --timestamp "$$AAX_PATH" || \
+				(echo "ERROR: Apple codesigning failed for M1-Panner AAX" && exit 1); \
 			$(WRAPTOOL) sign --verbose --account $(PACE_ACCOUNT) --wcguid "$(PANNER_FREE_GUID)" \
-				--signid $(APPLE_CODESIGN_ID) --in "$$AAX_PATH" --out "$$AAX_PATH" --autoinstall on; \
+				--signid $(APPLE_CODESIGN_ID) --in "$$AAX_PATH" --out "$$AAX_PATH" --autoinstall on || \
+				(echo "ERROR: PACE signing failed for M1-Panner AAX" && exit 1); \
+			$(WRAPTOOL) verify --verbose --in "$$AAX_PATH" || \
+				(echo "ERROR: PACE verification failed for M1-Panner AAX" && exit 1); \
 			echo "M1-Panner AAX signed"; \
 		else \
-			echo "M1-Panner.aaxplugin not found"; \
+			echo "ERROR: M1-Panner.aaxplugin not found"; \
+			exit 1; \
 		fi; \
 	fi
 	@echo ""
@@ -1510,6 +1525,55 @@ else ifeq ($(detected_OS),Windows)
 	)
 endif
 	@echo "\n=== Code Signing Verification Complete ==="
+
+verify-aax-ci-signing:
+	@echo "=== Verifying CI AAX Plugin Code Signing ==="
+ifeq ($(detected_OS),Darwin)
+	@echo "Checking locally signed CI artifacts in build directories."
+	@STATUS=0; \
+	for plugin in $(CI_AAX_PLUGIN_PATHS); do \
+		echo ""; \
+		echo "--- $$plugin ---"; \
+		if [ ! -d "$$plugin" ]; then \
+			echo "ERROR: AAX plugin not found: $$plugin"; \
+			echo "Run 'make package-from-ci VERSION=<version>' or 'make install-arch-artifacts ARCH=<arch> && make sign-aax-local'."; \
+			STATUS=1; \
+			continue; \
+		fi; \
+		if codesign --verify --deep --strict --verbose=2 "$$plugin"; then \
+			echo "codesign verify: PASS"; \
+			codesign -dvvv "$$plugin" 2>&1 | grep -E "(Authority|TeamIdentifier|Signature|Format|Identifier)" || true; \
+		else \
+			echo "codesign verify: FAIL"; \
+			codesign -dvvv "$$plugin" 2>&1 | grep -E "(Authority|TeamIdentifier|Signature|Format|Identifier)" || true; \
+			STATUS=1; \
+		fi; \
+		if $(WRAPTOOL) verify --verbose --in "$$plugin"; then \
+			echo "PACE verify: PASS"; \
+		else \
+			echo "PACE verify: FAIL"; \
+			STATUS=1; \
+		fi; \
+	done; \
+	echo "\n=== CI AAX Code Signing Verification Complete ==="; \
+	exit $$STATUS
+else
+	@echo "CI AAX signing verification is only supported on macOS"
+endif
+
+test-aax-ci: check-aax-validator verify-aax-ci-signing
+	@echo "=== Testing CI AAX Plugins ==="
+	@echo "NOTE: Ensure iLok License Manager is running for PACE support"
+	@echo "NOTE: Override AAX_VALIDATOR_TIMEOUT=<seconds> if validation needs more time"
+ifeq ($(detected_OS),Darwin)
+	@/usr/bin/python3 installer/osx/validate_aax_plugins.py \
+		--validator "$(AAX_VALIDATOR_PATH)" \
+		--timeout "$(AAX_VALIDATOR_TIMEOUT)" \
+		$(CI_AAX_PLUGIN_PATHS)
+else
+	@echo "CI AAX validation is only supported on macOS"
+endif
+	@echo "\n=== CI AAX Plugin Validation Complete ==="
 
 test-aax-release: check-aax-validator verify-aax-signing
 	@echo "=== Testing Release AAX Plugins ==="
