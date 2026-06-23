@@ -521,6 +521,9 @@ endif
 overlay-debug:
 	cd m1-panner/Resources/overlay_debug && ./run_simulator.sh --title "Avid Video Engine"
 
+overlay-debug-list:
+	cd m1-panner/Resources/overlay_debug && ./run_list_windows.sh $(ARGS)
+
 # =============================================================================
 # Release Packaging
 # =============================================================================
