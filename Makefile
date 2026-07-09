@@ -567,7 +567,7 @@ WIN_PLAYER_EXE_PATH := $(or $(firstword $(wildcard m1-player/build/M1-Player_art
 WIN_ORIENTATION_EXE_PATH := $(or $(firstword $(wildcard m1-orientationmanager/build/m1-orientationmanager_artefacts/Release/m1-orientationmanager.exe)),m1-orientationmanager/build/m1-orientationmanager_artefacts/m1-orientationmanager.exe)
 WIN_HELPER_EXE_PATH := $(or $(firstword $(wildcard services/m1-system-helper/build/m1-system-helper_artefacts/Release/m1-system-helper.exe)),services/m1-system-helper/build/m1-system-helper_artefacts/m1-system-helper.exe)
 
-package-from-ci: download-ci-artifacts sign-aax-local installer-pkg-from-ci
+package-from-ci: download-ci-artifacts installer-pkg-from-ci
 	@echo ""
 	@echo "========================================"
 	@echo "Release Complete!"
@@ -761,7 +761,7 @@ else ifeq ($(detected_OS),Windows)
 	)
 endif
 
-installer-pkg-from-ci: sign-aax-local
+installer-pkg-from-ci:
 	@echo ""
 	@echo "========================================"
 	@echo "Creating Installer Packages"
