@@ -10,24 +10,41 @@ param(
 $configFile = Join-Path $PSScriptRoot "..\..\Makefile.variables"
 $config = @{}
 
-Get-Content $configFile | Where-Object { $_ -match '^\w+=' } | ForEach-Object {
-    if ($_ -match '^(\w+)=(.*)$') {
+Get-Content $configFile | ForEach-Object {
+    if ($_ -match '^\s*([A-Za-z_][A-Za-z0-9_]*)\s*[:?+]?=\s*(.*)$') {
         $key = $matches[1]
-        $value = $matches[2].Trim('"').Trim("'")
+        $value = $matches[2].Trim()
+        if ($value.StartsWith("#")) {
+            $value = ""
+        }
+        $value = $value.Trim('"').Trim("'")
         $config[$key] = $value
     }
 }
 
+function Get-ConfigValue {
+    param([string]$Name)
+
+    if ($config.ContainsKey($Name) -and -not [string]::IsNullOrWhiteSpace($config[$Name])) {
+        return $config[$Name]
+    }
+
+    return [Environment]::GetEnvironmentVariable($Name)
+}
+
 # Set Azure environment variables
-$env:AZURE_CLIENT_ID = $config['AZURE_CLIENT_ID']
-$env:AZURE_TENANT_ID = $config['AZURE_TENANT_ID']
-$env:AZURE_CLIENT_SECRET = $config['AZURE_CLIENT_SECRET']
+$env:AZURE_CLIENT_ID = Get-ConfigValue 'AZURE_CLIENT_ID'
+$env:AZURE_TENANT_ID = Get-ConfigValue 'AZURE_TENANT_ID'
+$env:AZURE_CLIENT_SECRET = Get-ConfigValue 'AZURE_CLIENT_SECRET'
+if ([string]::IsNullOrWhiteSpace($env:AZURE_CLIENT_SECRET)) {
+    $env:AZURE_CLIENT_SECRET = Get-ConfigValue 'AZURE_SECRET_ID'
+}
 
 # Get paths
-$signtoolPath = $config['WIN_SIGNTOOL_PATH']
-$dlibPath = $config['AZURE_DLIB_PATH']
-$metadataPath = $config['AZURE_METADATA_PATH']
-$timestampUrl = $config['AZURE_TIMESTAMP_URL']
+$signtoolPath = Get-ConfigValue 'WIN_SIGNTOOL_PATH'
+$dlibPath = Get-ConfigValue 'AZURE_DLIB_PATH'
+$metadataPath = Get-ConfigValue 'AZURE_METADATA_PATH'
+$timestampUrl = Get-ConfigValue 'AZURE_TIMESTAMP_URL'
 
 # Check if file exists
 if (-not (Test-Path $FilePath)) {

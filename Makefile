@@ -29,6 +29,7 @@ help:
 	@echo "  make package-from-ci COMMIT=abc123    - Same as above, but by commit SHA"
 	@echo "  make list-ci-builds                   - List available CI builds in S3"
 	@echo "  make installer-pkg                    - Build installer packages only"
+	@echo "  make deploy-installer VERSION=x.x.x   - Upload installer packages to S3"
 	@echo ""
 	@echo "CI/CD Testing (local simulation):"
 	@echo "  make test-ci-build                    - Simulate full CI build locally"
@@ -148,7 +149,7 @@ endif
 .PHONY: verify-aax-signing verify-aax-ci-signing diagnose-aax
 .PHONY: test-ci-build test-ci-build-player-only test-ci-yaml
 .PHONY: test-ci-act-arm
-.PHONY: package-from-ci download-ci-artifacts install-arch-artifacts sign-aax-local installer-pkg-from-ci
+.PHONY: package-from-ci download-ci-artifacts install-arch-artifacts sign-aax-local installer-pkg-from-ci deploy-installer
 
 pull:
 	git pull --recurse-submodules
@@ -546,6 +547,8 @@ package: update-versions-internal build docs-build codesign notarize installer-p
 #   - Apple Developer certificate in keychain for macOS
 #
 ARTIFACTS_BUCKET ?= mach1-build-artifacts
+RELEASES_BUCKET ?= mach1-releases
+AWS_PROFILE ?= mach1
 CI_ARTIFACTS_DIR ?= ci-artifacts
 AAX_VALIDATOR_TIMEOUT ?= 300
 CI_AAX_PLUGIN_PATHS := \
@@ -576,6 +579,10 @@ ifeq ($(detected_OS),Darwin)
 	@echo ""
 	@echo "macOS installers ready:"
 	@ls -la installer/osx/build/signed/*.pkg
+else ifeq ($(detected_OS),Windows)
+	@echo ""
+	@echo "Windows installer ready:"
+	@if exist "installer\win\Output\Mach1 Spatial System Installer.exe" echo   installer\win\Output\Mach1 Spatial System Installer.exe
 endif
 	@echo ""
 
@@ -626,23 +633,7 @@ ifeq ($(detected_OS),Darwin)
 	@echo "  - $(CI_ARTIFACTS_DIR)/macos-arm64/"
 	@echo "  - $(CI_ARTIFACTS_DIR)/macos-x86/"
 else ifeq ($(detected_OS),Windows)
-	@echo "Downloading Windows artifacts..."
-	@if not defined VERSION if not defined COMMIT ( \
-		echo ERROR: Specify VERSION or COMMIT && \
-		echo   make package-from-ci VERSION=2.1 && \
-		echo   make package-from-ci COMMIT=abc12345 && \
-		exit 1 \
-	)
-	@if not exist $(CI_ARTIFACTS_DIR) mkdir $(CI_ARTIFACTS_DIR)
-	@if defined VERSION ( \
-		aws s3 cp "s3://$(ARTIFACTS_BUCKET)/builds/$(VERSION)/windows-builds.zip" \
-			"$(CI_ARTIFACTS_DIR)\windows-builds.zip" --region us-east-1 \
-	) else ( \
-		aws s3 cp "s3://$(ARTIFACTS_BUCKET)/commits/$(COMMIT)/windows-builds.zip" \
-			"$(CI_ARTIFACTS_DIR)\windows-builds.zip" --region us-east-1 \
-	)
-	@7z x -y "$(CI_ARTIFACTS_DIR)\windows-builds.zip" -o"$(CI_ARTIFACTS_DIR)"
-	@echo Artifacts downloaded and extracted
+	@powershell -NoProfile -ExecutionPolicy Bypass -File installer\win\package-from-ci.ps1 -Version "$(VERSION)" -Commit "$(COMMIT)" -ArtifactsBucket "$(ARTIFACTS_BUCKET)" -CiArtifactsDir "$(CI_ARTIFACTS_DIR)" -Region "us-east-1"
 endif
 
 # Helper to install artifacts for a specific architecture
@@ -733,32 +724,7 @@ ifeq ($(detected_OS),Darwin)
 	@echo ""
 	@echo "AAX signing complete!"
 else ifeq ($(detected_OS),Windows)
-	@echo "Signing AAX plugins on Windows..."
-	@echo "Ensure iLok License Manager is running..."
-	@if exist "m1-monitor\build\M1-Monitor_artefacts\Release\AAX\M1-Monitor.aaxplugin" ( \
-		set SIGNTOOL_PATH=$(WIN_SIGNTOOL_PATH) && \
-		set ACS_DLIB=$(AZURE_DLIB_PATH) && \
-		set ACS_JSON=$(AZURE_METADATA_PATH) && \
-		set AZURE_TENANT_ID=$(AZURE_TENANT_ID) && \
-		set AZURE_CLIENT_ID=$(AZURE_CLIENT_ID) && \
-		set AZURE_SECRET_ID=$(AZURE_CLIENT_SECRET) && \
-		$(WRAPTOOL) sign --signtool "$(CURDIR)/installer/win/aax-signtool.bat" --signid 1 --verbose \
-			--installedbinaries --account $(PACE_ACCOUNT) --wcguid "$(MONITOR_FREE_GUID)" \
-			--in m1-monitor\build\M1-Monitor_artefacts\Release\AAX\M1-Monitor.aaxplugin \
-			--out m1-monitor\build\M1-Monitor_artefacts\Release\AAX\M1-Monitor.aaxplugin \
-	)
-	@if exist "m1-panner\build\M1-Panner_artefacts\Release\AAX\M1-Panner.aaxplugin" ( \
-		set SIGNTOOL_PATH=$(WIN_SIGNTOOL_PATH) && \
-		set ACS_DLIB=$(AZURE_DLIB_PATH) && \
-		set ACS_JSON=$(AZURE_METADATA_PATH) && \
-		set AZURE_TENANT_ID=$(AZURE_TENANT_ID) && \
-		set AZURE_CLIENT_ID=$(AZURE_CLIENT_ID) && \
-		set AZURE_SECRET_ID=$(AZURE_CLIENT_SECRET) && \
-		$(WRAPTOOL) sign --signtool "$(CURDIR)/installer/win/aax-signtool.bat" --signid 1 --verbose \
-			--installedbinaries --account $(PACE_ACCOUNT) --wcguid "$(PANNER_FREE_GUID)" \
-			--in m1-panner\build\M1-Panner_artefacts\Release\AAX\M1-Panner.aaxplugin \
-			--out m1-panner\build\M1-Panner_artefacts\Release\AAX\M1-Panner.aaxplugin \
-	)
+	@powershell -NoProfile -ExecutionPolicy Bypass -File installer\win\sign-aax.ps1
 endif
 
 installer-pkg-from-ci:
@@ -847,12 +813,9 @@ ifeq ($(detected_OS),Darwin)
 	@echo "  - installer/osx/build/signed/Mach1 Spatial System Installer-x86_64.pkg"
 	@echo "========================================"
 else ifeq ($(detected_OS),Windows)
-	@echo "Building Windows installer..."
-	$(WIN_INNO_PATH) "${CURDIR}/installer/win/installer.iss"
-	@echo "Signing installer..."
-	powershell -ExecutionPolicy Bypass -File installer\win\sign-file.ps1 \
-		-FilePath "installer\win\Output\Mach1 Spatial System Installer.exe"
-	@echo "Installer created at: installer\win\Output\Mach1 Spatial System Installer.exe"
+	@$(MAKE) sign-aax-local
+	@$(MAKE) docs-build
+	@powershell -NoProfile -ExecutionPolicy Bypass -File installer\win\build-installer.ps1 -InnoSetupPath "$(WIN_INNO_PATH)"
 endif
 
 # List available CI builds
@@ -869,7 +832,7 @@ list-ci-builds:
 clean-ci-artifacts:
 	@echo "Cleaning CI artifacts..."
 ifeq ($(detected_OS),Windows)
-	@if exist "$(CI_ARTIFACTS_DIR)" rmdir /s /q "$(CI_ARTIFACTS_DIR)"
+	@powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Test-Path -LiteralPath '$(CI_ARTIFACTS_DIR)') { Remove-Item -LiteralPath '$(CI_ARTIFACTS_DIR)' -Recurse -Force }"
 else
 	rm -rf "$(CI_ARTIFACTS_DIR)"
 endif
@@ -1711,16 +1674,8 @@ ifeq ($(detected_OS),Darwin)
 	echo ""; \
 	echo "Installer created: installer/osx/build/signed/Mach1 Spatial System Installer-$$ARCH_SUFFIX.pkg"
 else ifeq ($(detected_OS),Windows)
-	@echo "Building Windows installer..."
-	$(WIN_INNO_PATH) "${CURDIR}/installer/win/installer.iss"
-	@echo "Signing Windows installer with Azure Trusted Signing..."
-	@if exist "installer\win\Output\Mach1 Spatial System Installer.exe" ( \
-		powershell -ExecutionPolicy Bypass -File installer\win\sign-file.ps1 -FilePath "installer\win\Output\Mach1 Spatial System Installer.exe" \
-	) else ( \
-		echo "ERROR: Installer not found at installer\win\Output\Mach1 Spatial System Installer.exe" && \
-		exit 1 \
-	)
-	@echo "Windows installer built and signed"
+	@$(MAKE) docs-build
+	@powershell -NoProfile -ExecutionPolicy Bypass -File installer\win\build-installer.ps1 -InnoSetupPath "$(WIN_INNO_PATH)"
 endif
 
 deploy-installer:
@@ -1766,12 +1721,7 @@ ifeq ($(detected_OS),Darwin)
 	echo "REMINDER: Update the Avid Store Submission per version update!"
 	echo "REMINDER: Run 'make deploy-installer' to deploy the installers to S3"
 else ifeq ($(detected_OS),Windows)
-	@echo "### DEPLOYING TO S3 ###"
-	@if not exist "installer\win\Output\Mach1 Spatial System Installer.exe" ( \
-		echo "Installer not found. Please run 'make installer-pkg' first." && \
-		exit 1 \
-	)
-	@powershell -Command "$$current_version = Get-Content VERSION; $$rootPath = (Get-Location).Path; $$rootVersionPath = Join-Path $$rootPath 'VERSION'; $$allVersions = Get-ChildItem -Recurse -Filter 'VERSION'; $$component_versions = @(); foreach ($$file in $$allVersions) { if ($$file.FullName -ne $$rootVersionPath) { $$relDir = $$file.DirectoryName.Replace($$rootPath, '').TrimStart('\', '/'); if ($$relDir) { $$pathParts = $$relDir -split '[\\/]' | Where-Object { $$_ }; if ($$pathParts.Count -le 1) { $$component_versions += Get-Content $$file.FullName } } } }; $$suggested_version = $$component_versions | Sort-Object { [version]$$_ } | Select-Object -Last 1; Write-Host \"Current central version: $$current_version\"; Write-Host \"Newest component version: $$suggested_version\"; Write-Host \"Suggested version: $$suggested_version\"; $$version = Read-Host \"Version [$$suggested_version]\"; if ($$version -eq '') { $$version = $$suggested_version }; aws s3 cp 'installer\win\Output\Mach1 Spatial System Installer.exe' \"s3://mach1-releases/$$version/Mach1 Spatial System Installer.exe\" --profile mach1 --content-disposition \"Mach1 Spatial System Installer.exe\"; Write-Host \"Installer deployed to s3://mach1-releases/$$version/\"; Write-Host \"REMINDER: Update the Avid Store Submission per version update!\""
+	@powershell -NoProfile -ExecutionPolicy Bypass -File installer\win\deploy-installer.ps1 -Version "$(VERSION)" -ReleaseBucket "$(RELEASES_BUCKET)" -AwsProfile "$(AWS_PROFILE)"
 else
 	@echo "Installer deployment is not supported on this platform"
 endif
