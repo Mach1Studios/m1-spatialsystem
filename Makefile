@@ -149,7 +149,7 @@ endif
 .PHONY: verify-aax-signing verify-aax-ci-signing diagnose-aax
 .PHONY: test-ci-build test-ci-build-player-only test-ci-yaml
 .PHONY: test-ci-act-arm
-.PHONY: package-from-ci download-ci-artifacts install-arch-artifacts sign-aax-local installer-pkg-from-ci deploy-installer
+.PHONY: package-from-ci download-ci-artifacts install-arch-artifacts sign-aax-local prepare-ci-installer-version installer-pkg-from-ci deploy-installer
 
 pull:
 	git pull --recurse-submodules
@@ -723,7 +723,24 @@ else ifeq ($(detected_OS),Windows)
 	@powershell -NoProfile -ExecutionPolicy Bypass -File installer\win\sign-aax.ps1
 endif
 
-installer-pkg-from-ci:
+prepare-ci-installer-version:
+ifeq ($(detected_OS),Windows)
+	@if "$(VERSION)"=="" ( \
+		echo No VERSION supplied; using existing installer metadata version. \
+	) else ( \
+		echo Synchronizing installer metadata to VERSION=$(VERSION)... && \
+		$(MAKE) update-version VERSION=$(VERSION) \
+	)
+else
+	@if [ -n "$(VERSION)" ]; then \
+		echo "Synchronizing installer metadata to VERSION=$(VERSION)..."; \
+		$(MAKE) update-version VERSION="$(VERSION)"; \
+	else \
+		echo "No VERSION supplied; using existing installer metadata version $$(cat VERSION)."; \
+	fi
+endif
+
+installer-pkg-from-ci: prepare-ci-installer-version
 	@echo ""
 	@echo "========================================"
 	@echo "Creating Installer Packages"
