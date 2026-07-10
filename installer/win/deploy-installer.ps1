@@ -43,16 +43,55 @@ function Get-SuggestedVersion {
     return ""
 }
 
+function Invoke-Native {
+    param(
+        [string]$FilePath,
+        [string[]]$Arguments
+    )
+
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $output = & $FilePath @Arguments 2>&1
+        $exitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+
+    Write-NativeOutput $output
+
+    return [pscustomobject]@{
+        ExitCode = $exitCode
+        Output = $output
+    }
+}
+
+function Write-NativeOutput {
+    param([object[]]$Output)
+
+    if (-not $Output) {
+        return
+    }
+
+    $Output | ForEach-Object {
+        $line = $_.ToString()
+        if ($line -and $line -ne "System.Management.Automation.RemoteException") {
+            Write-Host $line
+        }
+    }
+}
+
 function Invoke-Checked {
     param(
         [string]$FilePath,
         [string[]]$Arguments
     )
 
-    & $FilePath @Arguments
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "ERROR: Command failed with exit code $LASTEXITCODE`: $FilePath $($Arguments -join ' ')" -ForegroundColor Red
-        exit $LASTEXITCODE
+    $result = Invoke-Native $FilePath $Arguments
+    if ($result.ExitCode -ne 0) {
+        Write-Host "ERROR: Command failed with exit code $($result.ExitCode): $FilePath $($Arguments -join ' ')" -ForegroundColor Red
+        exit $result.ExitCode
     }
 }
 

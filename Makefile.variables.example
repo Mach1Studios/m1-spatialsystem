@@ -16,6 +16,11 @@ VST2_PATH=
 
 WRAPTOOL=
 PACE_ACCOUNT=
+PACE_PASSWORD=
+
+# AWS profile used for downloading CI artifacts and deploying releases.
+# Leave empty to use the default AWS credential chain.
+AWS_PROFILE=mach1
 
 # AAX Validator (dsh tool) - Path to PACE AAX Validator CommandLineTools/dsh
 # Example macOS arm64: /Users/username/SDKs/aax-validator-dsh-2024-6-0-138bab0d-mac-arm64/CommandLineTools/dsh
@@ -29,6 +34,7 @@ APPLE_CODESIGN_CODE=
 APPLE_CODESIGN_INSTALLER_ID="Developer ID Installer: [NAME] ($(APPLE_TEAM_CODE))"
 
 WIN_INNO_PATH=
+# Optional. Leave blank to auto-detect from the installed Windows SDK.
 WIN_SIGNTOOL_PATH=
 
 # Azure CodeSigning with signtool.exe

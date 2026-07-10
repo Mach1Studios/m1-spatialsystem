@@ -186,13 +186,9 @@ ifeq ($(detected_OS),Darwin)
 	cd m1-panner && pre-commit install
 	cd m1-monitor && pre-commit install
 else ifeq ($(detected_OS),Windows)
-	@choco version >nul || (echo "chocolately is not working or installed" && exit 1)
-	@echo "choco is installed and working"
-	@choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' --apply-install-arguments-to-dependencies
-	@choco install pkgconfiglite autoconf automake libtool
+	@powershell -NoProfile -ExecutionPolicy Bypass -File installer\win\setup-prereqs.ps1
 	@pip3 install meson
 	@if not exist "$(pip show pre-commit)" (pip install pre-commit)
-	npm install -g nodemon
 	cd m1-panner && pre-commit install
 	cd m1-monitor && pre-commit install
 endif
@@ -633,7 +629,7 @@ ifeq ($(detected_OS),Darwin)
 	@echo "  - $(CI_ARTIFACTS_DIR)/macos-arm64/"
 	@echo "  - $(CI_ARTIFACTS_DIR)/macos-x86/"
 else ifeq ($(detected_OS),Windows)
-	@powershell -NoProfile -ExecutionPolicy Bypass -File installer\win\package-from-ci.ps1 -Version "$(VERSION)" -Commit "$(COMMIT)" -ArtifactsBucket "$(ARTIFACTS_BUCKET)" -CiArtifactsDir "$(CI_ARTIFACTS_DIR)" -Region "us-east-1"
+	@powershell -NoProfile -ExecutionPolicy Bypass -File installer\win\package-from-ci.ps1 -Version "$(VERSION)" -Commit "$(COMMIT)" -ArtifactsBucket "$(ARTIFACTS_BUCKET)" -CiArtifactsDir "$(CI_ARTIFACTS_DIR)" -Region "us-east-1" -AwsProfile "$(AWS_PROFILE)"
 endif
 
 # Helper to install artifacts for a specific architecture
@@ -815,7 +811,7 @@ ifeq ($(detected_OS),Darwin)
 else ifeq ($(detected_OS),Windows)
 	@$(MAKE) sign-aax-local
 	@$(MAKE) docs-build
-	@powershell -NoProfile -ExecutionPolicy Bypass -File installer\win\build-installer.ps1 -InnoSetupPath "$(WIN_INNO_PATH)"
+	@powershell -NoProfile -ExecutionPolicy Bypass -File installer\win\build-installer.ps1
 endif
 
 # List available CI builds
@@ -1675,7 +1671,7 @@ ifeq ($(detected_OS),Darwin)
 	echo "Installer created: installer/osx/build/signed/Mach1 Spatial System Installer-$$ARCH_SUFFIX.pkg"
 else ifeq ($(detected_OS),Windows)
 	@$(MAKE) docs-build
-	@powershell -NoProfile -ExecutionPolicy Bypass -File installer\win\build-installer.ps1 -InnoSetupPath "$(WIN_INNO_PATH)"
+	@powershell -NoProfile -ExecutionPolicy Bypass -File installer\win\build-installer.ps1
 endif
 
 deploy-installer:

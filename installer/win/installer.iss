@@ -37,8 +37,8 @@ Source: "..\..\m1-monitor\build\M1-Monitor_artefacts\Release\AAX\M1-Monitor.aaxp
 Source: "..\..\m1-panner\build\M1-Panner_artefacts\Release\AAX\M1-Panner.aaxplugin"; DestDir: "{pf64}\Common Files\Avid\Audio\Plug-Ins"; Components: aax; Flags: ignoreversion recursesubdirs
 Source: "..\resources\templates\PTHD\*"; DestDir: "{app}\templates\PTHD"; Components: aax; Flags: ignoreversion recursesubdirs createallsubdirs
 
-Source: "..\..\m1-monitor\build\M1-Monitor_artefacts\Release\VST\M1-Monitor.dll"; DestDir: "{code:GetDir|0}"; Components: vst2; Flags: ignoreversion
-Source: "..\..\m1-panner\build\M1-Panner_artefacts\Release\VST\M1-Panner.dll"; DestDir: "{code:GetDir|0}"; Components: vst2; Flags: ignoreversion
+Source: "..\..\m1-monitor\build\M1-Monitor_artefacts\Release\VST\M1-Monitor.dll"; DestDir: "{code:GetDir|0}"; Components: vst2; Flags: ignoreversion skipifsourcedoesntexist
+Source: "..\..\m1-panner\build\M1-Panner_artefacts\Release\VST\M1-Panner.dll"; DestDir: "{code:GetDir|0}"; Components: vst2; Flags: ignoreversion skipifsourcedoesntexist
 Source: "..\resources\templates\Reaper\*"; DestDir: "{app}\templates\Reaper"; Components: vst2; Flags: ignoreversion recursesubdirs createallsubdirs
 
 Source: "..\..\m1-monitor\build\M1-Monitor_artefacts\Release\VST3\M1-Monitor.vst3"; DestDir: "{code:GetDir|1}"; Components: vst3; Flags: ignoreversion recursesubdirs createallsubdirs

@@ -56,14 +56,57 @@ function Get-Setting {
 function Invoke-Checked {
     param(
         [string]$FilePath,
-        [string[]]$Arguments
+        [string[]]$Arguments,
+        [string[]]$DisplayArguments = $Arguments
     )
 
     & $FilePath @Arguments
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "ERROR: Command failed with exit code $LASTEXITCODE`: $FilePath $($Arguments -join ' ')" -ForegroundColor Red
+        Write-Host "ERROR: Command failed with exit code $LASTEXITCODE`: $FilePath $($DisplayArguments -join ' ')" -ForegroundColor Red
         exit $LASTEXITCODE
     }
+}
+
+function Resolve-SignTool {
+    param([string]$ConfiguredPath)
+
+    $candidates = @()
+    if (-not [string]::IsNullOrWhiteSpace($ConfiguredPath)) {
+        $candidates += $ConfiguredPath.Trim().Trim('"').Trim("'")
+    }
+
+    $command = Get-Command signtool.exe -ErrorAction SilentlyContinue
+    if ($command) {
+        $candidates += $command.Source
+    }
+
+    $kitsRoot = "${env:ProgramFiles(x86)}\Windows Kits\10\bin"
+    if (Test-Path -LiteralPath $kitsRoot) {
+        $sdkSignTools = Get-ChildItem -LiteralPath $kitsRoot -Directory -ErrorAction SilentlyContinue |
+            ForEach-Object {
+                $parsedVersion = $null
+                [pscustomobject]@{
+                    Path = Join-Path $_.FullName "x64\signtool.exe"
+                    Version = if ([version]::TryParse($_.Name, [ref]$parsedVersion)) { $parsedVersion } else { [version]"0.0" }
+                }
+            } |
+            Where-Object { Test-Path -LiteralPath $_.Path } |
+            Sort-Object Version -Descending |
+            Select-Object -ExpandProperty Path
+
+        $candidates += $sdkSignTools
+    }
+
+    foreach ($candidate in $candidates) {
+        if (-not [string]::IsNullOrWhiteSpace($candidate) -and (Test-Path -LiteralPath $candidate)) {
+            return (Resolve-Path -LiteralPath $candidate).Path
+        }
+    }
+
+    Write-Host "ERROR: signtool.exe was not found." -ForegroundColor Red
+    Write-Host "Install the Windows SDK signing tools, or set WIN_SIGNTOOL_PATH to the installed signtool.exe."
+    Write-Host "Expected SDK location: C:\Program Files (x86)\Windows Kits\10\bin\<version>\x64\signtool.exe"
+    exit 1
 }
 
 function Sign-AaxPlugin {
@@ -79,17 +122,32 @@ function Sign-AaxPlugin {
     }
 
     Write-Host "Signing $Label AAX plugin..."
-    Invoke-Checked $wraptool @(
+    $arguments = @(
         "sign",
         "--signtool", $signtoolWrapper,
         "--signid", "1",
         "--verbose",
         "--installedbinaries",
         "--account", $paceAccount,
+        "--password", $pacePassword,
         "--wcguid", $Guid,
         "--in", $PluginPath,
         "--out", $PluginPath
     )
+    $displayArguments = @(
+        "sign",
+        "--signtool", $signtoolWrapper,
+        "--signid", "1",
+        "--verbose",
+        "--installedbinaries",
+        "--account", $paceAccount,
+        "--password", "<redacted>",
+        "--wcguid", $Guid,
+        "--in", $PluginPath,
+        "--out", $PluginPath
+    )
+
+    Invoke-Checked $wraptool $arguments $displayArguments
 }
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
@@ -99,10 +157,12 @@ $config = Read-MakefileVariables (Join-Path $repoRoot "Makefile.variables")
 
 $wraptool = Get-Setting $config "WRAPTOOL"
 $paceAccount = Get-Setting $config "PACE_ACCOUNT"
+$pacePassword = Get-Setting $config "PACE_PASSWORD"
 $monitorGuid = Get-Setting $config "MONITOR_FREE_GUID"
 $pannerGuid = Get-Setting $config "PANNER_FREE_GUID"
 
-$env:SIGNTOOL_PATH = Get-Setting $config "WIN_SIGNTOOL_PATH"
+$env:SIGNTOOL_PATH = Resolve-SignTool (Get-Setting $config "WIN_SIGNTOOL_PATH" $false)
+Write-Host "Using signtool: $env:SIGNTOOL_PATH"
 $env:ACS_DLIB = Get-Setting $config "AZURE_DLIB_PATH"
 $env:ACS_JSON = Get-Setting $config "AZURE_METADATA_PATH"
 $env:AZURE_TENANT_ID = Get-Setting $config "AZURE_TENANT_ID"

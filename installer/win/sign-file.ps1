@@ -32,6 +32,48 @@ function Get-ConfigValue {
     return [Environment]::GetEnvironmentVariable($Name)
 }
 
+function Resolve-SignTool {
+    param([string]$ConfiguredPath)
+
+    $candidates = @()
+    if (-not [string]::IsNullOrWhiteSpace($ConfiguredPath)) {
+        $candidates += $ConfiguredPath.Trim().Trim('"').Trim("'")
+    }
+
+    $command = Get-Command signtool.exe -ErrorAction SilentlyContinue
+    if ($command) {
+        $candidates += $command.Source
+    }
+
+    $kitsRoot = "${env:ProgramFiles(x86)}\Windows Kits\10\bin"
+    if (Test-Path -LiteralPath $kitsRoot) {
+        $sdkSignTools = Get-ChildItem -LiteralPath $kitsRoot -Directory -ErrorAction SilentlyContinue |
+            ForEach-Object {
+                $parsedVersion = $null
+                [pscustomobject]@{
+                    Path = Join-Path $_.FullName "x64\signtool.exe"
+                    Version = if ([version]::TryParse($_.Name, [ref]$parsedVersion)) { $parsedVersion } else { [version]"0.0" }
+                }
+            } |
+            Where-Object { Test-Path -LiteralPath $_.Path } |
+            Sort-Object Version -Descending |
+            Select-Object -ExpandProperty Path
+
+        $candidates += $sdkSignTools
+    }
+
+    foreach ($candidate in $candidates) {
+        if (-not [string]::IsNullOrWhiteSpace($candidate) -and (Test-Path -LiteralPath $candidate)) {
+            return (Resolve-Path -LiteralPath $candidate).Path
+        }
+    }
+
+    Write-Host "ERROR: signtool.exe was not found." -ForegroundColor Red
+    Write-Host "Install the Windows SDK signing tools, or set WIN_SIGNTOOL_PATH to the installed signtool.exe."
+    Write-Host "Expected SDK location: C:\Program Files (x86)\Windows Kits\10\bin\<version>\x64\signtool.exe"
+    exit 1
+}
+
 # Set Azure environment variables
 $env:AZURE_CLIENT_ID = Get-ConfigValue 'AZURE_CLIENT_ID'
 $env:AZURE_TENANT_ID = Get-ConfigValue 'AZURE_TENANT_ID'
@@ -41,7 +83,7 @@ if ([string]::IsNullOrWhiteSpace($env:AZURE_CLIENT_SECRET)) {
 }
 
 # Get paths
-$signtoolPath = Get-ConfigValue 'WIN_SIGNTOOL_PATH'
+$signtoolPath = Resolve-SignTool (Get-ConfigValue 'WIN_SIGNTOOL_PATH')
 $dlibPath = Get-ConfigValue 'AZURE_DLIB_PATH'
 $metadataPath = Get-ConfigValue 'AZURE_METADATA_PATH'
 $timestampUrl = Get-ConfigValue 'AZURE_TIMESTAMP_URL'
@@ -53,6 +95,7 @@ if (-not (Test-Path $FilePath)) {
 }
 
 Write-Host "Signing: $FilePath" -ForegroundColor Cyan
+Write-Host "Using signtool: $signtoolPath"
 
 # Sign with Azure Trusted Signing
 # NOTE: Do NOT specify /sha1 - Azure will provide the certificate through the DLib
