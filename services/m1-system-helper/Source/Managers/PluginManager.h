@@ -23,6 +23,9 @@ public:
     void removePlugin(int port);
     void updatePluginSettings(int port, const juce::OSCMessage& message);
     void sendMonitorSettings(int mode, float yaw, float pitch, float roll);
+    // Sends a message to the single plugin registered on `port`.
+    // Returns false if the plugin is unknown or the send fails.
+    bool sendToPlugin(int port, const juce::OSCMessage& message);
     void sendToAllPlugins(const juce::OSCMessage& message);
     void sendToPannerPlugins(const juce::OSCMessage& message);
     bool hasActivePlugins() const;

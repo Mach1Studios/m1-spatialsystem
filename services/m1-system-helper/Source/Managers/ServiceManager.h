@@ -25,6 +25,7 @@ public:
     Result handleClientRequestToStartOrientationManager();
     bool isOrientationManagerRunning() const;
     void noteOrientationManagerClientPulse();
+    void clearOrientationManagerClientPulse();
     juce::int64 getLastOrientationManagerClientPulseTime() const;
     
     void setClientRequestsServer(bool value) { clientRequestsServer.store(value); }

@@ -173,7 +173,14 @@ bool M1SystemHelperManager::triggerSocketActivation() const
     if (sockfd < 0) {
         return false;
     }
-    
+
+    // Bound the probe so a wedged helper cannot block the caller indefinitely.
+    struct timeval probeTimeout;
+    probeTimeout.tv_sec = 0;
+    probeTimeout.tv_usec = 500000; // 500ms
+    setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &probeTimeout, sizeof(probeTimeout));
+    setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, &probeTimeout, sizeof(probeTimeout));
+
     struct sockaddr_un addr;
     memset(&addr, 0, sizeof(addr));
     addr.sun_family = AF_UNIX;

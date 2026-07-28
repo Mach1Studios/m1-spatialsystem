@@ -18,15 +18,10 @@ ServiceManager::~ServiceManager() {
 Result ServiceManager::startOrientationManager() {
     timeWhenWeLastAttemptedToStartAManager = juce::Time::currentTimeMillis();
 
-    // Check if port is available
-    juce::DatagramSocket socket(false);
-    socket.setEnablePortReuse(false);
-    
-    if (!socket.bindToPort(serverPort)) {
-        DBG("[ServiceManager] Port " + juce::String(serverPort) + " is in use, assuming service is running");
-        return Result::ok(); // Service is already running
+    if (isOrientationManagerRunning()) {
+        DBG("[ServiceManager] Orientation manager already accepting connections on port " + juce::String(serverPort));
+        return Result::ok();
     }
-    socket.shutdown();
 
     DBG("[ServiceManager] Starting orientation manager service");
 
@@ -35,9 +30,13 @@ Result ServiceManager::startOrientationManager() {
 
 #if JUCE_MAC
     // Prefer the installed LaunchAgent on modern macOS, with a legacy start fallback.
+    // Note: kickstart deliberately does NOT use -k: we only reach this point
+    // when the manager is not serving, and -k would kill/restart a healthy
+    // process (dropping any connected head-tracking device) if the running
+    // check ever produced a false negative.
     const auto plistPath = getServicePath();
     const auto bootstrapCommand = "/bin/launchctl bootstrap gui/" + juce::String(uid) + " " + plistPath.quoted();
-    const auto kickstartCommand = "/bin/launchctl kickstart -kp " + getServiceTarget();
+    const auto kickstartCommand = "/bin/launchctl kickstart -p " + getServiceTarget();
     const auto legacyStartCommand = "/bin/launchctl start " + getServiceName();
     const auto command = bootstrapCommand + " >/dev/null 2>&1 || "
                        + kickstartCommand + " >/dev/null 2>&1 || "
@@ -132,14 +131,24 @@ Result ServiceManager::handleClientRequestToStartOrientationManager() {
 }
 
 bool ServiceManager::isOrientationManagerRunning() const {
-    // Check if port is in use
-    juce::DatagramSocket socket(false);
-    socket.setEnablePortReuse(false);
-    
-    bool isRunning = !socket.bindToPort(serverPort);
-    socket.shutdown();
-    
-    return isRunning;
+    // The orientation manager exposes an HTTP (TCP) server, so probe it with
+    // a TCP connect. The previous implementation tried to bind a UDP socket
+    // on the port: a UDP bind succeeds even while a TCP listener is present,
+    // so the check always reported "not running" and callers kept issuing
+    // kill/restart cycles against a healthy service.
+    auto canConnect = [this](const juce::String& host) {
+        juce::StreamingSocket probe;
+        const bool connected = probe.connect(host, serverPort, 200);
+        probe.close();
+        return connected;
+    };
+
+    // The manager listens on "localhost", which may resolve to IPv4 or IPv6.
+    return canConnect("127.0.0.1") || canConnect("::1");
+}
+
+void ServiceManager::clearOrientationManagerClientPulse() {
+    lastOrientationManagerClientPulseTime.store(0);
 }
 
 void ServiceManager::noteOrientationManagerClientPulse() {

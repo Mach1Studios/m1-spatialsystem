@@ -436,3 +436,4 @@ installer/resources/docs/index.html
 Makefile.variables
 .DS_Store
 signing-metadata.json
+services/m1-system-helper/build-tests

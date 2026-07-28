@@ -141,6 +141,25 @@ void PluginManager::sendMonitorSettings(int mode, float yaw, float pitch, float 
     }
 }
 
+bool PluginManager::sendToPlugin(int port, const juce::OSCMessage& message) {
+    const juce::ScopedLock lock(mutex);
+
+    auto it = std::find_if(plugins.begin(), plugins.end(),
+        [port](const auto& plugin) { return plugin.port == port; });
+
+    if (it == plugins.end() || !it->messageSender) {
+        DBG("[PluginManager] No registered plugin/sender for port " + juce::String(port));
+        return false;
+    }
+
+    if (!it->messageSender->send(message)) {
+        DBG("[PluginManager] Failed to send message to plugin on port " + juce::String(port));
+        return false;
+    }
+
+    return true;
+}
+
 void PluginManager::sendToAllPlugins(const juce::OSCMessage& message) {
     const juce::ScopedLock lock(mutex);
     

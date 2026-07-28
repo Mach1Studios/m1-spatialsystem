@@ -354,12 +354,26 @@ void OSCHandler::handleRegisterPlugin(const juce::OSCMessage& message) {
             DBG("[OSCHandler] Registered panner plugin on port " + juce::String(plugin.port) + " with tracking manager");
         }
 
+        // Send the current monitor state only to the plugin that just
+        // registered. Broadcasting to every plugin here made session loads
+        // O(N^2): each of N registrations (and every 10s re-registration)
+        // triggered N sends, and each "/m1-channel-config" delivery used to
+        // cause a host-visible parameter change in every panner instance.
         const auto activeMonitorSnapshot = getActiveMonitorSnapshot();
-        pluginManager->sendMonitorSettings(activeMonitorSnapshot.masterMode,
-                                           activeMonitorSnapshot.masterYaw,
-                                           activeMonitorSnapshot.masterPitch,
-                                           activeMonitorSnapshot.masterRoll);
-        broadcastMonitorChannelConfig(activeMonitorSnapshot.systemChannelCount);
+
+        juce::OSCMessage settingsMsg("/monitor-settings");
+        settingsMsg.addInt32(activeMonitorSnapshot.masterMode);
+        settingsMsg.addFloat32(activeMonitorSnapshot.masterYaw);
+        settingsMsg.addFloat32(activeMonitorSnapshot.masterPitch);
+        settingsMsg.addFloat32(activeMonitorSnapshot.masterRoll);
+        pluginManager->sendToPlugin(plugin.port, settingsMsg);
+
+        const int channelCount = activeMonitorSnapshot.systemChannelCount;
+        if (channelCount == 4 || channelCount == 8 || channelCount == 14) {
+            juce::OSCMessage channelConfigMsg("/m1-channel-config");
+            channelConfigMsg.addInt32(channelCount);
+            pluginManager->sendToPlugin(plugin.port, channelConfigMsg);
+        }
     }
 }
 

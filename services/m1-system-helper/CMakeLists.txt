@@ -189,3 +189,10 @@ endif()
 install(TARGETS ${CMAKE_PROJECT_NAME}
         BUNDLE DESTINATION ${CMAKE_INSTALL_PREFIX}
         RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX})
+
+option(BUILD_UNIT_TESTS "Build unit/regression tests" OFF)
+
+if (BUILD_UNIT_TESTS)
+    enable_testing()
+    add_subdirectory(Tests/unit)
+endif()

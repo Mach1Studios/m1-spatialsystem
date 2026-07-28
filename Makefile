@@ -1465,6 +1465,28 @@ endif
 test-plugins: test-monitor test-panner
 	@echo "All plugin validations completed successfully!"
 
+# C++ unit/regression tests (fast; no plugin formats built).
+# Covers the session-load / device-reconnect regressions:
+#  - m1-panner: /m1-channel-config policy (no redundant host notifications)
+#  - m1-system-helper: TCP-based orientation-manager detection + targeted
+#    plugin registration replies (no O(N^2) broadcast)
+#  - m1-orientationmanager: device reconnect + drop-detection state handling
+.PHONY: test-unit
+test-unit:
+	@echo "=== m1-panner unit tests ==="
+	cmake m1-panner -Bm1-panner/build-tests -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBUILD_UNIT_TESTS=ON -DBUILD_VST3=ON -DBUILD_AAX=OFF -DBUILD_AU=OFF -DBUILD_VST=OFF -DBUILD_STANDALONE=OFF -DENABLE_VST2_COMPATIBILITY=OFF
+	cmake --build m1-panner/build-tests --target m1-panner-policy-tests
+	cd m1-panner/build-tests && ctest --output-on-failure -R m1-panner-policy
+	@echo "=== m1-system-helper unit tests ==="
+	cmake services/m1-system-helper -Bservices/m1-system-helper/build-tests -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBUILD_UNIT_TESTS=ON
+	cmake --build services/m1-system-helper/build-tests --target m1-system-helper-tests
+	cd services/m1-system-helper/build-tests && ctest --output-on-failure -R m1-system-helper-unit
+	@echo "=== m1-orientationmanager unit tests ==="
+	cmake m1-orientationmanager -Bm1-orientationmanager/build-tests -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBUILD_UNIT_TESTS=ON
+	cmake --build m1-orientationmanager/build-tests --target m1-orientationmanager-tests
+	cd m1-orientationmanager/build-tests && ctest --output-on-failure -R m1-orientationmanager-unit
+	@echo "All unit tests passed!"
+
 # AAX-specific validation and diagnostics
 verify-aax-signing:
 	@echo "=== Verifying AAX Plugin Code Signing ==="

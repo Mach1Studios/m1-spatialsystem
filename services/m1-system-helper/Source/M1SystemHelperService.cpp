@@ -121,6 +121,10 @@ void M1SystemHelperService::timerCallback() {
     // Check for inactive clients
     const auto lastOrientationPulseTime = serviceManager->getLastOrientationManagerClientPulseTime();
     if (lastOrientationPulseTime > 0 && (currentTime - lastOrientationPulseTime) > CLIENT_TIMEOUT_MS) {
+        // Clear the pulse first: otherwise the stale timestamp keeps this
+        // branch firing on every timer tick, spamming kill commands until a
+        // new client pulse arrives.
+        serviceManager->clearOrientationManagerClientPulse();
         if (serviceManager->isOrientationManagerRunning()) {
             auto result = serviceManager->killOrientationManager();
             if (!result.wasOk()) {
