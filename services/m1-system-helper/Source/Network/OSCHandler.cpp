@@ -126,7 +126,30 @@ void OSCHandler::broadcastMonitorSettings(const MonitorStateCache& state, bool f
             return;
     }
 
-    pluginManager->sendMonitorSettings(state.mode, state.yaw, state.pitch, state.roll);
+    // Un-forced broadcasts carry only the streamed orientation, which panners
+    // use purely for their UI overlay - skip instances with closed editors.
+    // Forced broadcasts carry discrete changes (monitor mode affects panner
+    // audio processing) and must reach every instance.
+    pluginManager->sendMonitorSettings(state.mode, state.yaw, state.pitch, state.roll, !force);
+}
+
+void OSCHandler::sendCurrentMonitorStateToPlugin(int port)
+{
+    const auto activeMonitorSnapshot = getActiveMonitorSnapshot();
+
+    juce::OSCMessage settingsMsg("/monitor-settings");
+    settingsMsg.addInt32(activeMonitorSnapshot.masterMode);
+    settingsMsg.addFloat32(activeMonitorSnapshot.masterYaw);
+    settingsMsg.addFloat32(activeMonitorSnapshot.masterPitch);
+    settingsMsg.addFloat32(activeMonitorSnapshot.masterRoll);
+    pluginManager->sendToPlugin(port, settingsMsg);
+
+    const int channelCount = activeMonitorSnapshot.systemChannelCount;
+    if (channelCount == 4 || channelCount == 8 || channelCount == 14) {
+        juce::OSCMessage channelConfigMsg("/m1-channel-config");
+        channelConfigMsg.addInt32(channelCount);
+        pluginManager->sendToPlugin(port, channelConfigMsg);
+    }
 }
 
 void OSCHandler::broadcastMonitorChannelConfig(int channelCount)
@@ -376,21 +399,7 @@ void OSCHandler::handleRegisterPlugin(const juce::OSCMessage& message) {
         // O(N^2): each of N registrations (and every 10s re-registration)
         // triggered N sends, and each "/m1-channel-config" delivery used to
         // cause a host-visible parameter change in every panner instance.
-        const auto activeMonitorSnapshot = getActiveMonitorSnapshot();
-
-        juce::OSCMessage settingsMsg("/monitor-settings");
-        settingsMsg.addInt32(activeMonitorSnapshot.masterMode);
-        settingsMsg.addFloat32(activeMonitorSnapshot.masterYaw);
-        settingsMsg.addFloat32(activeMonitorSnapshot.masterPitch);
-        settingsMsg.addFloat32(activeMonitorSnapshot.masterRoll);
-        pluginManager->sendToPlugin(plugin.port, settingsMsg);
-
-        const int channelCount = activeMonitorSnapshot.systemChannelCount;
-        if (channelCount == 4 || channelCount == 8 || channelCount == 14) {
-            juce::OSCMessage channelConfigMsg("/m1-channel-config");
-            channelConfigMsg.addInt32(channelCount);
-            pluginManager->sendToPlugin(plugin.port, channelConfigMsg);
-        }
+        sendCurrentMonitorStateToPlugin(plugin.port);
     }
 }
 
@@ -496,11 +505,25 @@ void OSCHandler::handleOMClientPulse(const juce::OSCMessage& message) {
 void OSCHandler::handlePluginPulse(const juce::OSCMessage& message) {
     if (message.size() >= 1) {
         int port = message[0].getInt32();
-        
+
         // Check if plugin exists and is active
         if (pluginManager->hasActivePlugin(port)) // exists
         {
             pluginManager->updatePluginTime(port);
+
+            // Optional second argument: whether the plugin's editor is open.
+            // Plugins report it in every pulse so the state self-heals even
+            // if an open/close notification is lost. Older plugins omit it
+            // and keep the default (open = receive everything).
+            if (message.size() >= 2 && message[1].isInt32()) {
+                const bool editorOpen = message[1].getInt32() != 0;
+                if (pluginManager->setEditorOpen(port, editorOpen)) {
+                    // closed -> open: the plugin missed orientation updates
+                    // while its editor was hidden; push the current state so
+                    // the reopened UI is never stale.
+                    sendCurrentMonitorStateToPlugin(port);
+                }
+            }
         }
     }
 }
@@ -717,7 +740,7 @@ void OSCHandler::timerCallback() {
         hasPendingValues = monitorBroadcastThrottle.takePendingFlush(juce::Time::currentTimeMillis(), pendingValues);
     }
     if (hasPendingValues && pluginManager)
-        pluginManager->sendMonitorSettings(pendingValues.mode, pendingValues.yaw, pendingValues.pitch, pendingValues.roll);
+        pluginManager->sendMonitorSettings(pendingValues.mode, pendingValues.yaw, pendingValues.pitch, pendingValues.roll, true);
 }
 
 } // namespace Mach1

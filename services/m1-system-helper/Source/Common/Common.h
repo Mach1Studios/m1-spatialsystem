@@ -93,6 +93,11 @@ struct M1RegisteredPlugin {
     int pannerMode = 0;
     bool autoOrbit = false;
     bool isPannerPlugin = false;
+    // Whether the plugin's editor window is currently open in the host.
+    // Defaults to true so plugins that never report (older builds) keep
+    // receiving every broadcast. High-rate cosmetic updates (monitor
+    // orientation for the UI overlay) are skipped when this is false.
+    bool hasEditorOpen = true;
     juce::int64 time = 0;
     
     std::shared_ptr<juce::OSCSender> messageSender;

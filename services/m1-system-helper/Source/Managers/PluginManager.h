@@ -22,7 +22,14 @@ public:
     juce::Result registerPlugin(const M1RegisteredPlugin& plugin);
     void removePlugin(int port);
     void updatePluginSettings(int port, const juce::OSCMessage& message);
-    void sendMonitorSettings(int mode, float yaw, float pitch, float roll);
+    // When `onlyToOpenEditors` is true, plugins that reported a closed editor
+    // are skipped (the values only feed their UI overlay). Discrete changes
+    // (monitor mode, active-monitor switches) must pass false so every
+    // instance stays in sync for audio-relevant state.
+    void sendMonitorSettings(int mode, float yaw, float pitch, float roll, bool onlyToOpenEditors = false);
+    // Records whether the plugin's editor is open. Returns true when this is
+    // a closed -> open transition (caller should push fresh monitor state).
+    bool setEditorOpen(int port, bool open);
     // Sends a message to the single plugin registered on `port`.
     // Returns false if the plugin is unknown or the send fails.
     bool sendToPlugin(int port, const juce::OSCMessage& message);

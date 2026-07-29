@@ -17,14 +17,17 @@
 
 #include <JuceHeader.h>
 #include "Common/MonitorBroadcastThrottle.h"
+#include "Managers/ClientManager.h"
 #include "Managers/ServiceManager.h"
 #include "Managers/PluginManager.h"
+#include "Network/OSCHandler.h"
 #include "Core/EventSystem.h"
 
 #include <atomic>
 #include <iostream>
 #include <memory>
 #include <thread>
+#include <vector>
 
 static int failures = 0;
 
@@ -170,6 +173,145 @@ void testMonitorBroadcastThrottleRateLimitsStreams()
     CHECK(!throttle.takePendingFlush(now + 200, flushed));
 }
 
+// Counts "/monitor-settings" deliveries to one fake panner instance.
+struct MonitorSettingsCountingListener : public juce::OSCReceiver::Listener<juce::OSCReceiver::RealtimeCallback> {
+    std::atomic<int> monitorSettingsCount { 0 };
+
+    void oscMessageReceived(const juce::OSCMessage& msg) override
+    {
+        if (msg.getAddressPattern() == "/monitor-settings")
+            ++monitorSettingsCount;
+    }
+};
+
+// End-to-end stress test against the real OSCHandler over real UDP: many
+// registered panner instances while a monitor streams head-tracker
+// orientation. Guards the failure mode where every "/setMasterYPR" was
+// re-broadcast to every plugin (rate * N messages per second), which starved
+// the host's message thread and left newly opened panner editors grey.
+void testManyPannersUnderOrientationStorm()
+{
+    auto eventSystem = std::make_shared<Mach1::EventSystem>();
+    Mach1::PluginManager pluginManager(eventSystem);
+    Mach1::ClientManager clientManager(eventSystem);
+    // Leaked deliberately: ~ServiceManager() issues real launchctl/sc kill
+    // commands against any installed orientation manager.
+    auto* serviceManager = new Mach1::ServiceManager(46346);
+
+    Mach1::OSCHandler oscHandler(&clientManager, &pluginManager, serviceManager,
+                                 /*pannerTrackingManager*/ nullptr, /*externalMixer*/ nullptr);
+
+    int helperPort = 0;
+    for (int candidate = 46800; candidate < 46900; ++candidate) {
+        if (oscHandler.startListening(candidate)) {
+            helperPort = candidate;
+            break;
+        }
+    }
+    CHECK(helperPort != 0);
+
+    constexpr int kOpenEditorPanners = 24;
+    constexpr int kClosedEditorPanners = 16;
+    constexpr int kTotalPanners = kOpenEditorPanners + kClosedEditorPanners + 1; // last joins mid-storm
+
+    std::vector<std::unique_ptr<juce::OSCReceiver>> receivers(kTotalPanners);
+    std::vector<std::unique_ptr<MonitorSettingsCountingListener>> listeners(kTotalPanners);
+    std::vector<int> ports(kTotalPanners, 0);
+
+    int candidate = 47000;
+    for (int i = 0; i < kTotalPanners; ++i) {
+        receivers[i] = std::make_unique<juce::OSCReceiver>();
+        listeners[i] = std::make_unique<MonitorSettingsCountingListener>();
+        while (candidate < 48000 && !receivers[i]->connect(candidate))
+            ++candidate;
+        CHECK(candidate < 48000);
+        ports[i] = candidate++;
+        receivers[i]->addListener(listeners[i].get());
+    }
+
+    juce::OSCSender toHelper;
+    CHECK(toHelper.connect("127.0.0.1", helperPort));
+
+    // Register everything except the mid-storm panner.
+    for (int i = 0; i < kTotalPanners - 1; ++i) {
+        juce::OSCMessage reg("/m1-register-plugin");
+        reg.addInt32(ports[i]);
+        CHECK(toHelper.send(reg));
+    }
+    for (int i = 0; i < 200 && pluginManager.getPluginCount() < (size_t)(kTotalPanners - 1); ++i)
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    CHECK(pluginManager.getPluginCount() == (size_t)(kTotalPanners - 1));
+
+    // The "closed editor" group reports its state, like real panners do in
+    // every ping reply and on editor close.
+    for (int i = kOpenEditorPanners; i < kOpenEditorPanners + kClosedEditorPanners; ++i) {
+        juce::OSCMessage pulse("/m1-status-plugin");
+        pulse.addInt32(ports[i]);
+        pulse.addInt32(0);
+        CHECK(toHelper.send(pulse));
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(300)); // let registration replies land
+
+    for (auto& listener : listeners)
+        listener->monitorSettingsCount = 0;
+
+    // Storm: a monitor with a streaming head-tracker, ~200 updates/sec.
+    const auto stormStart = juce::Time::currentTimeMillis();
+    for (int i = 0; i < 300; ++i) {
+        juce::OSCMessage ypr("/setMasterYPR");
+        ypr.addFloat32((float)(i % 360));
+        ypr.addFloat32(0.0f);
+        ypr.addFloat32(0.0f);
+        toHelper.send(ypr);
+
+        // A new panner instance must be able to join mid-storm (a user
+        // opening a session / adding a track while the head-tracker runs).
+        if (i == 150) {
+            juce::OSCMessage reg("/m1-register-plugin");
+            reg.addInt32(ports[kTotalPanners - 1]);
+            CHECK(toHelper.send(reg));
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    const auto stormElapsedMs = juce::Time::currentTimeMillis() - stormStart;
+
+    // Open-editor panners receive the stream, but rate limited (~20/sec) -
+    // NOT one delivery per incoming update.
+    const int maxExpectedPerPanner = (int)(stormElapsedMs / 50) + 3;
+    for (int i = 0; i < kOpenEditorPanners; ++i) {
+        const int received = listeners[i]->monitorSettingsCount.load();
+        CHECK(received >= 5);
+        CHECK(received <= maxExpectedPerPanner);
+    }
+
+    // Closed-editor panners receive none of the (UI-only) orientation stream.
+    for (int i = kOpenEditorPanners; i < kOpenEditorPanners + kClosedEditorPanners; ++i)
+        CHECK(listeners[i]->monitorSettingsCount.load() == 0);
+
+    // The mid-storm registrant got its targeted registration reply.
+    CHECK(pluginManager.getPluginCount() == (size_t)kTotalPanners);
+    CHECK(listeners[kTotalPanners - 1]->monitorSettingsCount.load() >= 1);
+
+    // Reopening an editor triggers an immediate targeted state refresh.
+    {
+        const int reopenIndex = kOpenEditorPanners; // first closed-editor panner
+        juce::OSCMessage pulse("/m1-status-plugin");
+        pulse.addInt32(ports[reopenIndex]);
+        pulse.addInt32(1);
+        CHECK(toHelper.send(pulse));
+
+        for (int i = 0; i < 100 && listeners[reopenIndex]->monitorSettingsCount.load() < 1; ++i)
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        CHECK(listeners[reopenIndex]->monitorSettingsCount.load() >= 1);
+    }
+
+    for (int i = 0; i < kTotalPanners; ++i) {
+        receivers[i]->removeListener(listeners[i].get());
+        receivers[i]->disconnect();
+    }
+}
+
 void testMonitorBroadcastThrottleDedupesAndForces()
 {
     Mach1::MonitorBroadcastThrottle throttle;
@@ -199,6 +341,7 @@ int main()
     testSendToPluginTargetsSinglePlugin();
     testMonitorBroadcastThrottleRateLimitsStreams();
     testMonitorBroadcastThrottleDedupesAndForces();
+    testManyPannersUnderOrientationStorm();
 
     if (failures == 0) {
         std::cout << "All m1-system-helper unit tests passed" << std::endl;

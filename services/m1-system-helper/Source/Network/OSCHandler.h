@@ -56,6 +56,9 @@ private:
     // changes (mode / active-monitor switches) that must reach plugins now.
     void broadcastMonitorSettings(const MonitorStateCache& state, bool force = false);
     void broadcastMonitorChannelConfig(int channelCount);
+    // Targeted monitor-settings + channel-config reply (registration and
+    // editor-reopen refresh).
+    void sendCurrentMonitorStateToPlugin(int port);
     bool sendMessageToMonitorClient(int port, const juce::OSCMessage& message) const;
     void pruneInactiveMonitorStates();
     

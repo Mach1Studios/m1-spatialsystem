@@ -110,18 +110,20 @@ void PluginManager::updatePluginSettings(int port, const juce::OSCMessage& messa
     }
 }
 
-void PluginManager::sendMonitorSettings(int mode, float yaw, float pitch, float roll) {
+void PluginManager::sendMonitorSettings(int mode, float yaw, float pitch, float roll, bool onlyToOpenEditors) {
     const juce::ScopedLock lock(mutex);
-    
+
     DBG("[PluginManager] Sending monitor settings to " + std::to_string(plugins.size()) + " plugins");
-    
+
     juce::OSCMessage msg("/monitor-settings");
     msg.addInt32(mode);
     msg.addFloat32(yaw);
     msg.addFloat32(pitch);
     msg.addFloat32(roll);
-    
+
     for (auto& plugin : plugins) {
+        if (onlyToOpenEditors && !plugin.hasEditorOpen)
+            continue;
         if (plugin.messageSender) {
             if (!plugin.messageSender->send(msg)) {
                 DBG("[PluginManager] Failed to send monitor settings to plugin on port: " + 
@@ -259,6 +261,19 @@ void PluginManager::updatePluginTime(int port) {
             break;
         }
     }
+}
+
+bool PluginManager::setEditorOpen(int port, bool open) {
+    const juce::ScopedLock lock(mutex);
+
+    for (auto& plugin : plugins) {
+        if (plugin.port == port) {
+            const bool wasOpen = plugin.hasEditorOpen;
+            plugin.hasEditorOpen = open;
+            return open && !wasOpen;
+        }
+    }
+    return false;
 }
 
 } // namespace Mach1
