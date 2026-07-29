@@ -104,13 +104,29 @@ OSCHandler::MonitorStateCache OSCHandler::getMonitorStateLocked(int port) const
     return {};
 }
 
-void OSCHandler::broadcastMonitorSettings(const MonitorStateCache& state)
+void OSCHandler::broadcastMonitorSettings(const MonitorStateCache& state, bool force)
 {
+    // The external mixer renders audio from this orientation; keep it at full
+    // rate (cheap in-process update, no fan-out).
     if (externalMixer)
         externalMixer->setMasterYPR(state.yaw, state.pitch, state.roll);
 
-    if (pluginManager)
-        pluginManager->sendMonitorSettings(state.mode, state.yaw, state.pitch, state.roll);
+    if (!pluginManager)
+        return;
+
+    // Throttle the plugin fan-out. With a streaming head-tracker this is
+    // called for every incoming "/setMasterYPR" (hundreds per second) and
+    // each call becomes one UDP message per registered plugin, all handled on
+    // the host's message thread. Unthrottled, large sessions starve the host
+    // message thread and plugin editors never finish opening (grey windows).
+    MonitorBroadcastThrottle::Values values { state.mode, state.yaw, state.pitch, state.roll };
+    {
+        const juce::ScopedLock lock(stateMutex);
+        if (!monitorBroadcastThrottle.shouldBroadcast(values, juce::Time::currentTimeMillis(), force))
+            return;
+    }
+
+    pluginManager->sendMonitorSettings(state.mode, state.yaw, state.pitch, state.roll);
 }
 
 void OSCHandler::broadcastMonitorChannelConfig(int channelCount)
@@ -336,8 +352,9 @@ void OSCHandler::handleSetMonitoringMode(const juce::OSCMessage& message) {
             }
         }
 
+        // Mode changes are discrete and rare; bypass the rate limiter.
         if (monitorPort == 0 || monitorPort == getActiveMonitorPort())
-            broadcastMonitorSettings(state);
+            broadcastMonitorSettings(state, true);
     }
 }
 
@@ -585,7 +602,8 @@ void OSCHandler::applyMonitorModeFromUi(int mode)
         state = cachedState;
     }
 
-    broadcastMonitorSettings(state);
+    // Mode changes are discrete and rare; bypass the rate limiter.
+    broadcastMonitorSettings(state, true);
 }
 
 void OSCHandler::applyChannelConfigFromUi(int channelCount)
@@ -632,7 +650,8 @@ void OSCHandler::handleSetMonitorActiveRequest(const juce::OSCMessage& message) 
 
             if (hasCachedState) {
                 broadcastMonitorChannelConfig(state.channelCount);
-                broadcastMonitorSettings(state);
+                // Active-monitor switches are discrete; bypass the rate limiter.
+                broadcastMonitorSettings(state, true);
             }
         } else {
             // Handle the case where the rotation fails
@@ -688,6 +707,17 @@ void OSCHandler::timerCallback() {
     clientManager->cleanupInactiveClients();
     pluginManager->cleanupInactivePlugins();
     pruneInactiveMonitorStates();
+
+    // Deliver any monitor-settings update the rate limiter suppressed, so the
+    // final orientation always reaches the plugins after a stream stops.
+    MonitorBroadcastThrottle::Values pendingValues;
+    bool hasPendingValues = false;
+    {
+        const juce::ScopedLock lock(stateMutex);
+        hasPendingValues = monitorBroadcastThrottle.takePendingFlush(juce::Time::currentTimeMillis(), pendingValues);
+    }
+    if (hasPendingValues && pluginManager)
+        pluginManager->sendMonitorSettings(pendingValues.mode, pendingValues.yaw, pendingValues.pitch, pendingValues.roll);
 }
 
 } // namespace Mach1

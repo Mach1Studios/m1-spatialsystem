@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../Common/Common.h"
+#include "../Common/MonitorBroadcastThrottle.h"
 #include "../Managers/ClientManager.h"
 #include "../Managers/PluginManager.h"
 #include "../Managers/ServiceManager.h"
@@ -51,7 +52,9 @@ private:
     int resolveMonitorPortFromMessage(const juce::OSCMessage& message, int payloadItemsWithoutPort) const;
     MonitorStateCache& getOrCreateMonitorStateLocked(int port);
     MonitorStateCache getMonitorStateLocked(int port) const;
-    void broadcastMonitorSettings(const MonitorStateCache& state);
+    // `force` bypasses the broadcast rate limiter; use it for discrete state
+    // changes (mode / active-monitor switches) that must reach plugins now.
+    void broadcastMonitorSettings(const MonitorStateCache& state, bool force = false);
     void broadcastMonitorChannelConfig(int channelCount);
     bool sendMessageToMonitorClient(int port, const juce::OSCMessage& message) const;
     void pruneInactiveMonitorStates();
@@ -89,6 +92,7 @@ private:
     // Cached state
     mutable juce::CriticalSection stateMutex;
     std::unordered_map<int, MonitorStateCache> monitorStatesByPort;
+    MonitorBroadcastThrottle monitorBroadcastThrottle; // guarded by stateMutex
     int playerLastUpdate = 0;
 
     static constexpr int KEEPALIVE_INTERVAL_MS = 1000;

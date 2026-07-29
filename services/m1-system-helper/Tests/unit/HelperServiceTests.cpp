@@ -1,6 +1,6 @@
 // Regression tests for m1-system-helper internals.
 //
-// Guards against two field-reported failure modes:
+// Guards against field-reported failure modes:
 //  1. ServiceManager::isOrientationManagerRunning() used a UDP port-bind
 //     check against the orientation manager's TCP (HTTP) server. A UDP bind
 //     succeeds even while a TCP listener owns the port, so the helper always
@@ -9,8 +9,14 @@
 //  2. Plugin registration used to broadcast monitor state to every registered
 //     plugin, making session loads O(N^2). Registration replies must go only
 //     to the plugin that registered (PluginManager::sendToPlugin).
+//  3. Every "/setMasterYPR" from a streaming head-tracker was re-broadcast
+//     immediately to every registered plugin (rate * N messages per second),
+//     starving the host's message thread so panner editors never finished
+//     opening (grey windows). The fan-out must be rate limited and deduped
+//     (MonitorBroadcastThrottle).
 
 #include <JuceHeader.h>
+#include "Common/MonitorBroadcastThrottle.h"
 #include "Managers/ServiceManager.h"
 #include "Managers/PluginManager.h"
 #include "Core/EventSystem.h"
@@ -138,6 +144,51 @@ void testSendToPluginTargetsSinglePlugin()
     receiverB.disconnect();
 }
 
+void testMonitorBroadcastThrottleRateLimitsStreams()
+{
+    Mach1::MonitorBroadcastThrottle throttle; // 50ms interval, 0.01 epsilon
+
+    // Regression: a head-tracker streaming a new orientation every 5ms must
+    // not produce one plugin broadcast per message.
+    int sent = 0;
+    std::int64_t now = 1000;
+    for (int i = 0; i < 100; ++i, now += 5) {
+        Mach1::MonitorBroadcastThrottle::Values v { 0, (float)i, 0.0f, 0.0f };
+        if (throttle.shouldBroadcast(v, now))
+            ++sent;
+    }
+    // 100 updates over 500ms at a 50ms interval: at most ~11 sends.
+    CHECK(sent <= 11);
+    CHECK(sent >= 9);
+
+    // The newest suppressed value must flush once the interval has passed.
+    Mach1::MonitorBroadcastThrottle::Values flushed;
+    CHECK(throttle.takePendingFlush(now + 100, flushed));
+    CHECK(flushed.yaw == 99.0f);
+
+    // Nothing further pending.
+    CHECK(!throttle.takePendingFlush(now + 200, flushed));
+}
+
+void testMonitorBroadcastThrottleDedupesAndForces()
+{
+    Mach1::MonitorBroadcastThrottle throttle;
+
+    Mach1::MonitorBroadcastThrottle::Values v { 0, 10.0f, 0.0f, 0.0f };
+    CHECK(throttle.shouldBroadcast(v, 1000));
+
+    // Identical values must not re-broadcast, even after the interval.
+    CHECK(!throttle.shouldBroadcast(v, 2000));
+
+    // A mode change with force must always go through immediately.
+    Mach1::MonitorBroadcastThrottle::Values modeChange { 1, 10.0f, 0.0f, 0.0f };
+    CHECK(throttle.shouldBroadcast(modeChange, 2001, true));
+
+    // Sub-epsilon jitter must not re-broadcast.
+    Mach1::MonitorBroadcastThrottle::Values jitter { 1, 10.005f, 0.0f, 0.0f };
+    CHECK(!throttle.shouldBroadcast(jitter, 3000));
+}
+
 } // namespace
 
 int main()
@@ -146,6 +197,8 @@ int main()
 
     testOrientationManagerRunningDetection();
     testSendToPluginTargetsSinglePlugin();
+    testMonitorBroadcastThrottleRateLimitsStreams();
+    testMonitorBroadcastThrottleDedupesAndForces();
 
     if (failures == 0) {
         std::cout << "All m1-system-helper unit tests passed" << std::endl;
