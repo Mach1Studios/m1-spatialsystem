@@ -6,6 +6,8 @@
 
 #include "SessionUI.h"
 #include "BinaryData.h"
+#include "../Core/ExportEngine.h"
+#include <Mach1Encode.h>
 
 namespace Mach1 {
 
@@ -60,8 +62,7 @@ SessionMainComponent::SessionMainComponent(PannerTrackingManager& manager, Clien
     };
     
     captureTimelinePanel->onExportClicked = [this]() {
-        DBG("[SessionMainComponent] Timeline export clicked");
-        // TODO: Implement export
+        runExport();
     };
     
     // Add as visible children
@@ -142,6 +143,77 @@ void SessionMainComponent::stopCapture()
 bool SessionMainComponent::isCapturing() const
 {
     return captureEngine && captureEngine->isCapturing();
+}
+
+void SessionMainComponent::runExport()
+{
+    if (!captureEngine)
+        return;
+
+    bool expected = false;
+    if (!exportInProgress.compare_exchange_strong(expected, true))
+    {
+        DBG("[SessionMainComponent] Export already in progress");
+        return;
+    }
+
+    const juce::File sessionDir = captureEngine->getCaptureRoot()
+                                      .getChildFile(captureEngine->getSessionId());
+
+    // Export in the format the monitor/system is currently set to (4/8/14)
+    const int channelCount = oscHandler.getActiveMonitorSnapshot().systemChannelCount;
+    ExportEngine::Request request;
+    request.sessionDir = sessionDir;
+    switch (channelCount)
+    {
+        case 4:  request.outputMode = M1Spatial_4;  break;
+        case 14: request.outputMode = M1Spatial_14; break;
+        default: request.outputMode = M1Spatial_8;  break;
+    }
+    const int busChannels = (channelCount == 4 || channelCount == 14) ? channelCount : 8;
+    request.outputFile = sessionDir.getChildFile("exports")
+        .getChildFile("M1Spatial-" + juce::String(busChannels) + "_"
+                      + juce::Time::getCurrentTime().formatted("%Y%m%d_%H%M%S") + ".wav");
+
+    auto safeThis = juce::Component::SafePointer<SessionMainComponent>(this);
+    juce::Thread::launch([safeThis, request]() {
+        const ExportEngine::Result result = ExportEngine::exportSession(request);
+
+        juce::MessageManager::callAsync([safeThis, result]() {
+            if (safeThis != nullptr)
+                safeThis->exportInProgress.store(false);
+
+            if (!result.success)
+            {
+                juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon,
+                                                       "Export failed", result.errorMessage);
+                return;
+            }
+
+            const double seconds = result.sampleRate > 0
+                ? static_cast<double>(result.endSample - result.startSample) / result.sampleRate
+                : 0.0;
+
+            juce::String summary;
+            summary << "Rendered " << juce::String(result.channels) << "-channel Mach1 Spatial mix\n"
+                    << juce::String(seconds, 2) << " s @ " << juce::String(static_cast<int>(result.sampleRate)) << " Hz\n"
+                    << "Full coverage (all inputs): " << juce::String(result.allStreamsCoveragePercent, 1) << "%\n";
+
+            for (const auto& stream : result.streams)
+            {
+                summary << "\n" << juce::String(stream.name) << ": "
+                        << juce::String(stream.coveragePercent, 1) << "% received";
+                if (!stream.missing.empty())
+                    summary << " (" << juce::String(static_cast<int>(stream.missing.size())) << " gap(s), see report)";
+            }
+
+            summary << "\n\n" << result.outputFile.getFullPathName();
+
+            juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::InfoIcon,
+                                                   "Export complete", summary);
+            result.outputFile.revealToUser();
+        });
+    });
 }
 
 void SessionMainComponent::setupLayout()

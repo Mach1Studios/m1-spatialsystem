@@ -123,6 +123,7 @@ public:
     // Consumer management
     bool registerAsConsumer(uint32_t consumerId);
     bool unregisterAsConsumer(uint32_t consumerId);
+    uint32_t getConsumerId() const { return consumerId; }
     
     // Statistics
     struct MemoryShareStats {

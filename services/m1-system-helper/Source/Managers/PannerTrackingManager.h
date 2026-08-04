@@ -42,6 +42,10 @@ struct PannerInfo {
     int port = 0;
     std::string name;
     uint32_t processId = 0;
+    // Unique per plugin instance within a process (the panner's mapped-object
+    // address from its memory segment name). DAWs host every plugin instance
+    // in one process, so processId alone cannot identify an instance.
+    uintptr_t memoryAddress = 0;
     
     // State
     bool isActive = false;

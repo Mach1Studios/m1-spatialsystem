@@ -207,8 +207,9 @@ void CaptureEngine::processPannerData(const PannerInfo& panner)
         return;
     }
     
-    // Find the panner in the tracker
-    auto* memPanner = tracker->findPanner(panner.processId);
+    // Find the panner in the tracker. The memory address disambiguates
+    // multiple plugin instances hosted in the same DAW process.
+    auto* memPanner = tracker->findPanner(panner.processId, panner.memoryAddress);
     if (!memPanner || !memPanner->memoryShare)
     {
         // Reduced logging - only log occasionally
@@ -223,68 +224,67 @@ void CaptureEngine::processPannerData(const PannerInfo& panner)
         return;
     }
     
-    // Read audio buffer with parameters
-    juce::AudioBuffer<float> audioBuffer;
-    ParameterMap parameters;
-    uint64_t dawTimestamp = 0;
-    double playheadPosition = 0.0;
-    bool isPlaying = false;
-    uint64_t bufferId = 0;
-    uint32_t updateSource = 0;
+    // Drain the ring sequentially through this consumer's cursor. Every
+    // published block is seen exactly once; ring overruns are reported via
+    // droppedBlocksBefore. Bounded per pass so one busy panner cannot starve
+    // the others.
+    const uint32_t consumerId = tracker->getConsumerId();
+    M1MemoryShare::SharedBlock block;
+    int blocksThisPass = 0;
     
-    if (!memPanner->memoryShare->readAudioBufferWithGenericParameters(
-            audioBuffer, parameters, dawTimestamp, playheadPosition, isPlaying, bufferId, updateSource))
+    while (blocksThisPass < MAX_BLOCKS_PER_PASS
+           && memPanner->memoryShare->readNextBlockForConsumer(consumerId, block))
     {
-        return;  // No new data available
+        ++blocksThisPass;
+        ingestBlock(panner, pannerId, block);
     }
-    
-    // Get or create panner state
+}
+
+void CaptureEngine::ingestBlock(const PannerInfo& panner, const PannerId& pannerId,
+                                const M1MemoryShare::SharedBlock& block)
+{
     PannerCaptureState& state = getOrCreatePannerState(pannerId);
     
-    // Skip if we've already processed this buffer
-    if (bufferId == state.lastBufferId)
-        return;
+    const uint32_t sampleRate = block.sampleRate > 0 ? block.sampleRate : 44100;
+    const int64_t startSample = block.startSamplePosition;
+    const int32_t numSamples = block.audio.getNumSamples();
+    const int16_t numChannels = static_cast<int16_t>(block.audio.getNumChannels());
     
-    // Debug logging for new buffer
-    static std::map<std::string, juce::int64> lastBufferLogTime;
-    auto now = juce::Time::currentTimeMillis();
-    std::string key = pannerId.toString();
-    if (now - lastBufferLogTime[key] > 2000) // Every 2s per panner
+    // Record blocks lost to ring overrun (capture fell behind the writer)
+    if (block.droppedBlocksBefore > 0)
     {
-        lastBufferLogTime[key] = now;
-        DBG("[CaptureEngine] New buffer from " + juce::String(panner.name) + 
-            ": bufferId=" + juce::String((juce::int64)bufferId) +
-            " playhead=" + juce::String(playheadPosition, 3) + "s" +
-            " isPlaying=" + juce::String(isPlaying ? "yes" : "no") +
-            " channels=" + juce::String(audioBuffer.getNumChannels()) +
-            " samples=" + juce::String(audioBuffer.getNumSamples()));
-    }
-    
-    // Calculate start sample position
-    uint32_t sampleRate = memPanner->sampleRate > 0 ? memPanner->sampleRate : 44100;
-    int64_t startSample = static_cast<int64_t>(playheadPosition * sampleRate);
-    int32_t numSamples = audioBuffer.getNumSamples();
-    int16_t numChannels = static_cast<int16_t>(audioBuffer.getNumChannels());
-    
-    // Detect dropout (sequence gap)
-    uint32_t sequenceNumber = memPanner->sequenceNumber;
-    if (state.lastBufferId > 0 && sequenceNumber > state.lastSequenceNumber + 1)
-    {
-        uint32_t missed = sequenceNumber - state.lastSequenceNumber - 1;
+        const uint32_t missed = static_cast<uint32_t>(block.droppedBlocksBefore);
         m_totalDropoutsDetected.fetch_add(missed);
         
-        // Record dropout in coverage model
-        int64_t dropoutStart = state.lastEndSample;
-        int64_t dropoutEnd = startSample;
+        const int64_t dropoutStart = state.lastEndSample;
+        const int64_t dropoutEnd = startSample;
         if (dropoutEnd > dropoutStart)
         {
             m_coverageModel.addDropout(pannerId, dropoutStart, dropoutEnd, missed, true);
         }
     }
     
-    // Skip if no audio data
+    // Occasional debug logging
+    static std::map<std::string, juce::int64> lastBufferLogTime;
+    auto now = juce::Time::currentTimeMillis();
+    std::string key = pannerId.toString();
+    if (now - lastBufferLogTime[key] > 2000) // Every 2s per panner
+    {
+        lastBufferLogTime[key] = now;
+        DBG("[CaptureEngine] Block from " + juce::String(panner.name) + 
+            ": bufferId=" + juce::String((juce::int64)block.bufferId) +
+            " startSample=" + juce::String(startSample) +
+            " isPlaying=" + juce::String(block.isPlaying ? "yes" : "no") +
+            " channels=" + juce::String((int)numChannels) +
+            " samples=" + juce::String(numSamples) +
+            " dropped=" + juce::String((juce::int64)block.droppedBlocksBefore));
+    }
+    
+    // Parameter-only blocks carry no audio; just track the sequence
     if (numChannels <= 0 || numSamples <= 0)
     {
+        state.lastSequenceNumber = block.sequenceNumber;
+        state.lastBufferId = block.bufferId;
         return;
     }
     
@@ -294,24 +294,25 @@ void CaptureEngine::processPannerData(const PannerInfo& panner)
     header.numSamples = numSamples;
     header.numChannels = numChannels;
     header.sampleRate = sampleRate;
-    header.bufferId = bufferId;
-    header.sequenceNumber = sequenceNumber;
-    header.dawTimestampMs = dawTimestamp;
-    header.wallClockMs = static_cast<uint64_t>(juce::Time::currentTimeMillis());
+    header.bufferId = block.bufferId;
+    header.sequenceNumber = block.sequenceNumber;
+    header.dawTimestampMs = block.dawTimestamp;
+    header.wallClockMs = static_cast<uint64_t>(now);
     header.audioDataSize = static_cast<uint32_t>(numChannels * numSamples * sizeof(float));
     
-    // Create state snapshot from panner info
-    StateSnapshot snapshot = createStateSnapshot(panner);
+    // State snapshot straight from the block's own parameter payload, so the
+    // captured automation state is sample-aligned with the captured audio.
+    StateSnapshot snapshot = createStateSnapshot(panner, block.parameters);
     snapshot.captureTimestampMs = header.wallClockMs;
-    snapshot.stateSeq = sequenceNumber;
+    snapshot.stateSeq = block.sequenceNumber;
     
     // Interleave audio data for storage
-    std::vector<float> interleavedAudio(static_cast<size_t>(numChannels * numSamples));
+    std::vector<float> interleavedAudio(static_cast<size_t>(numChannels) * numSamples);
     for (int sample = 0; sample < numSamples; ++sample)
     {
         for (int channel = 0; channel < numChannels; ++channel)
         {
-            interleavedAudio[static_cast<size_t>(sample * numChannels + channel)] = audioBuffer.getSample(channel, sample);
+            interleavedAudio[static_cast<size_t>(sample) * numChannels + channel] = block.audio.getSample(channel, sample);
         }
     }
     
@@ -320,15 +321,12 @@ void CaptureEngine::processPannerData(const PannerInfo& panner)
     
     // Update coverage model
     m_coverageModel.addPannerInterval(pannerId, startSample, numSamples,
-                                      sampleRate, numChannels, sequenceNumber, bufferId);
+                                      sampleRate, numChannels, block.sequenceNumber, block.bufferId);
     
     // Update state tracking
-    state.lastSequenceNumber = sequenceNumber;
-    state.lastBufferId = bufferId;
+    state.lastSequenceNumber = block.sequenceNumber;
+    state.lastBufferId = block.bufferId;
     state.lastEndSample = startSample + numSamples;
-    
-    // Acknowledge the buffer
-    memPanner->memoryShare->acknowledgeBuffer(bufferId, 9001);  // Consumer ID
 }
 
 void CaptureEngine::writeChunk(PannerCaptureState& state, const ChunkHeader& header,
@@ -436,27 +434,37 @@ void CaptureEngine::closeAllPannerStates()
 //==============================================================================
 PannerId CaptureEngine::createPannerId(const PannerInfo& panner) const
 {
+    // The instance uuid must be unique per plugin instance: DAWs host every
+    // instance in one process, so the name/PID alone would merge their
+    // capture streams. The memory address distinguishes instances.
+    std::string instanceUuid = panner.name;
+    if (panner.memoryAddress != 0)
+        instanceUuid += "_PTR" + juce::String::toHexString(static_cast<juce::int64>(panner.memoryAddress)).toStdString();
+
     return PannerId(
         m_sessionId.toStdString(),
-        panner.name,
+        instanceUuid,
         panner.processId
     );
 }
 
-StateSnapshot CaptureEngine::createStateSnapshot(const PannerInfo& panner) const
+StateSnapshot CaptureEngine::createStateSnapshot(const PannerInfo& panner,
+                                                 const ParameterMap& blockParameters) const
 {
+    // Prefer the parameter payload carried inside the block itself (it was
+    // serialized in the same processBlock() as the audio); fall back to the
+    // tracker's last-known values for anything missing.
     StateSnapshot snapshot;
-    snapshot.azimuthDeg = panner.azimuth;
-    snapshot.elevationDeg = panner.elevation;
-    snapshot.diverge = panner.diverge;
-    snapshot.gainDb = panner.gain;
-    snapshot.stereoOrbitAzimuth = panner.stereoOrbitAzimuth;
-    snapshot.stereoSpread = panner.stereoSpread;
-    snapshot.stereoInputBalance = panner.stereoInputBalance;
-    snapshot.autoOrbit = panner.autoOrbit;
-    snapshot.autoOrbit = panner.autoOrbit;
-    snapshot.inputMode = panner.inputMode;
-    snapshot.outputMode = panner.outputMode;
+    snapshot.azimuthDeg = blockParameters.getFloat(M1SystemHelperParameterIDs::AZIMUTH, panner.azimuth);
+    snapshot.elevationDeg = blockParameters.getFloat(M1SystemHelperParameterIDs::ELEVATION, panner.elevation);
+    snapshot.diverge = blockParameters.getFloat(M1SystemHelperParameterIDs::DIVERGE, panner.diverge);
+    snapshot.gainDb = blockParameters.getFloat(M1SystemHelperParameterIDs::GAIN, panner.gain);
+    snapshot.stereoOrbitAzimuth = blockParameters.getFloat(M1SystemHelperParameterIDs::STEREO_ORBIT_AZIMUTH, panner.stereoOrbitAzimuth);
+    snapshot.stereoSpread = blockParameters.getFloat(M1SystemHelperParameterIDs::STEREO_SPREAD, panner.stereoSpread);
+    snapshot.stereoInputBalance = blockParameters.getFloat(M1SystemHelperParameterIDs::STEREO_INPUT_BALANCE, panner.stereoInputBalance);
+    snapshot.autoOrbit = blockParameters.getBool(M1SystemHelperParameterIDs::AUTO_ORBIT, panner.autoOrbit);
+    snapshot.inputMode = blockParameters.getInt(M1SystemHelperParameterIDs::INPUT_MODE, panner.inputMode);
+    snapshot.outputMode = blockParameters.getInt(M1SystemHelperParameterIDs::OUTPUT_MODE, panner.outputMode);
     snapshot.pannerMode = panner.pannerMode;
     return snapshot;
 }

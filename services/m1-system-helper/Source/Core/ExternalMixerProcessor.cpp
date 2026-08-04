@@ -64,12 +64,19 @@ void ExternalMixerProcessor::processAudioBlock(float* const* outputChannels, int
 // Per-panner M1Encode management
 // ---------------------------------------------------------------------------
 
-PerPannerEncoder& ExternalMixerProcessor::getOrCreateEncoder(uint32_t processId) {
-    auto it = pannerEncoders.find(processId);
+// Unique key per panner instance: DAWs host all plugin instances in one
+// process, so the process id alone would make instances share one encoder.
+static uint64_t encoderKeyFor(const MemorySharePannerInfo& panner) {
+    return (static_cast<uint64_t>(panner.processId) << 48)
+         ^ static_cast<uint64_t>(panner.memoryAddress);
+}
+
+PerPannerEncoder& ExternalMixerProcessor::getOrCreateEncoder(uint64_t instanceKey) {
+    auto it = pannerEncoders.find(instanceKey);
     if (it == pannerEncoders.end()) {
         PerPannerEncoder enc;
         enc.m1Encode = std::make_unique<Mach1Encode<float>>();
-        auto result = pannerEncoders.emplace(processId, std::move(enc));
+        auto result = pannerEncoders.emplace(instanceKey, std::move(enc));
         return result.first->second;
     }
     return it->second;
@@ -139,16 +146,16 @@ void ExternalMixerProcessor::configureEncoder(PerPannerEncoder& enc, const Memor
 }
 
 void ExternalMixerProcessor::cleanupStaleEncoders(const std::vector<MemorySharePannerInfo>& activePanners) {
-    std::vector<uint32_t> toRemove;
-    for (auto& [pid, enc] : pannerEncoders) {
+    std::vector<uint64_t> toRemove;
+    for (auto& [key, enc] : pannerEncoders) {
         bool found = false;
         for (auto& p : activePanners)
-            if (p.processId == pid && p.isConnected) { found = true; break; }
+            if (encoderKeyFor(p) == key && p.isConnected) { found = true; break; }
         if (!found)
-            toRemove.push_back(pid);
+            toRemove.push_back(key);
     }
-    for (auto pid : toRemove)
-        pannerEncoders.erase(pid);
+    for (auto key : toRemove)
+        pannerEncoders.erase(key);
 }
 
 // ---------------------------------------------------------------------------
@@ -174,23 +181,22 @@ void ExternalMixerProcessor::processMemorySharePanners(int numSamples) {
         
         streamingReadBuffer.clear();
         
-        ParameterMap currentParams;
-        uint64_t dawTimestamp = 0;
-        double playheadPosition = 0.0;
-        bool isPlaying = false;
-        uint64_t bufferId = 0;
-        uint32_t updateSource = 0;
-
-        bool readSuccess = pannerInfo.memoryShare->readAudioBufferWithGenericParameters(
-            streamingReadBuffer, currentParams, dawTimestamp, playheadPosition, isPlaying, bufferId, updateSource
-        );
+        // Poll the most recently published block (non-consuming). The live mix
+        // always wants the freshest audio; sequential draining is the capture
+        // engine's job.
+        M1MemoryShare::SharedBlock block;
+        if (!pannerInfo.memoryShare->readLatestBlock(block))
+            continue;
         
-        if (!readSuccess) continue;
+        const int blockChannels = block.audio.getNumChannels();
+        const int blockSamples = block.audio.getNumSamples();
+        if (blockChannels <= 0 || blockSamples <= 0)
+            continue; // parameter-only block, nothing to mix
         
-        // Get the actual number of channels in the read buffer (from the panner's write)
-        int readChannels = static_cast<int>(pannerInfo.channels);
-        if (readChannels <= 0) readChannels = 1;
-        readChannels = juce::jmin(readChannels, streamingReadBuffer.getNumChannels());
+        const int copySamples = juce::jmin(numSamples, blockSamples);
+        const int readChannels = juce::jmin(blockChannels, streamingReadBuffer.getNumChannels());
+        for (int ch = 0; ch < readChannels; ++ch)
+            streamingReadBuffer.copyFrom(ch, 0, block.audio, ch, 0, copySamples);
         
         // Apply per-track gain from the panner parameters
         float pannerGain = pannerInfo.getGain();
@@ -198,8 +204,8 @@ void ExternalMixerProcessor::processMemorySharePanners(int numSamples) {
         // The panner stores gain as a linear float [0..1] based on the PluginProcessor code.
         pannerGain = juce::jlimit(0.0f, 2.0f, pannerGain);
         
-        // Get or create an M1Encode for this panner
-        auto& enc = getOrCreateEncoder(pannerInfo.processId);
+        // Get or create an M1Encode for this panner instance
+        auto& enc = getOrCreateEncoder(encoderKeyFor(pannerInfo));
         configureEncoder(enc, pannerInfo, numSamples);
         
         int inChans  = enc.m1Encode->getInputChannelsCount();

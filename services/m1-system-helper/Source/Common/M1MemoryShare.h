@@ -1,12 +1,9 @@
 #pragma once
 
-#include <memory>
 #include <atomic>
-#include <mutex>
-#include <queue>
-#include <unordered_map>
-#include <chrono>
 #include <cstring>
+#include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 #include "Common.h"
@@ -17,91 +14,103 @@
     #include <windows.h>
 #else
     #include <unistd.h>
-    #include <sys/mman.h>
-    #include <fcntl.h>
 #endif
 
 /**
- * M1MemoryShare provides IPC (Inter-Process Communication) memory sharing functionality
- * using JUCE's MemoryMappedFile for sharing audio data and control data between processes.
+ * M1MemoryShare - shared-memory audio block transport between M1-Panner
+ * plugin instances (writer) and m1-system-helper (readers).
  *
- * Enhanced with buffer acknowledgment system for handling multiple unconsumed buffers.
+ * Layout v2 ("slot ring"):
+ *
+ *   [SharedMemoryHeader]                     versioned header with ring cursors
+ *   [slot 0][slot 1]...[slot N-1]            fixed-size block slots
+ *   [control ring]                           MAX_CONTROL_MESSAGES ControlMessage
+ *
+ * Each slot contains one serialized audio block:
+ *   GenericAudioBufferHeader + GenericParameter entries + interleaved audio.
+ *
+ * Concurrency model:
+ *  - Single writer process (the panner). Writes go to slot
+ *    (writeCursor % slotCount) and are published by a release-store that
+ *    increments writeCursor. In-process writer threads are serialized by
+ *    m_writerMutex (try-lock on the realtime path).
+ *  - Readers either poll the latest published block (non-consuming) or
+ *    register a consumer and read sequentially with a per-consumer cursor.
+ *    Torn reads (writer lapping the reader mid-copy) are detected by
+ *    re-checking writeCursor after the copy and validating the block's
+ *    bufferId against the expected block index.
+ *  - For non-realtime (offline bounce) writes the writer can block until all
+ *    registered consumers have caught up, so no blocks are lost.
+ *
+ * IMPORTANT: this file has a sibling copy in m1-panner/Source/M1MemoryShare.h.
+ * The SharedMemoryHeader / ControlMessage structs and the ring logic must stay
+ * layout-identical between the two copies.
  */
 class M1MemoryShare
 {
 public:
+    static constexpr uint32_t MEMORY_LAYOUT_MAGIC = 0x4D315348;  // "M1SH"
+    static constexpr uint32_t MEMORY_LAYOUT_VERSION = 2;
+    static constexpr uint32_t MAX_CONSUMERS = 8;
+    static constexpr uint32_t MAX_CONTROL_MESSAGES = 16;
+
+    // Per-slot reservation for serialized parameters (worst case today ~400B).
+    static constexpr uint32_t MAX_PARAMETER_BYTES = 1024;
+    // Minimum audio headroom per slot in samples-per-channel, so common host
+    // block sizes (<= 2048) never require re-initializing the ring geometry.
+    static constexpr uint32_t MIN_SLOT_SAMPLES = 2048;
+    static constexpr uint32_t MIN_SLOT_COUNT = 4;
+    static constexpr uint32_t MAX_SLOT_COUNT = 256;
+
     /**
-     * Header structure that prefixes all shared memory segments
-     * Contains metadata about the shared data and buffer queue
+     * Header at offset 0 of every shared memory segment.
+     *
+     * Atomics are used for cross-process publication; they are lock-free and
+     * address-free for 32/64-bit integers on all supported platforms.
+     * MUST remain byte-identical to the sibling copy in m1-panner.
      */
     struct SharedMemoryHeader
     {
-        volatile uint32_t writeIndex;           // Current write position
-        volatile uint32_t readIndex;            // Current read position
-        volatile uint32_t dataSize;             // Size of valid data
-        volatile bool hasData;                  // Flag indicating if data is available
-        uint32_t bufferSize;                    // Total buffer size (set once)
-        uint32_t sampleRate;                    // Audio sample rate
-        uint32_t numChannels;                   // Number of audio channels
-        uint32_t samplesPerBlock;               // Samples per processing block
-        char name[64];                          // Name identifier for debugging
-        
-        // Buffer queue management
-        volatile uint32_t queueSize;            // Number of buffers in queue
-        volatile uint32_t maxQueueSize;         // Maximum queue size
-        volatile uint32_t nextSequenceNumber;   // Next sequence number to assign
-        volatile uint64_t nextBufferId;         // Next buffer ID to assign
-        
-        // Consumer management
-        volatile uint32_t consumerCount;        // Number of registered consumers
-        volatile uint32_t consumerIds[16];      // Consumer IDs (max 16 consumers)
-        
-        // Bidirectional communication - Control messages from consumers back to producer
-        volatile uint32_t controlMessageCount;  // Number of pending control messages
-        volatile uint32_t controlReadIndex;     // Read index for control messages
-        volatile uint32_t controlWriteIndex;    // Write index for control messages
-        
-        SharedMemoryHeader() : writeIndex(0), readIndex(0), dataSize(0), hasData(false),
-                              bufferSize(0), sampleRate(0), numChannels(0), samplesPerBlock(0),
-                              queueSize(0), maxQueueSize(8), nextSequenceNumber(0), nextBufferId(1),
-                              consumerCount(0), controlMessageCount(0), controlReadIndex(0), controlWriteIndex(0)
-        {
-            std::memset(name, 0, sizeof(name));
-            std::memset(const_cast<uint32_t*>(consumerIds), 0, sizeof(consumerIds));
-        }
-    };
-    
-    /**
-     * Queued buffer entry with acknowledgment tracking
-     */
-    struct QueuedBuffer
-    {
-        uint64_t bufferId;
-        uint32_t sequenceNumber;
-        uint64_t timestamp;
-        uint32_t dataSize;
-        uint32_t dataOffset;        // Offset from start of data buffer
-        bool requiresAcknowledgment;
-        uint32_t consumerCount;
-        uint32_t acknowledgedCount;
-        uint32_t consumerIds[16];   // IDs of consumers that need to acknowledge
-        bool acknowledged[16];      // Acknowledgment status for each consumer
-        
-        QueuedBuffer() : bufferId(0), sequenceNumber(0), timestamp(0), dataSize(0), dataOffset(0),
-                        requiresAcknowledgment(false), consumerCount(0), acknowledgedCount(0)
-        {
-            std::memset(consumerIds, 0, sizeof(consumerIds));
-            std::memset(acknowledged, false, sizeof(acknowledged));
-        }
+        // Identity / geometry (written by the creating process only)
+        uint32_t magic = 0;              // MEMORY_LAYOUT_MAGIC
+        uint32_t layoutVersion = 0;      // MEMORY_LAYOUT_VERSION
+        uint32_t headerSize = 0;         // sizeof(SharedMemoryHeader)
+        uint32_t totalSize = 0;          // total mapped size in bytes
+        uint32_t sampleRate = 0;
+        uint32_t numChannels = 0;
+        uint32_t samplesPerBlock = 0;
+        uint32_t ringGeneration = 0;     // incremented whenever the ring is (re)configured
+        uint32_t slotCount = 0;          // 0 until initializeForAudio() configures the ring
+        uint32_t slotSize = 0;           // bytes per slot
+        uint32_t slotsOffset = 0;        // byte offset of slot 0 from mapping base
+        uint32_t controlRingOffset = 0;  // byte offset of the control ring from mapping base
+        char name[64] = {};
+
+        // Block ring cursor: number of published blocks (single writer)
+        std::atomic<uint64_t> writeCursor { 0 };
+
+        // Registered sequential consumers
+        std::atomic<uint32_t> consumerCount { 0 };
+        uint32_t consumerIds[MAX_CONSUMERS] = {};
+        std::atomic<uint64_t> consumerCursors[MAX_CONSUMERS] = {};
+
+        // Control ring indices (helper -> panner)
+        std::atomic<uint32_t> controlReadIndex { 0 };
+        std::atomic<uint32_t> controlWriteIndex { 0 };
     };
 
+    static_assert(std::atomic<uint64_t>::is_always_lock_free,
+                  "shared-memory cursors require lock-free 64-bit atomics");
+    static_assert(std::atomic<uint32_t>::is_always_lock_free,
+                  "shared-memory indices require lock-free 32-bit atomics");
+
     /**
-     * Control message for bidirectional communication (helper -> panner)
-     * Stored in a ring buffer within the SharedMemoryHeader region.
+     * Control message for bidirectional communication (helper -> panner).
+     * Stored in a small ring after the block slots.
      */
     struct ControlMessage
     {
-        uint32_t parameterID;       // Which parameter to update
+        uint32_t parameterID;
         ParameterType parameterType;
         float floatValue;
         int32_t intValue;
@@ -109,20 +118,34 @@ public:
         ControlMessage() : parameterID(0), parameterType(ParameterType::FLOAT), floatValue(0.0f), intValue(0) {}
     };
 
-    static constexpr uint32_t MAX_CONTROL_MESSAGES = 16;
+    /**
+     * A fully deserialized audio block read from the ring.
+     */
+    struct SharedBlock
+    {
+        juce::AudioBuffer<float> audio;
+        ParameterMap parameters;
+        uint64_t dawTimestamp = 0;
+        double playheadPositionInSeconds = 0.0;
+        bool isPlaying = false;
+        uint64_t bufferId = 0;            // blockIndex + 1 (0 = invalid)
+        uint64_t blockIndex = 0;          // position in the ring's monotonic sequence
+        uint32_t sequenceNumber = 0;      // low 32 bits of blockIndex, kept for chunk files
+        uint32_t updateSource = 0;
+        int64_t startSamplePosition = 0;  // DAW timeline position of the first sample
+        uint32_t sampleRate = 0;
+        uint64_t droppedBlocksBefore = 0; // blocks lost to ring overrun before this one
+    };
 
     /**
-     * Constructor for creating/opening a shared memory segment
      * @param memoryName Unique name for the shared memory segment (OS-wide)
-     * @param totalSize Total size of the shared memory in bytes (must be >= 4KB)
-     * @param maxQueueSize Maximum number of buffers to queue (default: 8)
-     * @param persistent If true, memory persists until manually deleted; if false, cleaned up when process exits
-     * @param createMode If true, creates new segment; if false, opens existing segment
+     * @param totalSize Total size of the shared memory in bytes
+     * @param persistent If false, the backing file is deleted in the destructor
+     * @param createMode If true, creates a new segment; if false, opens an existing one
      * @param explicitFilePath Optional full path to the memory file (bypasses directory search)
      */
     M1MemoryShare(const std::string& memoryName,
                   size_t totalSize,
-                  uint32_t maxQueueSize = 8,
                   bool persistent = true,
                   bool createMode = true,
                   const std::string& explicitFilePath = "");
@@ -130,255 +153,134 @@ public:
     ~M1MemoryShare();
 
     /**
-     * Initialize the shared memory for audio data
-     * @param sampleRate Audio sample rate
-     * @param numChannels Number of audio channels
-     * @param samplesPerBlock Samples per processing block
-     * @return true if successful
+     * Configure (or reconfigure) the ring geometry for audio streaming.
+     * Only meaningful on the creating side. If the geometry changes, the ring
+     * is reset (cursors zeroed, generation bumped). Safe to call repeatedly
+     * with the same values (no-op).
      */
     bool initializeForAudio(uint32_t sampleRate, uint32_t numChannels, uint32_t samplesPerBlock);
 
+    //==========================================================================
+    // Writer API (panner side)
+
     /**
-     * Register a consumer for buffer acknowledgment
-     * @param consumerId Unique ID for the consumer
-     * @return true if registration successful
+     * Serialize one audio block (+ parameter snapshot) into the next ring slot
+     * and publish it.
+     *
+     * @param blockWhenConsumersBehind When true (non-realtime/offline bounce),
+     *        blocks until all registered consumers have caught up before
+     *        overwriting unread slots, so no blocks are dropped. When false
+     *        (realtime), never blocks; a slow consumer simply loses old blocks.
+     * @return bufferId (blockIndex + 1) on success, 0 on failure/skip
+     */
+    uint64_t writeAudioBufferWithGenericParameters(const juce::AudioBuffer<float>& audioBuffer,
+                                                   const ParameterMap& parameters,
+                                                   uint64_t dawTimestamp,
+                                                   double playheadPositionInSeconds,
+                                                   bool isPlaying,
+                                                   bool blockWhenConsumersBehind = false,
+                                                   uint32_t updateSource = 1,
+                                                   uint32_t sampleRate = 44100);
+
+    /** Maximum time a blocking write waits for consumers (default 2000 ms). */
+    void setBackpressureTimeoutMs(uint32_t timeoutMs) { m_backpressureTimeoutMs = timeoutMs; }
+
+    //==========================================================================
+    // Reader API (helper side)
+
+    /**
+     * Register a sequential consumer. Its cursor starts at the current write
+     * position (it only sees blocks published after registration).
      */
     bool registerConsumer(uint32_t consumerId);
-
-    /**
-     * Unregister a consumer
-     * @param consumerId Consumer ID to unregister
-     * @return true if unregistration successful
-     */
     bool unregisterConsumer(uint32_t consumerId);
+    bool isConsumerRegistered(uint32_t consumerId) const;
 
     /**
-     * Write audio buffer to shared memory with generic parameter system and acknowledgment
-     * @param audioBuffer Audio buffer containing the audio data (vector of channels)
-     * @param parameters Generic parameter map containing all settings
-     * @param dawTimestamp DAW/host timestamp
-     * @param playheadPositionInSeconds DAW playhead position
-     * @param isPlaying Whether DAW is currently playing
-     * @param requiresAcknowledgment Whether this buffer requires acknowledgment
-     * @param updateSource Source of the update (HOST, UI, MEMORYSHARE)
-     * @return buffer ID if write was successful, 0 otherwise
+     * Read the next unread block for a registered consumer and advance its
+     * cursor. Detects ring overruns (reported via out.droppedBlocksBefore).
+     * @return true if a block was read, false if no new data is available
      */
-    uint64_t writeAudioBufferWithGenericParameters(const std::vector<std::vector<float>>& audioBuffer,
-                                                  const ParameterMap& parameters,
-                                                  uint64_t dawTimestamp,
-                                                  double playheadPositionInSeconds,
-                                                  bool isPlaying,
-                                                  bool requiresAcknowledgment = false,
-                                                  uint32_t updateSource = 1);
+    bool readNextBlockForConsumer(uint32_t consumerId, SharedBlock& out);
 
     /**
-     * Read the oldest unacknowledged audio buffer from shared memory
-     * @param audioBuffer JUCE AudioBuffer to store the read data
-     * @param parameters Output parameter map to store all parameters
-     * @param dawTimestamp Output DAW timestamp
-     * @param playheadPositionInSeconds Output DAW playhead position
-     * @param isPlaying Output playing state
-     * @param bufferId Output buffer ID
-     * @param updateSource Output update source
-     * @return true if read was successful and data was available
+     * Read the most recently published block without consuming anything.
+     * Used for parameter/status polling; consumer cursors are unaffected.
      */
-    bool readAudioBufferWithGenericParameters(juce::AudioBuffer<float>& audioBuffer,
-                                            ParameterMap& parameters,
-                                            uint64_t& dawTimestamp,
-                                            double& playheadPositionInSeconds,
-                                            bool& isPlaying,
-                                            uint64_t& bufferId,
-                                            uint32_t& updateSource);
+    bool readLatestBlock(SharedBlock& out);
 
-    /**
-     * Read a specific buffer by ID
-     * @param bufferId Buffer ID to read
-     * @param audioBuffer JUCE AudioBuffer to store the read data
-     * @param parameters Output parameter map to store all parameters
-     * @param dawTimestamp Output DAW timestamp
-     * @param playheadPositionInSeconds Output DAW playhead position
-     * @param isPlaying Output playing state
-     * @param updateSource Output update source
-     * @return true if read was successful and buffer was found
-     */
-    bool readBufferById(uint64_t bufferId,
-                       juce::AudioBuffer<float>& audioBuffer,
-                       ParameterMap& parameters,
-                       uint64_t& dawTimestamp,
-                       double& playheadPositionInSeconds,
-                       bool& isPlaying,
-                       uint32_t& updateSource);
+    //==========================================================================
+    // Control messages (helper -> panner)
 
-    /**
-     * Acknowledge consumption of a buffer
-     * @param bufferId Buffer ID to acknowledge
-     * @param consumerId Consumer ID that is acknowledging
-     * @return true if acknowledgment was successful
-     */
-    bool acknowledgeBuffer(uint64_t bufferId, uint32_t consumerId);
-
-    /**
-     * Get list of available buffer IDs
-     * @return Vector of buffer IDs that are available for reading
-     */
-    std::vector<uint64_t> getAvailableBufferIds() const;
-
-    /**
-     * Get the number of unconsumed buffers in the queue
-     * @return Number of buffers waiting to be consumed
-     */
-    uint32_t getUnconsumedBufferCount() const;
-
-    /**
-     * Read only the generic parameters from shared memory (without audio data)
-     * @param parameters Output parameter map to store all parameters
-     * @param dawTimestamp Output DAW timestamp
-     * @param playheadPositionInSeconds Output DAW playhead position
-     * @param isPlaying Output playing state
-     * @param updateSource Output update source
-     * @return true if read was successful and header data was available
-     */
-    bool readGenericParameters(ParameterMap& parameters,
-                             uint64_t& dawTimestamp,
-                             double& playheadPositionInSeconds,
-                             bool& isPlaying,
-                             uint32_t& updateSource);
-
-    /**
-     * Read audio buffer from shared memory (legacy method)
-     * @param audioBuffer JUCE AudioBuffer to store the read data
-     * @return true if read was successful and data was available
-     */
-    bool readAudioBuffer(juce::AudioBuffer<float>& audioBuffer);
-
-    /**
-     * Write string data to shared memory
-     * @param data String to write
-     * @return true if write was successful
-     */
-    bool writeString(const juce::String& data);
-
-    /**
-     * Read string data from shared memory
-     * @return String data if available, empty string otherwise
-     */
-    juce::String readString();
-
-    /**
-     * Write raw binary data to shared memory
-     * @param data Pointer to data
-     * @param size Size of data in bytes
-     * @return true if write was successful
-     */
-    bool writeData(const void* data, size_t size);
-
-    /**
-     * Read raw binary data from shared memory
-     * @param buffer Buffer to store data
-     * @param maxSize Maximum size to read
-     * @return Number of bytes actually read
-     */
-    size_t readData(void* buffer, size_t maxSize);
-
-    /**
-     * Check if the shared memory is valid and accessible
-     * @return true if memory is accessible
-     */
-    bool isValid() const;
-
-    /**
-     * Get the current data size in the shared memory
-     * @return Size of available data in bytes
-     */
-    size_t getDataSize() const;
-
-    /**
-     * Clear all data in the shared memory
-     */
-    void clear();
-
-    /**
-     * Get memory usage statistics
-     */
-    struct MemoryStats
-    {
-        size_t totalSize;
-        size_t availableSize;
-        size_t usedSize;
-        uint32_t writeCount;
-        uint32_t readCount;
-        uint32_t queuedBufferCount;
-        uint32_t acknowledgedBufferCount;
-        uint32_t consumerCount;
-    };
-
-    MemoryStats getStats() const;
-
-    /**
-     * Write a control message (helper -> panner) into the shared memory control ring
-     * @return true if the message was written successfully
-     */
     bool writeControlMessage(uint32_t parameterID, ParameterType type, float floatValue, int32_t intValue = 0);
-
-    /**
-     * Read the next pending control message (panner reads from helper)
-     * @return true if a message was available
-     */
     bool readControlMessage(ControlMessage& outMessage);
 
-    /**
-     * Static method to delete a shared memory segment by name
-     * @param memoryName Name of the memory segment to delete
-     * @return true if successfully deleted
-     */
+    //==========================================================================
+    // Introspection
+
+    bool isValid() const;
+    bool isRingConfigured() const;
+    uint64_t getWriteCursor() const;
+    uint32_t getSlotCount() const;
+    uint32_t getRingGeneration() const;
+    bool getConsumerCursor(uint32_t consumerId, uint64_t& outCursor) const;
+
+    /** Async (message-thread) file modification time bump so directory scans
+        can tell live segments from stale ones without touching the RT path. */
+    void scheduleAsyncFileModTimeUpdate();
+
+    /** Delete a shared memory segment file by name. */
     static bool deleteSharedMemory(const juce::String& memoryName);
 
 private:
-    juce::String m_memoryName;
+    std::string m_memoryName;
     size_t m_totalSize;
-    uint32_t m_maxQueueSize;
     bool m_persistent;
     bool m_createMode;
+    std::string m_explicitFilePath;
 
     std::unique_ptr<juce::MemoryMappedFile> m_mappedFile;
     juce::File m_tempFile;
 
-    SharedMemoryHeader* m_header;
-    uint8_t* m_dataBuffer;
-    size_t m_dataBufferSize;
+    SharedMemoryHeader* m_header = nullptr;
+    size_t m_mappedSize = 0;
 
-    // Queue management
-    QueuedBuffer* m_queuedBuffers;  // Array of queued buffers
-    size_t m_queuedBuffersSize;     // Size of queued buffers area
-    
-    mutable std::atomic<uint32_t> m_writeCount{0};
-    mutable std::atomic<uint32_t> m_readCount{0};
-    mutable std::mutex m_queueMutex;
+    // Serializes in-process writers (audio thread vs. parameter-only timer).
+    std::mutex m_writerMutex;
+    // Serializes in-process readers (tracker poll vs. capture thread) and
+    // guards consumer registration.
+    mutable std::mutex m_readerMutex;
+
+    uint32_t m_backpressureTimeoutMs = 2000;
+    std::atomic<uint32_t> m_modTimeWriteCounter { 0 };
 
     bool createSharedMemoryFile();
     bool openSharedMemoryFile();
-    void setupMemoryPointers();
-    
-    // Buffer management
-    uint64_t getNextBufferId();
-    uint32_t getNextSequenceNumber();
-    uint64_t getCurrentTimestamp() const;
-    
-    // Queue management
-    bool addToQueue(uint64_t bufferId, uint32_t sequenceNumber, uint64_t timestamp,
-                   uint32_t dataSize, uint32_t dataOffset, bool requiresAcknowledgment);
-    bool removeFromQueue(uint64_t bufferId);
-    QueuedBuffer* findQueuedBuffer(uint64_t bufferId);
-    void cleanupAcknowledgedBuffers();
-    
-    // Consumer management
-    int findConsumerIndex(uint32_t consumerId) const;
-    bool isConsumerRegistered(uint32_t consumerId) const;
+    bool setupMemoryPointers();
 
-    // Explicit file path (if provided, bypasses search)
-    std::string m_explicitFilePath;
-    
+    uint8_t* basePtr() const;
+    uint8_t* slotPointer(uint64_t blockIndex) const;
+    ControlMessage* controlRing() const;
+
+    int findConsumerIndex(uint32_t consumerId) const;
+    uint64_t minimumConsumerCursor() const;
+    void waitForConsumersToCatchUp(uint64_t blockIndex);
+
+    size_t computeSerializedParameterBytes(const ParameterMap& parameters) const;
+    size_t serializeBlock(uint8_t* dst,
+                          size_t capacity,
+                          const juce::AudioBuffer<float>& audioBuffer,
+                          const ParameterMap& parameters,
+                          uint64_t dawTimestamp,
+                          double playheadPositionInSeconds,
+                          bool isPlaying,
+                          uint32_t updateSource,
+                          uint32_t sampleRate,
+                          uint64_t blockIndex);
+    bool parseBlock(const uint8_t* data, size_t size, SharedBlock& out) const;
+    bool copySlotToScratch(uint64_t blockIndex, std::vector<uint8_t>& scratch) const;
+
     // Prevent copying
     M1MemoryShare(const M1MemoryShare&) = delete;
     M1MemoryShare& operator=(const M1MemoryShare&) = delete;
-}; 
+};

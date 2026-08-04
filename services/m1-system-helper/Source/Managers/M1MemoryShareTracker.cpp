@@ -168,7 +168,6 @@ bool M1MemoryShareTracker::connectToPanner(MemorySharePannerInfo& panner) {
         panner.memoryShare = std::make_unique<M1MemoryShare>(
             panner.memorySegmentName, 
             1024 * 1024, // 1MB default size
-            8,           // maxQueueSize
             true,        // persistent
             false,       // createMode = false (open existing)
             panner.memoryFilePath  // Explicit file path (std::string)
@@ -239,39 +238,40 @@ bool M1MemoryShareTracker::readAudioBufferData(MemorySharePannerInfo& panner) {
         return false;
     }
     
-    // Try to read latest audio buffer with parameters
-    ParameterMap parameters;
-    juce::AudioBuffer<float> audioBuffer;
-    uint64_t dawTimestamp = 0;
-    double playheadPosition = 0.0;
-    bool isPlaying = false;
-    uint64_t bufferId = 0;
-    uint32_t updateSource = 0;
-    
-    if (panner.memoryShare->readAudioBufferWithGenericParameters(
-            audioBuffer, parameters, dawTimestamp, playheadPosition, isPlaying, bufferId, updateSource)) {
-        
-        // Update panner info with latest data
-        panner.parameters = parameters;
-        panner.dawTimestamp = dawTimestamp;
-        panner.playheadPositionInSeconds = playheadPosition;
-        panner.isPlaying = isPlaying;
-        panner.currentBufferId = bufferId;
-        
-        // Update audio format info from the buffer
-        if (audioBuffer.getNumChannels() > 0) {
-            panner.channels = static_cast<uint32_t>(audioBuffer.getNumChannels());
-        }
-        if (audioBuffer.getNumSamples() > 0) {
-            panner.samplesPerBlock = static_cast<uint32_t>(audioBuffer.getNumSamples());
-        }
-        
-        // Extract display name and other parameters
-        extractParametersFromBuffer(panner);
-        return true;
+    // Poll the most recently published block (non-consuming; the capture
+    // engine reads sequentially through its own consumer cursor).
+    M1MemoryShare::SharedBlock block;
+    if (!panner.memoryShare->readLatestBlock(block)) {
+        return false;
     }
     
-    return false;
+    const bool isNewBlock = (block.bufferId != panner.currentBufferId);
+    
+    // Update panner info with latest data
+    panner.parameters = block.parameters;
+    panner.dawTimestamp = block.dawTimestamp;
+    panner.playheadPositionInSeconds = block.playheadPositionInSeconds;
+    panner.isPlaying = block.isPlaying;
+    panner.currentBufferId = block.bufferId;
+    panner.sequenceNumber = block.sequenceNumber;
+    
+    // Update audio format info from the block
+    if (block.sampleRate > 0) {
+        panner.sampleRate = block.sampleRate;
+    }
+    if (block.audio.getNumChannels() > 0) {
+        panner.channels = static_cast<uint32_t>(block.audio.getNumChannels());
+    }
+    if (block.audio.getNumSamples() > 0) {
+        panner.samplesPerBlock = static_cast<uint32_t>(block.audio.getNumSamples());
+    }
+    
+    // Extract display name and other parameters
+    extractParametersFromBuffer(panner);
+    
+    // Only report activity when the writer actually published a new block,
+    // so staleness detection reflects reality instead of latching forever.
+    return isNewBlock;
 }
 
 bool M1MemoryShareTracker::registerAsConsumer(uint32_t consumerId) {

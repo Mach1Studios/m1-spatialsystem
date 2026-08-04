@@ -333,6 +333,13 @@ void testMonitorBroadcastThrottleDedupesAndForces()
 
 } // namespace
 
+// Defined in MemoryShareRingTests.cpp; returns the number of failed checks.
+int runMemoryShareRingTests();
+// Defined in ExportEngineTests.cpp; returns the number of failed checks.
+int runExportEngineTests();
+// Defined in SystemIntegrationTests.cpp; returns the number of failed checks.
+int runSystemIntegrationTests();
+
 int main()
 {
     juce::ScopedJuceInitialiser_GUI juceInitialiser;
@@ -342,6 +349,10 @@ int main()
     testMonitorBroadcastThrottleRateLimitsStreams();
     testMonitorBroadcastThrottleDedupesAndForces();
     testManyPannersUnderOrientationStorm();
+
+    failures += runMemoryShareRingTests();
+    failures += runExportEngineTests();
+    failures += runSystemIntegrationTests();
 
     if (failures == 0) {
         std::cout << "All m1-system-helper unit tests passed" << std::endl;

@@ -79,9 +79,14 @@ public:
     void stopCapture();
     bool isCapturing() const;
 
+    // Offline export of the current capture session (runs on a worker thread)
+    void runExport();
+
 private:
     void setupLayout();
     void setupCaptureEngine(bool debugFakeBlocks);
+
+    std::atomic<bool> exportInProgress { false };
     
     // Reference to panner manager
     PannerTrackingManager& pannerManager;

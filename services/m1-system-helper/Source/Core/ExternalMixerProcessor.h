@@ -94,7 +94,7 @@ private:
     void processTrack(int pluginPort, MixerTrackInfo& track, float* const* mixChannels, int numSamples);
     void applyMasterDecoding(float* const* channels, int numChannels, int numSamples);
     
-    PerPannerEncoder& getOrCreateEncoder(uint32_t processId);
+    PerPannerEncoder& getOrCreateEncoder(uint64_t instanceKey);
     void configureEncoder(PerPannerEncoder& enc, const MemorySharePannerInfo& panner, int numSamples);
     void cleanupStaleEncoders(const std::vector<MemorySharePannerInfo>& activePanners);
     
@@ -108,8 +108,8 @@ private:
     std::unordered_map<int, MixerTrackInfo> trackMap;
     juce::CriticalSection tracksMutex;
     
-    // Per-panner M1Encode instances keyed by PID
-    std::unordered_map<uint32_t, PerPannerEncoder> pannerEncoders;
+    // Per-panner M1Encode instances keyed by (PID, instance memory address)
+    std::unordered_map<uint64_t, PerPannerEncoder> pannerEncoders;
     
     // Processing buffers (spatialChannelCount channels x blockSize samples)
     std::vector<std::vector<float>> spatialMixBuffer;

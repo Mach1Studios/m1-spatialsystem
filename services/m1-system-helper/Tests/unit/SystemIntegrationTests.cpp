@@ -1,0 +1,372 @@
+/*
+    SystemIntegrationTests.cpp
+    --------------------------
+    End-to-end self-test of the panner -> helper -> monitor comm chain,
+    without a DAW:
+
+      1. A simulated M1-Panner creates a shared-memory segment in the real
+         shared directory using the exact naming scheme the plugin uses
+         (M1SpatialSystem_M1Panner_PID<pid>_PTR<addr>_T<ts>) and streams
+         audio blocks with a parameter payload.
+      2. The real PannerTrackingManager / M1MemoryShareTracker must discover
+         the segment by scanning the filesystem, connect as a consumer, and
+         surface the panner's parameters and audio activity.
+      3. TWO simulated instances share this test's process id - exactly like
+         two panner plugin instances inside one DAW process - and must be
+         tracked as two distinct panners (regression: tracking used to key
+         memory-share panners by PID only, collapsing them into one).
+      4. Capture-style sequential draining must deliver each instance's own
+         blocks through the tracker's registered consumer cursor.
+      5. The real OSCHandler must deliver "/m1-streaming-panners <count>" to
+         a registered monitor client over real UDP - the message the
+         M1-Monitor UI uses to show its STREAMING badge.
+*/
+
+#include <JuceHeader.h>
+#include "Common/M1MemoryShare.h"
+#include "Common/SharedPathUtils.h"
+#include "Common/TypesForDataExchange.h"
+#include "Core/EventSystem.h"
+#include "Managers/ClientManager.h"
+#include "Managers/PannerTrackingManager.h"
+#include "Managers/PluginManager.h"
+#include "Managers/ServiceManager.h"
+#include "Network/OSCHandler.h"
+
+#include <atomic>
+#include <chrono>
+#include <iostream>
+#include <thread>
+
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <unistd.h>
+#endif
+
+namespace {
+
+int integrationFailures = 0;
+
+#define ICHECK(cond, message)                                                   \
+    do {                                                                        \
+        if (!(cond)) {                                                          \
+            ++integrationFailures;                                              \
+            std::cout << "FAILED: " << message << " (" << #cond << ") at "      \
+                      << __FILE__ << ":" << __LINE__ << std::endl;              \
+        }                                                                       \
+    } while (false)
+
+uint32_t currentPid()
+{
+#ifdef _WIN32
+    return static_cast<uint32_t>(GetCurrentProcessId());
+#else
+    return static_cast<uint32_t>(getpid());
+#endif
+}
+
+juce::File sharedMemoryDirectory()
+{
+    const auto dirs = Mach1::SharedPathUtils::getAllSharedDirectories();
+    juce::File dir = dirs.empty()
+        ? juce::File::getSpecialLocation(juce::File::tempDirectory)
+        : juce::File(juce::String(dirs.front()));
+    dir.createDirectory();
+    return dir;
+}
+
+/**
+ * Stand-in for one M1-Panner plugin instance: same segment naming, same
+ * shared-memory writer, same parameter payload as the real plugin.
+ */
+struct SimulatedPanner
+{
+    juce::File file;
+    juce::String segmentName;
+    std::unique_ptr<M1MemoryShare> share;
+    uintptr_t fakeAddress = 0;
+    float azimuth = 0.0f;
+    std::string displayName;
+    uint64_t blocksWritten = 0;
+
+    SimulatedPanner(uintptr_t address, float azimuthDeg, const std::string& name)
+        : fakeAddress(address), azimuth(azimuthDeg), displayName(name)
+    {
+        segmentName = juce::String("M1SpatialSystem_M1Panner_PID") + juce::String(static_cast<int>(currentPid()))
+                    + "_PTR" + juce::String::toHexString(static_cast<juce::int64>(address))
+                    + "_T" + juce::String(juce::Time::currentTimeMillis());
+        file = sharedMemoryDirectory().getChildFile(segmentName + ".mem");
+
+        share = std::make_unique<M1MemoryShare>(segmentName.toStdString(), 1024 * 1024,
+                                                /*persistent*/ true, /*createMode*/ true,
+                                                file.getFullPathName().toStdString());
+        if (share->isValid())
+            share->initializeForAudio(48000, 2, 480);
+    }
+
+    ~SimulatedPanner()
+    {
+        share.reset();
+        file.deleteFile();
+    }
+
+    uint64_t writeBlock()
+    {
+        juce::AudioBuffer<float> audio(2, 480);
+        for (int ch = 0; ch < 2; ++ch)
+            for (int s = 0; s < 480; ++s)
+                audio.setSample(ch, s, 0.25f + 0.25f * ch);
+
+        ParameterMap params;
+        params.addFloat(M1SystemHelperParameterIDs::AZIMUTH, azimuth);
+        params.addFloat(M1SystemHelperParameterIDs::ELEVATION, -10.0f);
+        params.addFloat(M1SystemHelperParameterIDs::DIVERGE, 60.0f);
+        params.addFloat(M1SystemHelperParameterIDs::GAIN, -3.0f);
+        params.addInt(M1SystemHelperParameterIDs::INPUT_MODE, 1);
+        params.addInt(M1SystemHelperParameterIDs::OUTPUT_MODE, 1);
+        params.addBool(M1SystemHelperParameterIDs::AUTO_ORBIT, true);
+        params.addInt(M1SystemHelperParameterIDs::PORT, 9998);
+        params.addString(M1SystemHelperParameterIDs::DISPLAY_NAME, displayName);
+
+        const double playheadSeconds = static_cast<double>(blocksWritten) * (480.0 / 48000.0);
+        const uint64_t id = share->writeAudioBufferWithGenericParameters(
+            audio, params,
+            static_cast<uint64_t>(juce::Time::currentTimeMillis()),
+            playheadSeconds, /*isPlaying*/ true,
+            /*blockWhenConsumersBehind*/ false, /*updateSource*/ 1, 48000);
+        if (id != 0)
+            ++blocksWritten;
+        return id;
+    }
+};
+
+// Finds this test's simulated panners among whatever the tracker discovered
+// (a developer machine may have a real DAW with real panners running).
+std::vector<Mach1::PannerInfo> findOwnPanners(const std::vector<Mach1::PannerInfo>& panners)
+{
+    std::vector<Mach1::PannerInfo> own;
+    for (const auto& panner : panners)
+        if (panner.processId == currentPid() && panner.isMemoryShareBased)
+            own.push_back(panner);
+    return own;
+}
+
+//==============================================================================
+void testPannerDiscoveryAndTwoInstanceDataShare()
+{
+    auto eventSystem = std::make_shared<Mach1::EventSystem>();
+    Mach1::PannerTrackingManager manager(eventSystem);
+    manager.start();
+
+    // Two instances inside ONE process, like two panner tracks in a DAW
+    SimulatedPanner pannerA(0xA11CE000, 10.0f, "Integration Panner A");
+    SimulatedPanner pannerB(0xB0BB0000, 75.0f, "Integration Panner B");
+    ICHECK(pannerA.share->isValid() && pannerB.share->isValid(),
+           "simulated panner segments created in the shared directory");
+
+    // Drive discovery the same way the helper service does (periodic update()
+    // calls) while the "plugins" keep streaming blocks.
+    std::vector<Mach1::PannerInfo> own;
+    const auto deadline = juce::Time::currentTimeMillis() + 8000;
+    while (juce::Time::currentTimeMillis() < deadline)
+    {
+        pannerA.writeBlock();
+        pannerB.writeBlock();
+        manager.update();
+
+        own = findOwnPanners(manager.getActivePanners());
+        if (own.size() >= 2)
+            break;
+        std::this_thread::sleep_for(std::chrono::milliseconds(120));
+    }
+
+    ICHECK(own.size() == 2,
+           "both same-process panner instances tracked separately (got "
+           + std::to_string(own.size()) + ")");
+
+    if (own.size() == 2)
+    {
+        // Identify by memory address and verify per-instance parameter flow
+        const Mach1::PannerInfo* a = nullptr;
+        const Mach1::PannerInfo* b = nullptr;
+        for (const auto& panner : own)
+        {
+            if (panner.memoryAddress == pannerA.fakeAddress) a = &panner;
+            if (panner.memoryAddress == pannerB.fakeAddress) b = &panner;
+        }
+        ICHECK(a != nullptr && b != nullptr, "instances distinguished by memory address");
+
+        if (a != nullptr && b != nullptr)
+        {
+            ICHECK(std::abs(a->azimuth - 10.0f) < 0.01f, "instance A azimuth arrived via memory share");
+            ICHECK(std::abs(b->azimuth - 75.0f) < 0.01f, "instance B azimuth arrived via memory share");
+            ICHECK(a->name == "Integration Panner A", "instance A display name arrived");
+            ICHECK(b->name == "Integration Panner B", "instance B display name arrived");
+            ICHECK(a->channels == 2 && a->sampleRate == 48000, "audio format propagated");
+            ICHECK(a->isPlaying, "playback state propagated");
+        }
+    }
+
+    // Capture-style sequential drain: each instance's blocks must be readable
+    // through the tracker's registered consumer, independently per instance.
+    auto* tracker = manager.getMemoryShareTracker();
+    ICHECK(tracker != nullptr, "memory share tracker available");
+    if (tracker != nullptr && own.size() == 2)
+    {
+        const uint32_t consumerId = tracker->getConsumerId();
+
+        auto drainAndCheck = [&](SimulatedPanner& simulated, const char* label)
+        {
+            auto* memPanner = tracker->findPanner(currentPid(), simulated.fakeAddress);
+            ICHECK(memPanner != nullptr && memPanner->memoryShare != nullptr,
+                   std::string(label) + ": tracker connected to segment");
+            if (memPanner == nullptr || !memPanner->memoryShare)
+                return;
+
+            // Skip anything already published, then stream fresh blocks
+            M1MemoryShare::SharedBlock block;
+            while (memPanner->memoryShare->readNextBlockForConsumer(consumerId, block)) {}
+
+            const int freshBlocks = 5;
+            for (int i = 0; i < freshBlocks; ++i)
+                ICHECK(simulated.writeBlock() != 0, std::string(label) + ": block write accepted");
+
+            int drained = 0;
+            float lastAzimuth = -999.0f;
+            while (memPanner->memoryShare->readNextBlockForConsumer(consumerId, block))
+            {
+                ++drained;
+                lastAzimuth = block.parameters.getFloat(M1SystemHelperParameterIDs::AZIMUTH, -999.0f);
+            }
+            ICHECK(drained == freshBlocks,
+                   std::string(label) + ": capture drain sees every block (got "
+                   + std::to_string(drained) + ")");
+            ICHECK(std::abs(lastAzimuth - simulated.azimuth) < 0.01f,
+                   std::string(label) + ": drained blocks carry the instance's own parameters");
+        };
+
+        drainAndCheck(pannerA, "panner A");
+        drainAndCheck(pannerB, "panner B");
+    }
+
+    manager.stop();
+}
+
+//==============================================================================
+class StreamingStatusListener : public juce::OSCReceiver::Listener<juce::OSCReceiver::RealtimeCallback>
+{
+public:
+    std::atomic<int> receivedCount { 0 };
+    std::atomic<int> lastCount { -1 };
+
+    void oscMessageReceived(const juce::OSCMessage& msg) override
+    {
+        if (msg.getAddressPattern() == "/m1-streaming-panners" && msg.size() >= 1 && msg[0].isInt32())
+        {
+            lastCount = msg[0].getInt32();
+            ++receivedCount;
+        }
+    }
+};
+
+void testStreamingStatusReachesMonitorClients()
+{
+    auto eventSystem = std::make_shared<Mach1::EventSystem>();
+    Mach1::PannerTrackingManager manager(eventSystem);
+    manager.start();
+
+    // One streaming "panner" so the broadcast carries a non-zero count
+    SimulatedPanner panner(0xCAFE0000, 33.0f, "Integration Panner C");
+    ICHECK(panner.share->isValid(), "simulated panner segment created");
+
+    const auto discoveryDeadline = juce::Time::currentTimeMillis() + 8000;
+    while (juce::Time::currentTimeMillis() < discoveryDeadline)
+    {
+        panner.writeBlock();
+        manager.update();
+        if (!findOwnPanners(manager.getActivePanners()).empty())
+            break;
+        std::this_thread::sleep_for(std::chrono::milliseconds(120));
+    }
+    ICHECK(!findOwnPanners(manager.getActivePanners()).empty(), "panner discovered before broadcast test");
+
+    Mach1::PluginManager pluginManager(eventSystem);
+    Mach1::ClientManager clientManager(eventSystem);
+    // Leaked deliberately: ~ServiceManager() issues real launchctl/sc kill
+    // commands against any installed orientation manager.
+    auto* serviceManager = new Mach1::ServiceManager(46347);
+
+    Mach1::OSCHandler oscHandler(&clientManager, &pluginManager, serviceManager,
+                                 &manager, /*externalMixer*/ nullptr);
+
+    int helperPort = 0;
+    for (int candidate = 48400; candidate < 48500; ++candidate)
+    {
+        if (oscHandler.startListening(candidate))
+        {
+            helperPort = candidate;
+            break;
+        }
+    }
+    ICHECK(helperPort != 0, "test helper OSC port bound");
+
+    // Fake M1-Monitor client
+    juce::OSCReceiver monitorReceiver;
+    StreamingStatusListener monitorListener;
+    int monitorPort = 0;
+    for (int candidate = 48500; candidate < 48600; ++candidate)
+    {
+        if (monitorReceiver.connect(candidate))
+        {
+            monitorPort = candidate;
+            break;
+        }
+    }
+    ICHECK(monitorPort != 0, "fake monitor port bound");
+    monitorReceiver.addListener(&monitorListener);
+
+    // Register exactly like MonitorOSC::connectToHelper() does
+    juce::OSCSender toHelper;
+    ICHECK(toHelper.connect("127.0.0.1", helperPort), "sender connected to helper");
+    juce::OSCMessage addClient("/m1-addClient");
+    addClient.addInt32(monitorPort);
+    addClient.addString("monitor");
+    ICHECK(toHelper.send(addClient), "monitor registration sent");
+
+    // Wait for registration to land, then trigger the keepalive broadcast
+    for (int i = 0; i < 100 && clientManager.getClientCount() < 1; ++i)
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    ICHECK(clientManager.getClientCount() >= 1, "monitor client registered with helper");
+
+    manager.update(); // refresh the streaming panner list
+    oscHandler.broadcastStreamingStatusToMonitors();
+
+    for (int i = 0; i < 200 && monitorListener.receivedCount.load() == 0; ++i)
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+    ICHECK(monitorListener.receivedCount.load() >= 1,
+           "monitor received /m1-streaming-panners heartbeat");
+    ICHECK(monitorListener.lastCount.load() >= 1,
+           "streaming panner count includes the active simulated panner (got "
+           + std::to_string(monitorListener.lastCount.load()) + ")");
+
+    monitorReceiver.removeListener(&monitorListener);
+    monitorReceiver.disconnect();
+    oscHandler.stopListening();
+    manager.stop();
+}
+
+} // namespace
+
+// Called from HelperServiceTests.cpp's main(); returns failed check count.
+int runSystemIntegrationTests()
+{
+    testPannerDiscoveryAndTwoInstanceDataShare();
+    testStreamingStatusReachesMonitorClients();
+
+    if (integrationFailures == 0)
+        std::cout << "All system integration tests passed" << std::endl;
+
+    return integrationFailures;
+}

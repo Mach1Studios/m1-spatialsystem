@@ -243,7 +243,10 @@ void PannerTrackingManager::mergeTrackingResults() {
         for (const auto& foundPanner : foundPanners) {
             bool matches = false;
             if (existingPanner.isMemoryShareBased && foundPanner.isMemoryShareBased) {
-                matches = (existingPanner.processId == foundPanner.processId && foundPanner.processId != 0);
+                // processId alone is NOT unique: DAWs host every plugin
+                // instance in one process. The memory address disambiguates.
+                matches = (existingPanner.processId == foundPanner.processId && foundPanner.processId != 0
+                           && existingPanner.memoryAddress == foundPanner.memoryAddress);
             } else {
                 matches = (existingPanner.port == foundPanner.port && foundPanner.port != 0);
             }
@@ -280,7 +283,8 @@ void PannerTrackingManager::mergeTrackingResults() {
         bool isNew = true;
         for (const auto& existing : activePanners) {
             if (existing.isMemoryShareBased && foundPanner.isMemoryShareBased) {
-                if (existing.processId == foundPanner.processId && foundPanner.processId != 0) {
+                if (existing.processId == foundPanner.processId && foundPanner.processId != 0
+                    && existing.memoryAddress == foundPanner.memoryAddress) {
                     isNew = false;
                     break;
                 }
@@ -370,7 +374,7 @@ bool PannerTrackingManager::sendParameterUpdate(const PannerInfo& panner, const 
         return false;
 
     // Find the panner's M1MemoryShare instance via the tracker
-    auto* pannerInfo = memoryShareTracker->findPanner(panner.processId);
+    auto* pannerInfo = memoryShareTracker->findPanner(panner.processId, panner.memoryAddress);
     if (!pannerInfo || !pannerInfo->memoryShare || !pannerInfo->memoryShare->isValid())
         return false;
 
@@ -433,6 +437,7 @@ PannerInfo PannerTrackingManager::convertFromMemoryShare(const MemorySharePanner
     panner.port = info.getPort();
     panner.name = info.getDisplayName();  // Uses DISPLAY_NAME parameter, falls back to info.name
     panner.processId = info.processId;
+    panner.memoryAddress = info.memoryAddress;
     
     // State
     panner.isActive = info.isActive;

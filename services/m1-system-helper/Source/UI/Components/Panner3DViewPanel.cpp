@@ -108,6 +108,12 @@ Vec3 convertMach1PointToWorld(const Mach1Point3D& point)
 
 uint64_t getPannerEncoderKey(const PannerInfo& panner)
 {
+    // Include the instance memory address: multiple panner instances live in
+    // one DAW process (same PID) and may share a port value.
+    if (panner.memoryAddress != 0)
+        return (static_cast<uint64_t>(panner.processId) << 48)
+             ^ static_cast<uint64_t>(panner.memoryAddress);
+
     if (panner.processId != 0 || panner.port != 0)
         return (static_cast<uint64_t>(panner.processId) << 32) | static_cast<uint32_t>(panner.port);
 

@@ -393,9 +393,9 @@ endif
 
 dev-panner:
 ifeq ($(detected_OS),Darwin)
-	cmake m1-panner -Bm1-panner/build-dev -G "Xcode" -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DBUILD_STANDALONE=ON
+	cmake m1-panner -Bm1-panner/build-dev -G "Xcode" -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DBUILD_STANDALONE=ON -DENABLE_EXTERNAL_RENDERER=ON
 else
-	cmake m1-panner -Bm1-panner/build-dev -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_STANDALONE=ON
+	cmake m1-panner -Bm1-panner/build-dev -DJUCE_COPY_PLUGIN_AFTER_BUILD=ON -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_STANDALONE=ON -DENABLE_EXTERNAL_RENDERER=ON
 endif
 
 dev-player:
@@ -938,7 +938,7 @@ test-ci-yaml:
 # clean and configure for release
 configure: clean update-versions-internal
 	cmake m1-monitor -Bm1-monitor/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF
-	cmake m1-panner -Bm1-panner/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF
+	cmake m1-panner -Bm1-panner/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_AU=ON -DBUILD_VST=ON -DVST2_PATH=$(VST2_PATH) -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF -DENABLE_EXTERNAL_RENDERER=ON
 ifeq ($(detected_OS),Darwin)
 	@echo "Configuring m1-player (release)..."
 	cmake m1-player -Bm1-player/build -G "Xcode" -DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF || true
@@ -1474,7 +1474,7 @@ test-plugins: test-monitor test-panner
 .PHONY: test-unit
 test-unit:
 	@echo "=== m1-panner unit tests ==="
-	cmake m1-panner -Bm1-panner/build-tests -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBUILD_UNIT_TESTS=ON -DBUILD_VST3=ON -DBUILD_AAX=OFF -DBUILD_AU=OFF -DBUILD_VST=OFF -DBUILD_STANDALONE=OFF -DENABLE_VST2_COMPATIBILITY=OFF
+	cmake m1-panner -Bm1-panner/build-tests -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBUILD_UNIT_TESTS=ON -DBUILD_VST3=ON -DBUILD_AAX=OFF -DBUILD_AU=OFF -DBUILD_VST=OFF -DBUILD_STANDALONE=OFF -DENABLE_VST2_COMPATIBILITY=OFF -DENABLE_EXTERNAL_RENDERER=ON
 	cmake --build m1-panner/build-tests --target m1-panner-policy-tests
 	cd m1-panner/build-tests && ctest --output-on-failure -R m1-panner-policy
 	@echo "=== m1-system-helper unit tests ==="

@@ -233,9 +233,15 @@ private:
     int64_t m_debugSamplePosition = 0;
     uint32_t m_debugSequenceNumber = 0;
     
+    // Maximum blocks drained from a single panner per capture pass, so one
+    // busy panner cannot starve the others.
+    static constexpr int MAX_BLOCKS_PER_PASS = 64;
+    
     // Processing
     void processCapture();
     void processPannerData(const PannerInfo& panner);
+    void ingestBlock(const PannerInfo& panner, const PannerId& pannerId,
+                     const M1MemoryShare::SharedBlock& block);
     void writeChunk(PannerCaptureState& state, const ChunkHeader& header,
                    const StateSnapshot& snapshot, const float* audioData);
     
@@ -246,7 +252,8 @@ private:
     
     // Helpers
     PannerId createPannerId(const PannerInfo& panner) const;
-    StateSnapshot createStateSnapshot(const PannerInfo& panner) const;
+    StateSnapshot createStateSnapshot(const PannerInfo& panner,
+                                      const ParameterMap& blockParameters) const;
     juce::File getPannerCaptureDir(const PannerId& pannerId) const;
     
     // Debug fake data generation

@@ -38,6 +38,8 @@ set(CORE_SOURCES
     Core/CoverageModel.cpp
     Core/CaptureEngine.h
     Core/CaptureEngine.cpp
+    Core/ExportEngine.h
+    Core/ExportEngine.cpp
 )
 
 # Network files

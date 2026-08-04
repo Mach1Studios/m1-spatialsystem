@@ -35,6 +35,12 @@ public:
     void applyMonitorModeFromUi(int mode);
     void applyChannelConfigFromUi(int channelCount);
 
+    // Tells every monitor client how many panner instances are currently
+    // streaming audio into the helper (memory-share based). Called once per
+    // keepalive tick so monitors can treat it as a heartbeat with a timeout;
+    // public so integration tests can trigger it without the timer.
+    void broadcastStreamingStatusToMonitors();
+
 private:
     struct MonitorStateCache {
         float yaw = 0.0f;

@@ -741,6 +741,30 @@ void OSCHandler::timerCallback() {
     }
     if (hasPendingValues && pluginManager)
         pluginManager->sendMonitorSettings(pendingValues.mode, pendingValues.yaw, pendingValues.pitch, pendingValues.roll, true);
+
+    broadcastStreamingStatusToMonitors();
+}
+
+void OSCHandler::broadcastStreamingStatusToMonitors()
+{
+    if (!clientManager || !pannerTrackingManager)
+        return;
+
+    const auto monitors = clientManager->getClientsByType(ClientType::Monitor);
+    if (monitors.empty())
+        return;
+
+    int streamingCount = 0;
+    for (const auto& panner : pannerTrackingManager->getActivePanners())
+    {
+        if (panner.isMemoryShareBased)
+            ++streamingCount;
+    }
+
+    juce::OSCMessage msg("/m1-streaming-panners");
+    msg.addInt32(streamingCount);
+    for (const auto& monitor : monitors)
+        sendMessageToMonitorClient(monitor.port, msg);
 }
 
 } // namespace Mach1
