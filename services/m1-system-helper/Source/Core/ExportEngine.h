@@ -57,7 +57,8 @@ public:
     /** Per-input-stream coverage summary for the export range. */
     struct StreamReport
     {
-        std::string name;            // panner directory name (uuid_pid)
+        std::string name;            // panner directory name (stable instance id)
+        std::string displayName;     // DAW track name (from name.txt, may be empty)
         int inputMode = 0;           // last captured Mach1EncodeInputMode
         uint32_t sampleRate = 0;
         uint32_t chunkCount = 0;

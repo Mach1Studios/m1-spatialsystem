@@ -244,6 +244,17 @@ void CaptureEngine::ingestBlock(const PannerInfo& panner, const PannerId& panner
                                 const M1MemoryShare::SharedBlock& block)
 {
     PannerCaptureState& state = getOrCreatePannerState(pannerId);
+
+    // Keep the human-readable name next to the capture data (the directory
+    // name is a stable instance id, not the track name). Updated whenever
+    // the DAW reports a new track name; name changes are rare so the tiny
+    // file write is negligible.
+    if (!panner.name.empty() && panner.name != state.lastDisplayName)
+    {
+        state.lastDisplayName = panner.name;
+        getPannerCaptureDir(pannerId).getChildFile("name.txt")
+            .replaceWithText(juce::String(panner.name));
+    }
     
     const uint32_t sampleRate = block.sampleRate > 0 ? block.sampleRate : 44100;
     const int64_t startSample = block.startSamplePosition;
@@ -434,12 +445,20 @@ void CaptureEngine::closeAllPannerStates()
 //==============================================================================
 PannerId CaptureEngine::createPannerId(const PannerInfo& panner) const
 {
-    // The instance uuid must be unique per plugin instance: DAWs host every
-    // instance in one process, so the name/PID alone would merge their
-    // capture streams. The memory address distinguishes instances.
-    std::string instanceUuid = panner.name;
+    // The instance uuid must be unique per plugin instance AND stable for
+    // the instance's lifetime. Display names are neither: the default
+    // "M1-Panner (PID x)" flips to the DAW track name as soon as the host
+    // reports it, which used to split one instance's capture into two
+    // streams mid-session. Identity therefore comes from the memory address
+    // (unique per instance within a process); the human-readable name is
+    // stored separately (name.txt in the capture directory).
+    std::string instanceUuid;
     if (panner.memoryAddress != 0)
-        instanceUuid += "_PTR" + juce::String::toHexString(static_cast<juce::int64>(panner.memoryAddress)).toStdString();
+        instanceUuid = "PTR" + juce::String::toHexString(static_cast<juce::int64>(panner.memoryAddress)).toStdString();
+    else if (panner.port != 0)
+        instanceUuid = "PORT" + std::to_string(panner.port);
+    else
+        instanceUuid = panner.name;
 
     return PannerId(
         m_sessionId.toStdString(),

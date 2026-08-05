@@ -252,6 +252,22 @@ void PannerTrackingManager::mergeTrackingResults() {
             }
             
             if (matches) {
+                // Promote an OSC-tracked entry to memory-share identity as
+                // soon as the instance's shared-memory stream is discovered
+                // (the port joins both views of the same plugin instance).
+                // Without this the merged entry would keep isMemoryShareBased
+                // = false and the capture engine would skip its audio.
+                if (foundPanner.isMemoryShareBased && !existingPanner.isMemoryShareBased) {
+                    existingPanner.isMemoryShareBased = true;
+                    existingPanner.processId = foundPanner.processId;
+                    existingPanner.memoryAddress = foundPanner.memoryAddress;
+                }
+                // Audio format only flows through memory share (OSC entries
+                // carry hardcoded defaults that must not stomp real values)
+                if (foundPanner.isMemoryShareBased) {
+                    existingPanner.channels = foundPanner.channels;
+                    existingPanner.sampleRate = foundPanner.sampleRate;
+                }
                 existingPanner.name = foundPanner.name;
                 existingPanner.azimuth = foundPanner.azimuth;
                 existingPanner.elevation = foundPanner.elevation;

@@ -70,6 +70,10 @@ SessionMainComponent::SessionMainComponent(PannerTrackingManager& manager, Clien
     addAndMakeVisible(view3DComponent.get());
     addAndMakeVisible(monitorComponent.get());
     addAndMakeVisible(captureTimelinePanel.get());
+
+    // Export result notification overlay (hidden until an export finishes)
+    exportResultOverlay = std::make_unique<ExportResultOverlay>();
+    addChildComponent(exportResultOverlay.get());
     
     // Set up layout
     setupLayout();
@@ -180,13 +184,20 @@ void SessionMainComponent::runExport()
         const ExportEngine::Result result = ExportEngine::exportSession(request);
 
         juce::MessageManager::callAsync([safeThis, result]() {
-            if (safeThis != nullptr)
-                safeThis->exportInProgress.store(false);
+            if (safeThis == nullptr)
+                return;
+
+            safeThis->exportInProgress.store(false);
+
+            auto* overlay = safeThis->exportResultOverlay.get();
+            if (overlay == nullptr)
+                return;
 
             if (!result.success)
             {
-                juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon,
-                                                       "Export failed", result.errorMessage);
+                overlay->show("Export failed",
+                              { { result.errorMessage, HelperUIColours::text } },
+                              juce::File(), /*isError*/ true);
                 return;
             }
 
@@ -194,24 +205,35 @@ void SessionMainComponent::runExport()
                 ? static_cast<double>(result.endSample - result.startSample) / result.sampleRate
                 : 0.0;
 
-            juce::String summary;
-            summary << "Rendered " << juce::String(result.channels) << "-channel Mach1 Spatial mix\n"
-                    << juce::String(seconds, 2) << " s @ " << juce::String(static_cast<int>(result.sampleRate)) << " Hz\n"
-                    << "Full coverage (all inputs): " << juce::String(result.allStreamsCoveragePercent, 1) << "%\n";
+            std::vector<ExportResultOverlay::Line> lines;
+            lines.push_back({ juce::String(result.channels) + "-channel Mach1 Spatial mix, "
+                                  + juce::String(seconds, 2) + " s @ "
+                                  + juce::String(static_cast<int>(result.sampleRate)) + " Hz",
+                              HelperUIColours::text });
+
+            const bool fullCoverage = result.allStreamsCoveragePercent > 99.9f;
+            lines.push_back({ "Full coverage (all inputs): "
+                                  + juce::String(result.allStreamsCoveragePercent, 1) + "%",
+                              fullCoverage ? HelperUIColours::success : HelperUIColours::warning });
 
             for (const auto& stream : result.streams)
             {
-                summary << "\n" << juce::String(stream.name) << ": "
-                        << juce::String(stream.coveragePercent, 1) << "% received";
+                const juce::String streamName = stream.displayName.empty()
+                    ? juce::String(stream.name)
+                    : juce::String(stream.displayName);
+
+                juce::String line = streamName + ": "
+                    + juce::String(stream.coveragePercent, 1) + "% received";
                 if (!stream.missing.empty())
-                    summary << " (" << juce::String(static_cast<int>(stream.missing.size())) << " gap(s), see report)";
+                    line += " (" + juce::String(static_cast<int>(stream.missing.size())) + " gap(s), see report)";
+
+                lines.push_back({ line, stream.missing.empty() ? HelperUIColours::success
+                                                               : HelperUIColours::warning });
             }
 
-            summary << "\n\n" << result.outputFile.getFullPathName();
+            lines.push_back({ result.outputFile.getFullPathName(), HelperUIColours::textDim });
 
-            juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::InfoIcon,
-                                                   "Export complete", summary);
-            result.outputFile.revealToUser();
+            overlay->show("Export complete", lines, result.outputFile, /*isError*/ false);
         });
     });
 }
@@ -284,6 +306,10 @@ void SessionMainComponent::resized()
                                       rightBounds.getX(), rightBounds.getY(),
                                       rightBounds.getWidth(), rightBounds.getHeight(),
                                       true, true);
+
+    // Notification overlay covers everything
+    if (exportResultOverlay)
+        exportResultOverlay->setBounds(getLocalBounds());
 }
 
 void SessionMainComponent::paint(juce::Graphics& g)
@@ -597,6 +623,14 @@ juce::String SessionUI::generateDiagnosticsText()
         text << "  Port: " << juce::String(panner.port) << juce::newLine;
         text << "  Process ID: " << juce::String(static_cast<int>(panner.processId)) << juce::newLine;
         text << "  Channels: " << juce::String(static_cast<int>(panner.channels)) << juce::newLine;
+        juce::String inputModeName;
+        switch (panner.inputMode)
+        {
+            case 0: inputModeName = "Mono"; break;
+            case 1: inputModeName = "Stereo"; break;
+            default: inputModeName = "Mode " + juce::String(panner.inputMode); break;
+        }
+        text << "  Input Mode: " << inputModeName << juce::newLine;
         text << "  Azimuth: " << juce::String(panner.azimuth, 1) << juce::newLine;
         text << "  Elevation: " << juce::String(panner.elevation, 1) << juce::newLine;
         text << "  Diverge: " << juce::String(panner.diverge, 1) << juce::newLine;

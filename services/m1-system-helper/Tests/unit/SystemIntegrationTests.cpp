@@ -88,10 +88,11 @@ struct SimulatedPanner
     uintptr_t fakeAddress = 0;
     float azimuth = 0.0f;
     std::string displayName;
+    int oscPort = 9998;
     uint64_t blocksWritten = 0;
 
-    SimulatedPanner(uintptr_t address, float azimuthDeg, const std::string& name)
-        : fakeAddress(address), azimuth(azimuthDeg), displayName(name)
+    SimulatedPanner(uintptr_t address, float azimuthDeg, const std::string& name, int port = 9998)
+        : fakeAddress(address), azimuth(azimuthDeg), displayName(name), oscPort(port)
     {
         segmentName = juce::String("M1SpatialSystem_M1Panner_PID") + juce::String(static_cast<int>(currentPid()))
                     + "_PTR" + juce::String::toHexString(static_cast<juce::int64>(address))
@@ -126,7 +127,7 @@ struct SimulatedPanner
         params.addInt(M1SystemHelperParameterIDs::INPUT_MODE, 1);
         params.addInt(M1SystemHelperParameterIDs::OUTPUT_MODE, 1);
         params.addBool(M1SystemHelperParameterIDs::AUTO_ORBIT, true);
-        params.addInt(M1SystemHelperParameterIDs::PORT, 9998);
+        params.addInt(M1SystemHelperParameterIDs::PORT, oscPort);
         params.addString(M1SystemHelperParameterIDs::DISPLAY_NAME, displayName);
 
         const double playheadSeconds = static_cast<double>(blocksWritten) * (480.0 / 48000.0);
@@ -254,6 +255,87 @@ void testPannerDiscoveryAndTwoInstanceDataShare()
 }
 
 //==============================================================================
+// One plugin instance is visible through BOTH tracking paths: it registers
+// over OSC (with its receiver port) and it streams audio via memory share
+// (whose parameter payload carries that same port). The tracker must list it
+// ONCE, keyed to the memory-share identity - regression for the helper UI
+// showing every streaming panner twice ("OSC" + "MemoryShare" rows).
+void testOscAndMemoryShareDedupe()
+{
+    auto eventSystem = std::make_shared<Mach1::EventSystem>();
+    Mach1::PannerTrackingManager manager(eventSystem);
+    manager.start();
+
+    const int port = 48777; // matches nothing else on a dev machine
+
+    M1RegisteredPlugin plugin;
+    plugin.port = port;
+    plugin.name = "Dedupe Panner";
+    plugin.isPannerPlugin = true;
+    plugin.azimuth = 20.0f;
+    plugin.time = juce::Time::currentTimeMillis();
+    ICHECK(manager.registerOSCPanner(plugin).wasOk(), "OSC registration accepted");
+    manager.update();
+
+    const auto countEntriesForPort = [&manager, port]()
+    {
+        int count = 0;
+        for (const auto& panner : manager.getActivePanners())
+            if (panner.port == port)
+                ++count;
+        return count;
+    };
+
+    ICHECK(countEntriesForPort() == 1, "panner tracked once after OSC-only registration");
+
+    // Same instance starts streaming: memory-share segment carrying the port
+    SimulatedPanner simulated(0xDED00000, 20.0f, "Dedupe Panner", port);
+    ICHECK(simulated.share->isValid(), "dedupe panner segment created");
+
+    bool promoted = false;
+    const auto deadline = juce::Time::currentTimeMillis() + 8000;
+    while (juce::Time::currentTimeMillis() < deadline)
+    {
+        simulated.writeBlock();
+        // Keep the OSC side alive too, like the plugin's ping replies
+        plugin.time = juce::Time::currentTimeMillis();
+        manager.registerOSCPanner(plugin);
+        manager.update();
+
+        for (const auto& panner : manager.getActivePanners())
+        {
+            if (panner.port == port && panner.isMemoryShareBased
+                && panner.memoryAddress == simulated.fakeAddress)
+            {
+                promoted = true;
+                break;
+            }
+        }
+        if (promoted)
+            break;
+        std::this_thread::sleep_for(std::chrono::milliseconds(120));
+    }
+
+    ICHECK(promoted, "entry promoted to memory-share identity (capture needs the address)");
+    ICHECK(countEntriesForPort() == 1,
+           "panner still tracked once after memory share appears (got "
+           + std::to_string(countEntriesForPort()) + ")");
+
+    if (promoted)
+    {
+        for (const auto& panner : manager.getActivePanners())
+        {
+            if (panner.port != port)
+                continue;
+            ICHECK(panner.channels == 2, "audio format flows into the merged entry");
+            ICHECK(panner.inputMode == 1, "input mode (stereo) flows into the merged entry");
+        }
+    }
+
+    manager.stop();
+}
+
+//==============================================================================
 class StreamingStatusListener : public juce::OSCReceiver::Listener<juce::OSCReceiver::RealtimeCallback>
 {
 public:
@@ -363,6 +445,7 @@ void testStreamingStatusReachesMonitorClients()
 int runSystemIntegrationTests()
 {
     testPannerDiscoveryAndTwoInstanceDataShare();
+    testOscAndMemoryShareDedupe();
     testStreamingStatusReachesMonitorClients();
 
     if (integrationFailures == 0)

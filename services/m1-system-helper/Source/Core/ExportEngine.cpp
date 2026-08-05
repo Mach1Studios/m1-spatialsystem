@@ -155,6 +155,12 @@ ExportEngine::Result ExportEngine::exportSession(const Request& request, const P
         StreamSource source;
         source.chunkFile = chunkFile;
         source.report.name = entry.getFile().getFileName().toStdString();
+
+        // Human-readable track name written by CaptureEngine (optional)
+        const juce::File nameFile = entry.getFile().getChildFile("name.txt");
+        if (nameFile.existsAsFile())
+            source.report.displayName = nameFile.loadFileAsString().trim().toStdString();
+
         if (indexChunkFile(chunkFile, source))
             streams.push_back(std::move(source));
     }
@@ -446,6 +452,7 @@ ExportEngine::Result ExportEngine::exportSession(const Request& request, const P
         {
             auto* streamObj = new juce::DynamicObject();
             streamObj->setProperty("name", juce::String(report.name));
+            streamObj->setProperty("displayName", juce::String(report.displayName));
             streamObj->setProperty("inputMode", report.inputMode);
             streamObj->setProperty("sampleRate", static_cast<juce::int64>(report.sampleRate));
             streamObj->setProperty("chunkCount", static_cast<juce::int64>(report.chunkCount));

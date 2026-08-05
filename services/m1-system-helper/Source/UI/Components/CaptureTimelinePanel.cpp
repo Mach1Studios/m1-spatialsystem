@@ -56,9 +56,6 @@ CaptureTimelinePanel::CaptureTimelinePanel()
     m_exportButton->setColour(juce::TextButton::buttonColourId, m_buttonColour);
     m_exportButton->setColour(juce::TextButton::textColourOffId, m_textColour);
     m_exportButton->onClick = [this]() {
-        // TODO: Implement export dialog
-        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::InfoIcon,
-            "Export", "Export functionality is not yet implemented.\nCaptured chunks are stored in the capture directory.");
         if (onExportClicked)
             onExportClicked();
     };

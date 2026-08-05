@@ -277,7 +277,14 @@ juce::String InputTracklistComponent::getColumnText(int rowNumber, int columnId)
                 : juce::String(panner.name);
             
         case ChannelsColumn:
-            return juce::String(panner.channels);
+            // Show the encode input mode (what the helper will render with),
+            // not just the raw bus width.
+            switch (panner.inputMode)
+            {
+                case 0: return "M";  // Mono
+                case 1: return "St"; // Stereo
+                default: return juce::String(panner.channels);
+            }
             
         case AzimuthColumn:
             return juce::String(panner.azimuth, 1);

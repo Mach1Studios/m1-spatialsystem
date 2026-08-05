@@ -116,7 +116,10 @@ struct PannerCaptureState
     // Statistics
     uint32_t chunksWritten = 0;
     uint64_t bytesWritten = 0;
-    
+
+    // Last display name written to the capture directory's name.txt
+    std::string lastDisplayName;
+
     bool isOpen() const { return outputStream != nullptr && outputStream->openedOk(); }
 };
 
