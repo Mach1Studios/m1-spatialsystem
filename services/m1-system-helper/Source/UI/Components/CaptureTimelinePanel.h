@@ -60,6 +60,7 @@ public:
     // Callbacks
     std::function<void()> onResetClicked;
     std::function<void()> onExportClicked;
+    std::function<void()> onStorageClicked;
     
 private:
     CaptureEngine* m_engine = nullptr;
@@ -110,6 +111,7 @@ private:
     std::unique_ptr<juce::TextButton> m_resetButton;
     std::unique_ptr<juce::TextButton> m_lockRangeButton;
     std::unique_ptr<juce::TextButton> m_exportButton;
+    std::unique_ptr<juce::TextButton> m_storageButton;
     std::unique_ptr<juce::ToggleButton> m_fillGapsToggle;
     std::unique_ptr<juce::ToggleButton> m_autoZoomToggle;
     

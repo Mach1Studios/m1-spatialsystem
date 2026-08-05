@@ -252,6 +252,10 @@ private:
     PannerCaptureState& getOrCreatePannerState(const PannerId& pannerId);
     void closePannerState(PannerCaptureState& state);
     void closeAllPannerStates();
+
+    // Session manifest (consumed by StorageGovernor / storage panel):
+    // written on start/stop and refreshed periodically from the capture thread
+    void writeSessionManifest();
     
     // Helpers
     PannerId createPannerId(const PannerInfo& panner) const;

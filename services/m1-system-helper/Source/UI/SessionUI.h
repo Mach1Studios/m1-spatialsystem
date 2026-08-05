@@ -24,6 +24,7 @@
 #include "Components/Panner3DViewPanel.h"
 #include "Components/MonitorPanel.h"
 #include "Components/ExportResultOverlay.h"
+#include "Components/StorageOverlay.h"
 
 namespace Mach1 {
 
@@ -103,6 +104,7 @@ private:
     std::unique_ptr<MonitorPanel> monitorComponent;
     std::unique_ptr<CaptureTimelinePanel> captureTimelinePanel;
     std::unique_ptr<ExportResultOverlay> exportResultOverlay;
+    std::unique_ptr<StorageOverlay> storageOverlay;
     
     // Layout managers
     juce::StretchableLayoutManager verticalLayout;   // Main vs Timeline

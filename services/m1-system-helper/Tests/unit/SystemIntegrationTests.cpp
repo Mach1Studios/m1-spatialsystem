@@ -263,19 +263,23 @@ void testPannerDiscoveryAndTwoInstanceDataShare()
 void testOscAndMemoryShareDedupe()
 {
     auto eventSystem = std::make_shared<Mach1::EventSystem>();
+    Mach1::PluginManager pluginManager(eventSystem);
     Mach1::PannerTrackingManager manager(eventSystem);
+    manager.initializeOSCTracker(&pluginManager); // OSC path needs the plugin manager
     manager.start();
 
     const int port = 48777; // matches nothing else on a dev machine
 
-    M1RegisteredPlugin plugin;
+    // Register through the PluginManager - the same path the real
+    // "/m1-register-plugin" OSC handler uses (the OSC tracker mirrors the
+    // plugin manager's list on every update).
+    Mach1::M1RegisteredPlugin plugin;
     plugin.port = port;
     plugin.name = "Dedupe Panner";
     plugin.isPannerPlugin = true;
     plugin.azimuth = 20.0f;
     plugin.time = juce::Time::currentTimeMillis();
-    ICHECK(manager.registerOSCPanner(plugin).wasOk(), "OSC registration accepted");
-    manager.update();
+    ICHECK(pluginManager.registerPlugin(plugin).wasOk(), "OSC registration accepted");
 
     const auto countEntriesForPort = [&manager, port]()
     {
@@ -285,6 +289,14 @@ void testOscAndMemoryShareDedupe()
                 ++count;
         return count;
     };
+
+    // The manager rescans on an interval, so poll until the OSC entry lands
+    const auto oscDeadline = juce::Time::currentTimeMillis() + 5000;
+    while (juce::Time::currentTimeMillis() < oscDeadline && countEntriesForPort() == 0)
+    {
+        manager.update();
+        std::this_thread::sleep_for(std::chrono::milliseconds(120));
+    }
 
     ICHECK(countEntriesForPort() == 1, "panner tracked once after OSC-only registration");
 
@@ -298,8 +310,7 @@ void testOscAndMemoryShareDedupe()
     {
         simulated.writeBlock();
         // Keep the OSC side alive too, like the plugin's ping replies
-        plugin.time = juce::Time::currentTimeMillis();
-        manager.registerOSCPanner(plugin);
+        pluginManager.updatePluginTime(port);
         manager.update();
 
         for (const auto& panner : manager.getActivePanners())
@@ -331,6 +342,108 @@ void testOscAndMemoryShareDedupe()
             ICHECK(panner.inputMode == 1, "input mode (stereo) flows into the merged entry");
         }
     }
+
+    manager.stop();
+}
+
+//==============================================================================
+// The discovery race seen in live DAW testing: the memory-share segment is
+// discovered while its parameter payload still carries port 0 (the plugin has
+// not bound its OSC receiver yet), so one entry is created with no port. The
+// OSC registration then creates a second entry. When the port finally shows
+// up in the block parameters, the tracker must converge to ONE entry - the
+// regression was two rows that both said "streaming" forever.
+void testLatePortConvergesToOneEntry()
+{
+    auto eventSystem = std::make_shared<Mach1::EventSystem>();
+    Mach1::PluginManager pluginManager(eventSystem);
+    Mach1::PannerTrackingManager manager(eventSystem);
+    manager.initializeOSCTracker(&pluginManager);
+    manager.start();
+
+    const int port = 48778;
+
+    // 1. Memory share appears FIRST, with port 0 in its parameters
+    SimulatedPanner simulated(0x1A7E0000, 40.0f, "Late Port Panner", /*port*/ 0);
+    ICHECK(simulated.share->isValid(), "late-port panner segment created");
+
+    const auto countOwnEntries = [&manager, &simulated, port]()
+    {
+        int count = 0;
+        for (const auto& panner : manager.getActivePanners())
+        {
+            const bool viaMemory = panner.isMemoryShareBased
+                && panner.processId == currentPid()
+                && panner.memoryAddress == simulated.fakeAddress;
+            const bool viaPort = panner.port == port;
+            if (viaMemory || viaPort)
+                ++count;
+        }
+        return count;
+    };
+
+    const auto memDeadline = juce::Time::currentTimeMillis() + 8000;
+    while (juce::Time::currentTimeMillis() < memDeadline && countOwnEntries() == 0)
+    {
+        simulated.writeBlock();
+        manager.update();
+        std::this_thread::sleep_for(std::chrono::milliseconds(120));
+    }
+    ICHECK(countOwnEntries() == 1, "memory-share entry tracked (port still unknown)");
+
+    // 2. OSC registration lands while the memory-share entry has no port
+    Mach1::M1RegisteredPlugin plugin;
+    plugin.port = port;
+    plugin.name = "Late Port Panner";
+    plugin.isPannerPlugin = true;
+    plugin.time = juce::Time::currentTimeMillis();
+    ICHECK(pluginManager.registerPlugin(plugin).wasOk(), "OSC registration accepted");
+
+    // 3. The plugin's blocks start carrying the bound port
+    simulated.oscPort = port;
+
+    bool converged = false;
+    const auto deadline = juce::Time::currentTimeMillis() + 8000;
+    while (juce::Time::currentTimeMillis() < deadline)
+    {
+        simulated.writeBlock();
+        pluginManager.updatePluginTime(port);
+        manager.update();
+
+        if (countOwnEntries() == 1)
+        {
+            // Must be the memory-share row AND know its port now
+            for (const auto& panner : manager.getActivePanners())
+            {
+                if (panner.isMemoryShareBased
+                    && panner.memoryAddress == simulated.fakeAddress
+                    && panner.port == port)
+                {
+                    converged = true;
+                    break;
+                }
+            }
+        }
+        if (converged)
+            break;
+        std::this_thread::sleep_for(std::chrono::milliseconds(120));
+    }
+
+    ICHECK(converged,
+           "one entry with memory-share identity and the late-arriving port (got "
+           + std::to_string(countOwnEntries()) + " entries)");
+
+    // Stays converged over further updates (no oscillation back to two rows)
+    for (int i = 0; i < 10; ++i)
+    {
+        simulated.writeBlock();
+        pluginManager.updatePluginTime(port);
+        manager.update();
+        std::this_thread::sleep_for(std::chrono::milliseconds(60));
+    }
+    ICHECK(countOwnEntries() == 1,
+           "entry count stays at one after convergence (got "
+           + std::to_string(countOwnEntries()) + ")");
 
     manager.stop();
 }
@@ -446,6 +559,7 @@ int runSystemIntegrationTests()
 {
     testPannerDiscoveryAndTwoInstanceDataShare();
     testOscAndMemoryShareDedupe();
+    testLatePortConvergesToOneEntry();
     testStreamingStatusReachesMonitorClients();
 
     if (integrationFailures == 0)

@@ -64,6 +64,10 @@ bool CaptureEngine::startCapture(const juce::String& sessionId, const juce::File
     m_captureRoot = captureRoot;
     m_startTime = juce::Time::getCurrentTime();
     m_capturing.store(true);
+
+    // Manifest identifies this directory as an attributable capture session;
+    // the StorageGovernor treats directories without one as orphaned.
+    writeSessionManifest();
     
     // Reset statistics
     m_totalChunksWritten.store(0);
@@ -93,11 +97,49 @@ void CaptureEngine::stopCapture()
     
     // Close all panner states
     closeAllPannerStates();
+
+    // Final manifest with the closing byte counts
+    writeSessionManifest();
     
     DBG("[CaptureEngine] Stopped capture");
     
     // Notify listeners
     sendChangeMessage();
+}
+
+void CaptureEngine::writeSessionManifest()
+{
+    if (m_sessionId.isEmpty() || m_captureRoot == juce::File())
+        return;
+
+    auto* root = new juce::DynamicObject();
+    root->setProperty("sessionId", m_sessionId);
+    root->setProperty("createdMs", m_startTime.toMilliseconds());
+    root->setProperty("lastWrittenMs", juce::Time::currentTimeMillis());
+    root->setProperty("totalBytes", static_cast<juce::int64>(m_totalBytesWritten.load()));
+    root->setProperty("totalChunks", static_cast<juce::int64>(m_totalChunksWritten.load()));
+
+    juce::Array<juce::var> streams;
+    {
+        const juce::ScopedLock lock(m_stateMutex);
+        for (const auto& [key, state] : m_pannerStates)
+        {
+            auto* stream = new juce::DynamicObject();
+            stream->setProperty("dir", juce::String(state.pannerId.instanceUuid) + "_"
+                                       + juce::String(state.pannerId.processId));
+            stream->setProperty("name", juce::String(state.lastDisplayName));
+            stream->setProperty("chunks", static_cast<juce::int64>(state.chunksWritten));
+            stream->setProperty("bytes", static_cast<juce::int64>(state.bytesWritten));
+            streams.add(juce::var(stream));
+        }
+    }
+    root->setProperty("streams", streams);
+
+    const juce::File manifestFile = m_captureRoot.getChildFile(m_sessionId).getChildFile("manifest.json");
+    // Write-then-rename so a reader never sees a half-written manifest
+    const juce::File tempFile = manifestFile.getSiblingFile("manifest.json.tmp");
+    if (tempFile.replaceWithText(juce::JSON::toString(juce::var(root))))
+        tempFile.moveFileTo(manifestFile);
 }
 
 CaptureEngine::CaptureStats CaptureEngine::getStats() const
@@ -138,9 +180,21 @@ void CaptureEngine::run()
 {
     DBG("[CaptureEngine] Background thread started");
     
+    juce::int64 lastManifestMs = juce::Time::currentTimeMillis();
+
     while (!threadShouldExit() && m_capturing.load())
     {
         processCapture();
+
+        // Refresh the session manifest a few times a minute so the storage
+        // panel sees near-live byte counts and a fresh lastWrittenMs even if
+        // the helper is killed without a clean stop.
+        const auto nowMs = juce::Time::currentTimeMillis();
+        if (nowMs - lastManifestMs > 10000)
+        {
+            lastManifestMs = nowMs;
+            writeSessionManifest();
+        }
         
         // Sleep briefly to avoid busy-waiting
         // Adjust this based on expected block rate (e.g., 10ms for ~100 blocks/sec)

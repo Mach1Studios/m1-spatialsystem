@@ -60,6 +60,16 @@ CaptureTimelinePanel::CaptureTimelinePanel()
             onExportClicked();
     };
     addAndMakeVisible(m_exportButton.get());
+
+    m_storageButton = std::make_unique<juce::TextButton>("STORAGE");
+    m_storageButton->setLookAndFeel(&m_flatButtonLookAndFeel);
+    m_storageButton->setColour(juce::TextButton::buttonColourId, m_buttonColour);
+    m_storageButton->setColour(juce::TextButton::textColourOffId, m_textColour);
+    m_storageButton->onClick = [this]() {
+        if (onStorageClicked)
+            onStorageClicked();
+    };
+    addAndMakeVisible(m_storageButton.get());
     
     m_fillGapsToggle = std::make_unique<juce::ToggleButton>("FILL GAPS");
     m_fillGapsToggle->setLookAndFeel(&m_flatButtonLookAndFeel);
@@ -99,6 +109,7 @@ CaptureTimelinePanel::~CaptureTimelinePanel()
     m_resetButton->setLookAndFeel(nullptr);
     m_lockRangeButton->setLookAndFeel(nullptr);
     m_exportButton->setLookAndFeel(nullptr);
+    m_storageButton->setLookAndFeel(nullptr);
     m_fillGapsToggle->setLookAndFeel(nullptr);
     m_autoZoomToggle->setLookAndFeel(nullptr);
     
@@ -170,6 +181,8 @@ void CaptureTimelinePanel::resized()
     m_lockRangeButton->setBounds(controlsArea.removeFromLeft(45).withHeight(buttonHeight).withY(buttonY));
     controlsArea.removeFromLeft(3);
     m_exportButton->setBounds(controlsArea.removeFromLeft(55).withHeight(buttonHeight).withY(buttonY));
+    controlsArea.removeFromLeft(3);
+    m_storageButton->setBounds(controlsArea.removeFromLeft(65).withHeight(buttonHeight).withY(buttonY));
     controlsArea.removeFromLeft(10);
     m_fillGapsToggle->setBounds(controlsArea.removeFromLeft(100).withHeight(buttonHeight).withY(buttonY));
     controlsArea.removeFromLeft(6);

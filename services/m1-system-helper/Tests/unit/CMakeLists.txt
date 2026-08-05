@@ -10,6 +10,7 @@ target_sources(m1-system-helper-tests PRIVATE
         HelperServiceTests.cpp
         MemoryShareRingTests.cpp
         ExportEngineTests.cpp
+        StorageGovernorTests.cpp
         SystemIntegrationTests.cpp
         TestStubs.cpp
         ${CMAKE_SOURCE_DIR}/Source/Managers/ServiceManager.cpp
@@ -24,7 +25,8 @@ target_sources(m1-system-helper-tests PRIVATE
         ${CMAKE_SOURCE_DIR}/Source/Common/M1MemoryShare.cpp
         ${CMAKE_SOURCE_DIR}/Source/Common/SharedPathUtils.cpp
         ${CMAKE_SOURCE_DIR}/Source/Core/CoverageModel.cpp
-        ${CMAKE_SOURCE_DIR}/Source/Core/ExportEngine.cpp)
+        ${CMAKE_SOURCE_DIR}/Source/Core/ExportEngine.cpp
+        ${CMAKE_SOURCE_DIR}/Source/Core/StorageGovernor.cpp)
 
 if(APPLE)
     target_sources(m1-system-helper-tests PRIVATE

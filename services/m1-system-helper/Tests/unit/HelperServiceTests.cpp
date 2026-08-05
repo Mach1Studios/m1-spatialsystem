@@ -337,6 +337,8 @@ void testMonitorBroadcastThrottleDedupesAndForces()
 int runMemoryShareRingTests();
 // Defined in ExportEngineTests.cpp; returns the number of failed checks.
 int runExportEngineTests();
+// Defined in StorageGovernorTests.cpp; returns the number of failed checks.
+int runStorageGovernorTests();
 // Defined in SystemIntegrationTests.cpp; returns the number of failed checks.
 int runSystemIntegrationTests();
 
@@ -352,6 +354,7 @@ int main()
 
     failures += runMemoryShareRingTests();
     failures += runExportEngineTests();
+    failures += runStorageGovernorTests();
     failures += runSystemIntegrationTests();
 
     if (failures == 0) {

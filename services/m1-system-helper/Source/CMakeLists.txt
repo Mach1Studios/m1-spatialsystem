@@ -40,6 +40,8 @@ set(CORE_SOURCES
     Core/CaptureEngine.cpp
     Core/ExportEngine.h
     Core/ExportEngine.cpp
+    Core/StorageGovernor.h
+    Core/StorageGovernor.cpp
 )
 
 # Network files

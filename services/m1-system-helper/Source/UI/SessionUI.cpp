@@ -64,6 +64,11 @@ SessionMainComponent::SessionMainComponent(PannerTrackingManager& manager, Clien
     captureTimelinePanel->onExportClicked = [this]() {
         runExport();
     };
+
+    captureTimelinePanel->onStorageClicked = [this]() {
+        if (storageOverlay)
+            storageOverlay->open();
+    };
     
     // Add as visible children
     addAndMakeVisible(inputPanelContainer.get());
@@ -74,6 +79,14 @@ SessionMainComponent::SessionMainComponent(PannerTrackingManager& manager, Clien
     // Export result notification overlay (hidden until an export finishes)
     exportResultOverlay = std::make_unique<ExportResultOverlay>();
     addChildComponent(exportResultOverlay.get());
+
+    // Storage panel overlay (opened from the timeline's STORAGE button)
+    storageOverlay = std::make_unique<StorageOverlay>();
+    storageOverlay->getActiveSessionId = [this]() {
+        return (captureEngine && captureEngine->isCapturing())
+            ? captureEngine->getSessionId() : juce::String();
+    };
+    addChildComponent(storageOverlay.get());
     
     // Set up layout
     setupLayout();
@@ -129,9 +142,11 @@ bool SessionMainComponent::startCapture(const juce::String& sessionId)
         actualSessionId = "Session_" + juce::Time::getCurrentTime().formatted("%Y%m%d_%H%M%S");
     }
     
-    // Use temp directory for capture storage
-    juce::File captureRoot = juce::File::getSpecialLocation(juce::File::tempDirectory)
-        .getChildFile("M1SpatialSystem_Captures");
+    // Durable capture root (Application Support): the old temp/caches root
+    // could be purged by the OS behind the user's back. Any sessions still in
+    // the legacy location are moved over once.
+    StorageGovernor::migrateLegacyCaptures();
+    const juce::File captureRoot = StorageGovernor::getDefaultCaptureRoot();
     
     return captureEngine->startCapture(actualSessionId, captureRoot);
 }
@@ -307,9 +322,11 @@ void SessionMainComponent::resized()
                                       rightBounds.getWidth(), rightBounds.getHeight(),
                                       true, true);
 
-    // Notification overlay covers everything
+    // Notification overlays cover everything
     if (exportResultOverlay)
         exportResultOverlay->setBounds(getLocalBounds());
+    if (storageOverlay)
+        storageOverlay->setBounds(getLocalBounds());
 }
 
 void SessionMainComponent::paint(juce::Graphics& g)

@@ -267,6 +267,11 @@ void PannerTrackingManager::mergeTrackingResults() {
                 if (foundPanner.isMemoryShareBased) {
                     existingPanner.channels = foundPanner.channels;
                     existingPanner.sampleRate = foundPanner.sampleRate;
+                    // The port arrives via the block parameter payload and can
+                    // lag discovery by a few blocks; adopt it as soon as it is
+                    // known so this entry can be joined with its OSC twin.
+                    if (foundPanner.port != 0)
+                        existingPanner.port = foundPanner.port;
                 }
                 existingPanner.name = foundPanner.name;
                 existingPanner.azimuth = foundPanner.azimuth;
@@ -321,6 +326,47 @@ void PannerTrackingManager::mergeTrackingResults() {
                 " (PID: " + std::to_string(newPanner.processId) + 
                 ", port: " + std::to_string(newPanner.port) + 
                 ", source: " + std::string(newPanner.isMemoryShareBased ? "MemoryShare" : "OSC") + ")");
+        }
+    }
+
+    // Collapse duplicate entries that refer to the same plugin instance.
+    // These arise from discovery races: a memory-share segment can be found
+    // while its parameter payload still carries port 0, creating one entry,
+    // while the instance's OSC registration creates another; once the port
+    // arrives and the OSC entry is promoted, both rows share one identity.
+    for (auto it = activePanners.begin(); it != activePanners.end();) {
+        bool duplicate = false;
+        for (auto keep = activePanners.begin(); keep != it; ++keep) {
+            const bool sameMemoryIdentity =
+                it->isMemoryShareBased && keep->isMemoryShareBased
+                && it->memoryAddress != 0
+                && it->processId == keep->processId
+                && it->memoryAddress == keep->memoryAddress;
+            // A port match only joins an OSC row with a memory-share row (two
+            // views of one instance). Two memory-share rows with different
+            // memory addresses are distinct instances even if their parameter
+            // payloads claim the same port (stale/incorrect port data must
+            // never merge real audio streams).
+            const bool oscJoinedWithMemoryShare =
+                it->port != 0 && it->port == keep->port
+                && (it->isMemoryShareBased != keep->isMemoryShareBased);
+
+            if (sameMemoryIdentity || oscJoinedWithMemoryShare) {
+                // Keep the richer row: prefer one that already knows its port
+                if (keep->port == 0 && it->port != 0)
+                    *keep = *it;
+                duplicate = true;
+                break;
+            }
+        }
+
+        if (duplicate) {
+            DBG("[PannerTrackingManager] Collapsed duplicate panner entry: " + it->name +
+                " (port: " + std::to_string(it->port) +
+                ", addr: " + std::to_string(static_cast<unsigned long long>(it->memoryAddress)) + ")");
+            it = activePanners.erase(it);
+        } else {
+            ++it;
         }
     }
 }
