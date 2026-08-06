@@ -20,10 +20,11 @@ constexpr int kTrayMenuDelayMs = 50;
 // SessionMainComponent
 //==============================================================================
 
-SessionMainComponent::SessionMainComponent(PannerTrackingManager& manager, ClientManager& clientManagerRef, OSCHandler& oscHandlerRef, bool debugFakeBlocks)
+SessionMainComponent::SessionMainComponent(PannerTrackingManager& manager, ClientManager& clientManagerRef, OSCHandler& oscHandlerRef, bool debugFakeBlocks, MixEngine* mixEngineRef)
     : pannerManager(manager)
     , clientManager(clientManagerRef)
     , oscHandler(oscHandlerRef)
+    , mixEngine(mixEngineRef)
     , m_debugFakeBlocks(debugFakeBlocks)
 {
     // Create components
@@ -343,9 +344,19 @@ void SessionMainComponent::timerCallback()
 void SessionMainComponent::updateFromManager()
 {
     auto panners = pannerManager.getActivePanners();
-    
+
     inputPanelContainer->updatePannerData(panners);
     view3DComponent->updatePannerData(panners);
+
+    // Live input meters: per-feed peaks published by the MixEngine render
+    // thread, in the same order as the strip list.
+    if (mixEngine != nullptr && !panners.empty())
+    {
+        std::vector<float> levels(panners.size(), 0.0f);
+        for (size_t i = 0; i < panners.size(); ++i)
+            levels[i] = mixEngine->getFeedPeak(panners[i].processId, panners[i].memoryAddress);
+        inputPanelContainer->updateLevelMeters(levels);
+    }
 
     const auto activeMonitorSnapshot = oscHandler.getActiveMonitorSnapshot();
     MonitorPanelState monitorPanelState;
@@ -387,10 +398,11 @@ SessionUI::MyMenuBarModel::~MyMenuBarModel()
 // SessionUI
 //==============================================================================
 
-SessionUI::SessionUI(PannerTrackingManager& manager, ClientManager& clientManagerRef, OSCHandler& oscHandlerRef, bool debugFakeBlocks)
+SessionUI::SessionUI(PannerTrackingManager& manager, ClientManager& clientManagerRef, OSCHandler& oscHandlerRef, bool debugFakeBlocks, MixEngine* mixEngineRef)
     : pannerManager(manager),
       clientManager(clientManagerRef),
       oscHandler(oscHandlerRef),
+      mixEngine(mixEngineRef),
       lastPannerCount(-1),
       lastMemoryShareStatus(false),
       lastOSCStatus(false),
@@ -568,7 +580,7 @@ void SessionUI::showSessionWindow()
     if (!sessionWindow)
     {
         // Create the main component with debug flag
-        mainComponent = std::make_unique<SessionMainComponent>(pannerManager, clientManager, oscHandler, m_debugFakeBlocks);
+        mainComponent = std::make_unique<SessionMainComponent>(pannerManager, clientManager, oscHandler, m_debugFakeBlocks, mixEngine);
         
         // Create the window with darker background matching reference
         sessionWindow = std::make_unique<SessionDocumentWindow>(

@@ -4,6 +4,7 @@
 #include "Common/ServiceLocator.h"
 #include "Core/ConfigManager.h"
 #include "Core/ExternalMixerProcessor.h"
+#include "Core/MixEngine.h"
 #include "Managers/ClientManager.h"
 #include "Managers/PluginManager.h"
 #include "Managers/ServiceManager.h"
@@ -38,6 +39,9 @@ public:
     
     // External mixer
     ExternalMixerProcessor& getExternalMixer() { return *externalMixer; }
+
+    // Live mix render clock (P2)
+    MixEngine& getMixEngine() { return *mixEngine; }
     
 private:
     M1SystemHelperService();
@@ -59,6 +63,9 @@ private:
     
     // External mixer
     std::unique_ptr<ExternalMixerProcessor> externalMixer;
+
+    // Live mix render clock (P2)
+    std::unique_ptr<MixEngine> mixEngine;
     
     // UI component
     std::unique_ptr<SessionUI> sessionUI;

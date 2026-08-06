@@ -849,6 +849,13 @@ bool M1MemoryShare::getConsumerCursor(uint32_t consumerId, uint64_t& outCursor) 
     return true;
 }
 
+uint32_t M1MemoryShare::getConsumerCount() const
+{
+    if (!isValid())
+        return 0;
+    return m_header->consumerCount.load(std::memory_order_acquire);
+}
+
 uint8_t* M1MemoryShare::basePtr() const
 {
     return static_cast<uint8_t*>(m_mappedFile->getData());

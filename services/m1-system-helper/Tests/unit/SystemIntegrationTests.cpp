@@ -27,6 +27,7 @@
 #include "Common/SharedPathUtils.h"
 #include "Common/TypesForDataExchange.h"
 #include "Core/EventSystem.h"
+#include "Core/MixEngine.h"
 #include "Managers/ClientManager.h"
 #include "Managers/PannerTrackingManager.h"
 #include "Managers/PluginManager.h"
@@ -90,6 +91,7 @@ struct SimulatedPanner
     std::string displayName;
     int oscPort = 9998;
     uint64_t blocksWritten = 0;
+    int32_t controlRevision = 0; // highest helper control revision applied
 
     SimulatedPanner(uintptr_t address, float azimuthDeg, const std::string& name, int port = 9998)
         : fakeAddress(address), azimuth(azimuthDeg), displayName(name), oscPort(port)
@@ -129,6 +131,7 @@ struct SimulatedPanner
         params.addBool(M1SystemHelperParameterIDs::AUTO_ORBIT, true);
         params.addInt(M1SystemHelperParameterIDs::PORT, oscPort);
         params.addString(M1SystemHelperParameterIDs::DISPLAY_NAME, displayName);
+        params.addInt(M1SystemHelperParameterIDs::CONTROL_REVISION, controlRevision);
 
         const double playheadSeconds = static_cast<double>(blocksWritten) * (480.0 / 48000.0);
         const uint64_t id = share->writeAudioBufferWithGenericParameters(
@@ -139,6 +142,22 @@ struct SimulatedPanner
         if (id != 0)
             ++blocksWritten;
         return id;
+    }
+
+    /** Mirrors the plugin's processExternalControlMessages(): drain the
+        control ring, apply edits, remember the newest revision for echoing. */
+    int drainControls()
+    {
+        M1MemoryShare::ControlMessage message;
+        int applied = 0;
+        while (share->readControlMessage(message))
+        {
+            ++applied;
+            if (message.parameterID == M1SystemHelperParameterIDs::AZIMUTH)
+                azimuth = message.floatValue;
+            controlRevision = std::max(controlRevision, message.intValue);
+        }
+        return applied;
     }
 };
 
@@ -552,6 +571,256 @@ void testStreamingStatusReachesMonitorClients()
     manager.stop();
 }
 
+//==============================================================================
+// P2 live-mix chain: simulated panners stream into the tracker, the MixEngine
+// render clock encodes/sums them and publishes the MixBus segment, and a
+// simulated M1-Monitor opens that segment and reads the multichannel mix -
+// exactly what the plugin's MixBusReader does inside processBlock.
+void testMixEngineEndToEnd()
+{
+    auto eventSystem = std::make_shared<Mach1::EventSystem>();
+    Mach1::PannerTrackingManager manager(eventSystem);
+    manager.start();
+
+    // Isolated bus segment so a live helper on this machine can't interfere
+    const juce::String busName = "M1SpatialSystem_MixBus_test" + juce::String(static_cast<int>(currentPid()));
+    const juce::File busFile = sharedMemoryDirectory().getChildFile(busName + ".mem");
+
+    Mach1::MixEngine engine(manager, busName);
+    engine.setOutputFormat(8);
+    engine.startEngine();
+
+    // Two "plugin instances" in this process, azimuth 0 and 90 degrees
+    SimulatedPanner pannerA(0x3117A000, 0.0f, "Mix Panner A");
+    SimulatedPanner pannerB(0x3117B000, 90.0f, "Mix Panner B");
+    ICHECK(pannerA.share->isValid() && pannerB.share->isValid(), "mix test segments created");
+
+    std::atomic<bool> keepStreaming { true };
+    std::atomic<bool> streamB { true };
+    std::thread streamThread([&] {
+        while (keepStreaming.load())
+        {
+            pannerA.writeBlock();
+            if (streamB.load())
+                pannerB.writeBlock();
+            std::this_thread::sleep_for(std::chrono::milliseconds(10)); // 480 samples @ 48k
+        }
+    });
+
+    // Drive discovery like the helper service timer does
+    const auto discoveryDeadline = juce::Time::currentTimeMillis() + 8000;
+    while (juce::Time::currentTimeMillis() < discoveryDeadline
+           && findOwnPanners(manager.getActivePanners()).size() < 2)
+    {
+        manager.update();
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+    ICHECK(findOwnPanners(manager.getActivePanners()).size() >= 2, "panners discovered for mix test");
+
+    // Wait for the engine to attach its feeds and publish bus blocks
+    const auto busDeadline = juce::Time::currentTimeMillis() + 8000;
+    while (juce::Time::currentTimeMillis() < busDeadline && !engine.getStatus().busActive)
+    {
+        manager.update();
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+    const auto status = engine.getStatus();
+    ICHECK(status.busActive, "MixBus segment is being written");
+    ICHECK(status.busChannels == 8, "bus format follows the configured output format");
+    ICHECK(status.sampleRate == 48000, "bus sample rate follows the panner feeds");
+    ICHECK(status.liveFeeds >= 2, "both feeds counted as live (got "
+           + std::to_string(status.liveFeeds) + ")");
+
+    // Simulated monitor: open the segment, register a consumer, read blocks
+    M1MemoryShare monitorSide(busName.toStdString(), 16 * 1024 * 1024,
+                              /*persistent*/ true, /*createMode*/ false,
+                              busFile.getFullPathName().toStdString());
+    ICHECK(monitorSide.isValid() && monitorSide.isRingConfigured(),
+           "monitor-side MixBus segment opened");
+
+    if (monitorSide.isValid() && monitorSide.isRingConfigured())
+    {
+        const uint32_t monitorConsumer = 0x4D4F4E01;
+        ICHECK(monitorSide.registerConsumer(monitorConsumer), "monitor consumer registered");
+
+        int blocksRead = 0;
+        float peakSample = 0.0f;
+        int lastChannels = 0;
+        const auto readDeadline = juce::Time::currentTimeMillis() + 6000;
+        while (juce::Time::currentTimeMillis() < readDeadline && blocksRead < 20)
+        {
+            M1MemoryShare::SharedBlock block;
+            while (monitorSide.readNextBlockForConsumer(monitorConsumer, block))
+            {
+                ++blocksRead;
+                lastChannels = block.audio.getNumChannels();
+                for (int ch = 0; ch < block.audio.getNumChannels(); ++ch)
+                    peakSample = juce::jmax(peakSample,
+                                            block.audio.getMagnitude(ch, 0, block.audio.getNumSamples()));
+            }
+            manager.update();
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        }
+
+        ICHECK(blocksRead >= 20, "monitor read a steady stream of mix blocks (got "
+               + std::to_string(blocksRead) + ")");
+        ICHECK(lastChannels == 8, "mix blocks carry the 8-channel spatial bus (got "
+               + std::to_string(lastChannels) + ")");
+        ICHECK(peakSample > 0.01f, "mix audio is non-silent (encoded panner content arrived)");
+    }
+
+    ICHECK(engine.getFeedPeak(currentPid(), pannerA.fakeAddress) > 0.01f,
+           "per-feed input meter is live for panner A");
+    float masterPeak = 0.0f;
+    for (int ch = 0; ch < 8; ++ch)
+        masterPeak = juce::jmax(masterPeak, engine.getMasterPeak(ch));
+    ICHECK(masterPeak > 0.01f, "master bus meters are live");
+
+    // Stall behavior: panner B stops delivering; the bus must keep flowing,
+    // paced by panner A alone (a silent/dead track must never mute the mix).
+    streamB.store(false);
+    std::this_thread::sleep_for(std::chrono::milliseconds(500)); // > STALL_TIMEOUT_MS
+
+    const uint64_t publishedBeforeStall = engine.getStatus().blocksPublished;
+    const auto stallDeadline = juce::Time::currentTimeMillis() + 4000;
+    while (juce::Time::currentTimeMillis() < stallDeadline
+           && engine.getStatus().blocksPublished < publishedBeforeStall + 20)
+    {
+        manager.update();
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
+    ICHECK(engine.getStatus().blocksPublished >= publishedBeforeStall + 20,
+           "bus keeps publishing while one panner is stalled (published "
+           + std::to_string(engine.getStatus().blocksPublished - publishedBeforeStall)
+           + " blocks after stall)");
+
+    keepStreaming.store(false);
+    streamThread.join();
+    engine.stopEngine();
+    manager.stop();
+    busFile.deleteFile();
+}
+
+//==============================================================================
+// P3 two-way control chain: an edit made in the helper's UI travels through
+// sendParameterUpdate -> shared-memory control ring -> panner apply -> revision
+// echo -> pending-overlay clear. Verifies:
+//   1. edits reach the panner with the well-known parameter ID (regression:
+//      IDs used to be hashString()'d and never matched, so panners silently
+//      dropped every edit)
+//   2. the tracked value shows the edit immediately (pending overlay), before
+//      the panner has applied it - no UI snap-back
+//   3. once the panner echoes the revision, the overlay clears and panner-side
+//      changes flow through again
+//   4. an edit the panner never applies expires and the tracked value reverts
+void testControlRoundTrip()
+{
+    auto eventSystem = std::make_shared<Mach1::EventSystem>();
+    Mach1::PannerTrackingManager manager(eventSystem);
+    manager.start();
+
+    SimulatedPanner panner(0xC057C000, 0.0f, "Control Panner");
+    ICHECK(panner.share->isValid(), "control test segment created");
+
+    // Discover the panner
+    std::vector<Mach1::PannerInfo> own;
+    const auto discoveryDeadline = juce::Time::currentTimeMillis() + 8000;
+    while (juce::Time::currentTimeMillis() < discoveryDeadline)
+    {
+        panner.writeBlock();
+        manager.update();
+        own = findOwnPanners(manager.getActivePanners());
+        if (!own.empty() && own.front().memoryAddress == panner.fakeAddress)
+            break;
+        own.clear();
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+    ICHECK(!own.empty(), "panner discovered for control test");
+    if (own.empty())
+    {
+        manager.stop();
+        return;
+    }
+
+    // Unknown parameters must be refused, not sent with a garbage ID
+    ICHECK(!manager.sendParameterUpdate(own.front(), "notARealParameter", 1.0f),
+           "unknown parameter names are refused");
+
+    // --- Edit azimuth from the helper side ---------------------------------
+    ICHECK(manager.sendParameterUpdate(own.front(), "azimuth", 42.0f),
+           "azimuth control message accepted");
+
+    // Pending overlay: tracked value shows the edit right away, even though
+    // the panner is still reporting azimuth 0 (it hasn't drained the ring yet)
+    panner.writeBlock();
+    std::this_thread::sleep_for(std::chrono::milliseconds(150));
+    manager.update();
+    own = findOwnPanners(manager.getActivePanners());
+    ICHECK(!own.empty() && std::abs(own.front().azimuth - 42.0f) < 0.01f,
+           "pending overlay shows the edited azimuth before panner acknowledgment (got "
+           + std::to_string(own.empty() ? -999.0f : own.front().azimuth) + ")");
+
+    // --- Panner applies the edit and echoes the revision -------------------
+    const int appliedCount = panner.drainControls();
+    ICHECK(appliedCount >= 1, "panner received the control message");
+    ICHECK(std::abs(panner.azimuth - 42.0f) < 0.01f,
+           "panner applied azimuth 42 (well-known parameter ID matched)");
+    ICHECK(panner.controlRevision >= 1, "revision travelled inside the control message");
+
+    // After the echo, panner-side changes must win again (overlay cleared by
+    // acknowledgment). The panner moves to 55; tracking must follow.
+    panner.azimuth = 55.0f;
+    const auto echoStartMs = juce::Time::currentTimeMillis();
+    bool followed = false;
+    while (juce::Time::currentTimeMillis() - echoStartMs < 3000)
+    {
+        panner.writeBlock();
+        manager.update();
+        own = findOwnPanners(manager.getActivePanners());
+        if (!own.empty() && std::abs(own.front().azimuth - 55.0f) < 0.01f)
+        {
+            followed = true;
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
+    ICHECK(followed, "after revision echo, panner-side azimuth changes flow through again");
+    ICHECK(!own.empty() && own.front().controlRevision >= 1,
+           "tracked info carries the echoed control revision");
+
+    // --- Unacknowledged edits must expire -----------------------------------
+    // The panner never drains this one (plugin gone unresponsive / stale ring)
+    ICHECK(manager.sendParameterUpdate(own.front(), "elevation", 33.0f),
+           "elevation control message accepted");
+
+    panner.writeBlock();
+    std::this_thread::sleep_for(std::chrono::milliseconds(150));
+    manager.update();
+    own = findOwnPanners(manager.getActivePanners());
+    ICHECK(!own.empty() && std::abs(own.front().elevation - 33.0f) < 0.01f,
+           "pending overlay shows the edited elevation");
+
+    // Wait past PENDING_EDIT_TIMEOUT_MS while the panner keeps streaming its
+    // real elevation (-10); the overlay must give up and stop lying.
+    const auto expiryDeadline = juce::Time::currentTimeMillis() + 4000;
+    bool reverted = false;
+    while (juce::Time::currentTimeMillis() < expiryDeadline)
+    {
+        panner.writeBlock();
+        manager.update();
+        own = findOwnPanners(manager.getActivePanners());
+        if (!own.empty() && std::abs(own.front().elevation - (-10.0f)) < 0.01f)
+        {
+            reverted = true;
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+    ICHECK(reverted, "unacknowledged edit expired and tracked elevation reverted to panner value");
+
+    manager.stop();
+}
+
 } // namespace
 
 // Called from HelperServiceTests.cpp's main(); returns failed check count.
@@ -561,6 +830,8 @@ int runSystemIntegrationTests()
     testOscAndMemoryShareDedupe();
     testLatePortConvergesToOneEntry();
     testStreamingStatusReachesMonitorClients();
+    testMixEngineEndToEnd();
+    testControlRoundTrip();
 
     if (integrationFailures == 0)
         std::cout << "All system integration tests passed" << std::endl;

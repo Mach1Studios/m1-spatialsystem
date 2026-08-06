@@ -10,6 +10,7 @@
 namespace Mach1 {
 
 class ExternalMixerProcessor;
+class MixEngine;
 
 struct ActiveMonitorSnapshot {
     std::vector<M1OrientationClientConnection> monitors;
@@ -25,7 +26,7 @@ class OSCHandler : public juce::OSCReceiver::Listener<juce::OSCReceiver::Realtim
                   public juce::Timer  // Add Timer
 {
 public:
-    OSCHandler(ClientManager* clientManager, PluginManager* pluginManager, ServiceManager* serviceManager, PannerTrackingManager* pannerTrackingManager, ExternalMixerProcessor* externalMixer);
+    OSCHandler(ClientManager* clientManager, PluginManager* pluginManager, ServiceManager* serviceManager, PannerTrackingManager* pannerTrackingManager, ExternalMixerProcessor* externalMixer, MixEngine* mixEngine = nullptr);
     ~OSCHandler() override;
 
     bool startListening(int port);
@@ -93,6 +94,7 @@ private:
     ServiceManager* serviceManager;
     PannerTrackingManager* pannerTrackingManager;
     ExternalMixerProcessor* externalMixer;
+    MixEngine* mixEngine;
     
     juce::OSCReceiver receiver;
     using MessageHandler = std::function<void(const juce::OSCMessage&)>;

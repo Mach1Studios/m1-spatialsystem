@@ -289,6 +289,7 @@ void PannerTrackingManager::mergeTrackingResults() {
                 existingPanner.outputMode = foundPanner.outputMode;
                 existingPanner.pannerMode = foundPanner.pannerMode;
                 existingPanner.autoOrbit = foundPanner.autoOrbit;
+                existingPanner.controlRevision = foundPanner.controlRevision;
                 existingPanner.state = foundPanner.state;
                 existingPanner.color = foundPanner.color;
                 existingPanner.lastUpdateTime = currentTime;
@@ -369,6 +370,50 @@ void PannerTrackingManager::mergeTrackingResults() {
             ++it;
         }
     }
+
+    // Overlay in-flight helper edits (sendParameterUpdate) so tracking data -
+    // and every UI reading it - keeps showing the edited value until the
+    // panner acknowledges it, instead of snapping back for a few cycles.
+    for (auto& panner : activePanners) {
+        if (panner.isMemoryShareBased) {
+            applyPendingEditOverlay(panner, currentTime);
+        }
+    }
+}
+
+void PannerTrackingManager::applyPendingEditOverlay(PannerInfo& panner, juce::int64 currentTimeMs)
+{
+    // Caller holds pannersMutex
+    auto it = pendingEdits.find(instanceKey(panner.processId, panner.memoryAddress));
+    if (it == pendingEdits.end())
+        return;
+
+    auto& pending = it->second;
+    const bool acknowledged = panner.controlRevision >= pending.revision;
+    const bool expired = (currentTimeMs - pending.sentAtMs) > PENDING_EDIT_TIMEOUT_MS;
+    if (acknowledged || expired)
+    {
+        if (expired && !acknowledged)
+            DBG("[PannerTrackingManager] Pending edit expired unacknowledged for " + panner.name);
+        pendingEdits.erase(it);
+        return;
+    }
+
+    for (const auto& [paramID, value] : pending.values)
+    {
+        switch (paramID)
+        {
+            case M1SystemHelperParameterIDs::AZIMUTH:              panner.azimuth = value; break;
+            case M1SystemHelperParameterIDs::ELEVATION:            panner.elevation = value; break;
+            case M1SystemHelperParameterIDs::DIVERGE:              panner.diverge = value; break;
+            case M1SystemHelperParameterIDs::GAIN:                 panner.gain = value; break;
+            case M1SystemHelperParameterIDs::STEREO_ORBIT_AZIMUTH: panner.stereoOrbitAzimuth = value; break;
+            case M1SystemHelperParameterIDs::STEREO_SPREAD:        panner.stereoSpread = value; break;
+            case M1SystemHelperParameterIDs::STEREO_INPUT_BALANCE: panner.stereoInputBalance = value; break;
+            case M1SystemHelperParameterIDs::AUTO_ORBIT:           panner.autoOrbit = value >= 0.5f; break;
+            default: break;
+        }
+    }
 }
 
 // =============================================================================
@@ -431,17 +476,54 @@ void PannerTrackingManager::sendToPanner(const PannerInfo& panner, const juce::O
 // BIDIRECTIONAL PARAMETER UPDATES
 // =============================================================================
 
+uint32_t PannerTrackingManager::parameterIdForName(const std::string& parameterName) {
+    // The well-known IDs are hand-picked constants, NOT string hashes, so
+    // hashString() must never be used for these names - the panner compares
+    // incoming control messages against the constants and would silently
+    // ignore hashed IDs.
+    if (parameterName == "azimuth")            return M1SystemHelperParameterIDs::AZIMUTH;
+    if (parameterName == "elevation")          return M1SystemHelperParameterIDs::ELEVATION;
+    if (parameterName == "diverge")            return M1SystemHelperParameterIDs::DIVERGE;
+    if (parameterName == "gain")               return M1SystemHelperParameterIDs::GAIN;
+    if (parameterName == "stereoOrbitAzimuth") return M1SystemHelperParameterIDs::STEREO_ORBIT_AZIMUTH;
+    if (parameterName == "stereoSpread")       return M1SystemHelperParameterIDs::STEREO_SPREAD;
+    if (parameterName == "stereoInputBalance") return M1SystemHelperParameterIDs::STEREO_INPUT_BALANCE;
+    if (parameterName == "autoOrbit")          return M1SystemHelperParameterIDs::AUTO_ORBIT;
+    if (parameterName == "isotropicMode")      return M1SystemHelperParameterIDs::ISOTROPIC_MODE;
+    if (parameterName == "equalpowerMode")     return M1SystemHelperParameterIDs::EQUALPOWER_MODE;
+    if (parameterName == "gainCompensationMode") return M1SystemHelperParameterIDs::GAIN_COMPENSATION_MODE;
+    return 0; // unknown parameter - refuse to send rather than send garbage
+}
+
 bool PannerTrackingManager::sendParameterUpdate(const PannerInfo& panner, const std::string& parameterName, float value) {
     if (!panner.isMemoryShareBased || !memoryShareTracker)
         return false;
+
+    const uint32_t paramID = parameterIdForName(parameterName);
+    if (paramID == 0) {
+        DBG("[PannerTrackingManager] Refusing to send unknown parameter: " + parameterName);
+        return false;
+    }
 
     // Find the panner's M1MemoryShare instance via the tracker
     auto* pannerInfo = memoryShareTracker->findPanner(panner.processId, panner.memoryAddress);
     if (!pannerInfo || !pannerInfo->memoryShare || !pannerInfo->memoryShare->isValid())
         return false;
 
-    uint32_t paramID = M1SystemHelperParameterIDs::hashString(parameterName.c_str());
-    return pannerInfo->memoryShare->writeControlMessage(paramID, ParameterType::FLOAT, value, 0);
+    // The revision rides in the control message's intValue; the panner echoes
+    // the highest applied revision back via CONTROL_REVISION in its block
+    // parameters, which clears the pending-edit overlay below.
+    int32_t revision = 0;
+    {
+        const juce::ScopedLock lock(pannersMutex);
+        revision = ++controlRevisionCounter;
+        auto& pending = pendingEdits[instanceKey(panner.processId, panner.memoryAddress)];
+        pending.values[paramID] = value;
+        pending.revision = revision;
+        pending.sentAtMs = juce::Time::currentTimeMillis();
+    }
+
+    return pannerInfo->memoryShare->writeControlMessage(paramID, ParameterType::FLOAT, value, revision);
 }
 
 bool PannerTrackingManager::sendParameterUpdate(const PannerInfo& panner, const std::string& parameterName, int value) {
@@ -528,6 +610,7 @@ PannerInfo PannerTrackingManager::convertFromMemoryShare(const MemorySharePanner
     panner.stereoOrbitAzimuth = info.getStereoOrbitAzimuth();
     panner.stereoSpread = info.getStereoSpread();
     panner.stereoInputBalance = info.getStereoInputBalance();
+    panner.controlRevision = info.parameters.getInt(M1SystemHelperParameterIDs::CONTROL_REVISION, 0);
     
     // DAW integration
     panner.dawTimestamp = info.dawTimestamp;

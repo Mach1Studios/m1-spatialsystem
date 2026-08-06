@@ -42,12 +42,17 @@ M1SystemHelperService::M1SystemHelperService() {
     externalMixer = std::make_unique<ExternalMixerProcessor>();
     externalMixer->initialize(44100.0, 512); // Default sample rate and block size
     externalMixer->setPannerTrackingManager(pannerTrackingManager.get());
-    
+
+    // Live mix render clock: paces the encode/sum math and publishes the
+    // MixBus segment that M1-Monitor reads in mono/stereo-only DAWs.
+    mixEngine = std::make_unique<MixEngine>(*pannerTrackingManager);
+
     oscHandler = std::make_unique<OSCHandler>(clientManager.get(), 
                                             pluginManager.get(), 
                                             serviceManager.get(),
                                             pannerTrackingManager.get(),
-                                            externalMixer.get());
+                                            externalMixer.get(),
+                                            mixEngine.get());
     
     // Start listening on helper port
     if (!oscHandler->startListening(configManager->getHelperPort())) {
@@ -71,7 +76,7 @@ void M1SystemHelperService::ensureSessionUICreated()
     if (!showSessionUI || sessionUI || !pannerTrackingManager || !clientManager || !oscHandler)
         return;
 
-    sessionUI = std::make_unique<SessionUI>(*pannerTrackingManager, *clientManager, *oscHandler, debugFakeBlocks);
+    sessionUI = std::make_unique<SessionUI>(*pannerTrackingManager, *clientManager, *oscHandler, debugFakeBlocks, mixEngine.get());
     sessionUI->setVisible(true);
     DBG("[M1SystemHelperService] Created system tray icon on main thread");
 
@@ -84,6 +89,11 @@ void M1SystemHelperService::initialise() {
     if (pannerTrackingManager) {
         pannerTrackingManager->start();
         DBG("[M1SystemHelperService] Started panner tracking manager");
+    }
+
+    if (mixEngine) {
+        mixEngine->startEngine();
+        DBG("[M1SystemHelperService] Started mix engine");
     }
     
     // Schedule system tray icon creation on the main thread if enabled
@@ -169,7 +179,10 @@ void M1SystemHelperService::shutdown() {
     
     if (oscHandler)
         oscHandler->stopTimer();
-    
+
+    if (mixEngine)
+        mixEngine->stopEngine();
+
     if (pannerTrackingManager)
         pannerTrackingManager->stop();
     

@@ -35,6 +35,11 @@ struct M1SystemHelperParameterIDs
     static constexpr uint32_t COLOR_A = 0x4E5F6071;
     static constexpr uint32_t DISPLAY_NAME = 0x5F607182;
 
+    // Revision counter echoed by the panner after applying helper-sent control
+    // messages (2-way control). Lets the helper distinguish "panner hasn't
+    // applied my edit yet" from "panner reverted / user changed it again".
+    static constexpr uint32_t CONTROL_REVISION = 0x6A7B8C9D;
+
     static constexpr uint32_t BUFFER_ID = 0x60718293;
     static constexpr uint32_t BUFFER_SEQUENCE = 0x71829304;
     static constexpr uint32_t BUFFER_TIMESTAMP = 0x82930415;

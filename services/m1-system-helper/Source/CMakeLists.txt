@@ -42,6 +42,8 @@ set(CORE_SOURCES
     Core/ExportEngine.cpp
     Core/StorageGovernor.h
     Core/StorageGovernor.cpp
+    Core/MixEngine.h
+    Core/MixEngine.cpp
 )
 
 # Network files

@@ -19,6 +19,8 @@
 #include "../Core/EventSystem.h"
 #include "M1MemoryShareTracker.h"
 #include "OSCPannerTracker.h"
+#include <cstdint>
+#include <map>
 #include <memory>
 #include <vector>
 
@@ -86,7 +88,11 @@ struct PannerInfo {
     int inputMode = 0;
     int outputMode = 0;
     int pannerMode = 0;
-    
+
+    // Highest helper-sent control revision the panner has applied and echoed
+    // back through its block parameters (0 = never received an edit).
+    int32_t controlRevision = 0;
+
     bool operator==(const PannerInfo& other) const {
         return port == other.port && processId == other.processId;
     }
@@ -172,6 +178,22 @@ private:
     PannerInfo convertFromMemoryShare(const MemorySharePannerInfo& info);
     PannerInfo convertFromOSC(const M1RegisteredPlugin& plugin);
     void cleanupInactivePanners();
+
+    // Pending helper->panner edits: after sendParameterUpdate we keep showing
+    // the edited value in tracking data until the panner echoes a control
+    // revision >= the edit's revision (or the edit times out). Without this
+    // the UI would snap back to the pre-edit value for a few refresh cycles
+    // while the control message is still in flight.
+    struct PendingParameterEdit {
+        std::map<uint32_t, float> values; // parameter ID -> last sent value
+        int32_t revision = 0;             // revision of the newest value
+        juce::int64 sentAtMs = 0;
+    };
+    static uint64_t instanceKey(uint32_t processId, uintptr_t memoryAddress) {
+        return (static_cast<uint64_t>(processId) << 48) ^ static_cast<uint64_t>(memoryAddress);
+    }
+    static uint32_t parameterIdForName(const std::string& parameterName);
+    void applyPendingEditOverlay(PannerInfo& panner, juce::int64 currentTimeMs);
     
     // Dependencies
     std::shared_ptr<EventSystem> eventSystem;
@@ -183,6 +205,11 @@ private:
     // State
     std::vector<PannerInfo> activePanners;
     mutable juce::CriticalSection pannersMutex;
+
+    // Pending edits per plugin instance (guarded by pannersMutex)
+    std::map<uint64_t, PendingParameterEdit> pendingEdits;
+    int32_t controlRevisionCounter = 0;
+    static constexpr int PENDING_EDIT_TIMEOUT_MS = 1500;
     
     // Tracking method flags
     bool usingMemoryShare = false;

@@ -26,7 +26,9 @@ target_sources(m1-system-helper-tests PRIVATE
         ${CMAKE_SOURCE_DIR}/Source/Common/SharedPathUtils.cpp
         ${CMAKE_SOURCE_DIR}/Source/Core/CoverageModel.cpp
         ${CMAKE_SOURCE_DIR}/Source/Core/ExportEngine.cpp
-        ${CMAKE_SOURCE_DIR}/Source/Core/StorageGovernor.cpp)
+        ${CMAKE_SOURCE_DIR}/Source/Core/StorageGovernor.cpp
+        # Live mix render clock (P2): exercised by the MixBus integration test
+        ${CMAKE_SOURCE_DIR}/Source/Core/MixEngine.cpp)
 
 if(APPLE)
     target_sources(m1-system-helper-tests PRIVATE

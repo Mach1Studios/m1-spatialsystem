@@ -1,15 +1,17 @@
 // Network/OSCHandler.cpp
 #include "OSCHandler.h"
 #include "../Core/ExternalMixerProcessor.h"
+#include "../Core/MixEngine.h"
 
 namespace Mach1 {
 
-OSCHandler::OSCHandler(ClientManager* clientManager, PluginManager* pluginManager, ServiceManager* serviceManager, PannerTrackingManager* pannerTrackingManager, ExternalMixerProcessor* externalMixer)
+OSCHandler::OSCHandler(ClientManager* clientManager, PluginManager* pluginManager, ServiceManager* serviceManager, PannerTrackingManager* pannerTrackingManager, ExternalMixerProcessor* externalMixer, MixEngine* mixEngine)
     : clientManager(clientManager)
     , pluginManager(pluginManager)
     , serviceManager(serviceManager)
     , pannerTrackingManager(pannerTrackingManager)
     , externalMixer(externalMixer)
+    , mixEngine(mixEngine)
 {
     setupMessageHandlers();
     // Keepalive and stale-client cleanup do not need to run on a 20ms message-thread loop.
@@ -165,6 +167,9 @@ void OSCHandler::broadcastMonitorChannelConfig(int channelCount)
 
     if (externalMixer)
         externalMixer->setOutputFormat(channelCount);
+
+    if (mixEngine)
+        mixEngine->setOutputFormat(channelCount);
 }
 
 bool OSCHandler::sendMessageToMonitorClient(int port, const juce::OSCMessage& message) const
@@ -765,6 +770,26 @@ void OSCHandler::broadcastStreamingStatusToMonitors()
     msg.addInt32(streamingCount);
     for (const auto& monitor : monitors)
         sendMessageToMonitorClient(monitor.port, msg);
+
+    // Extended handshake (P2): tells monitors whether the live MixBus segment
+    // is being written and in which spatial format, so a monitor on a
+    // mono/stereo-only bus knows it can (and should) read the shared-memory
+    // mix instead of its host input bus.
+    int busActive = 0;
+    int busChannels = 0;
+    if (mixEngine != nullptr)
+    {
+        const auto status = mixEngine->getStatus();
+        busActive = status.busActive ? 1 : 0;
+        busChannels = status.busChannels;
+    }
+
+    juce::OSCMessage stateMsg("/m1-external-mixer-state");
+    stateMsg.addInt32(busActive);
+    stateMsg.addInt32(busChannels);
+    stateMsg.addInt32(streamingCount);
+    for (const auto& monitor : monitors)
+        sendMessageToMonitorClient(monitor.port, stateMsg);
 }
 
 } // namespace Mach1

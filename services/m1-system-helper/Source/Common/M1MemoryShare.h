@@ -225,6 +225,9 @@ public:
     uint32_t getRingGeneration() const;
     bool getConsumerCursor(uint32_t consumerId, uint64_t& outCursor) const;
 
+    /** Number of registered sequential consumers (0 = nobody drains this ring). */
+    uint32_t getConsumerCount() const;
+
     /** Async (message-thread) file modification time bump so directory scans
         can tell live segments from stale ones without touching the RT path. */
     void scheduleAsyncFileModTimeUpdate();

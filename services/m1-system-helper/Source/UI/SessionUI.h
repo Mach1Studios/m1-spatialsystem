@@ -18,6 +18,7 @@
 #include "../Managers/ClientManager.h"
 #include "../Network/OSCHandler.h"
 #include "../Core/CaptureEngine.h"
+#include "../Core/MixEngine.h"
 #include "Components/InputPanelContainer.h"
 #include "Components/TimelineComponent.h"
 #include "Components/CaptureTimelinePanel.h"
@@ -58,7 +59,7 @@ class SessionMainComponent : public juce::Component,
                              private juce::Timer
 {
 public:
-    SessionMainComponent(PannerTrackingManager& manager, ClientManager& clientManager, OSCHandler& oscHandler, bool debugFakeBlocks = false);
+    SessionMainComponent(PannerTrackingManager& manager, ClientManager& clientManager, OSCHandler& oscHandler, bool debugFakeBlocks = false, MixEngine* mixEngine = nullptr);
     ~SessionMainComponent() override;
     
     void resized() override;
@@ -94,6 +95,7 @@ private:
     PannerTrackingManager& pannerManager;
     ClientManager& clientManager;
     OSCHandler& oscHandler;
+    MixEngine* mixEngine = nullptr; // live meters source (P2), may be null in tests
     
     // Capture Engine (background thread)
     std::unique_ptr<CaptureEngine> captureEngine;
@@ -134,7 +136,7 @@ class SessionUI : public juce::SystemTrayIconComponent,
                   private juce::Timer
 {
 public:
-    SessionUI(PannerTrackingManager& manager, ClientManager& clientManager, OSCHandler& oscHandler, bool debugFakeBlocks = false);
+    SessionUI(PannerTrackingManager& manager, ClientManager& clientManager, OSCHandler& oscHandler, bool debugFakeBlocks = false, MixEngine* mixEngine = nullptr);
     ~SessionUI() override;
     
     // Debug mode
@@ -164,6 +166,7 @@ private:
     PannerTrackingManager& pannerManager;
     ClientManager& clientManager;
     OSCHandler& oscHandler;
+    MixEngine* mixEngine = nullptr;
     std::unique_ptr<SessionDocumentWindow> sessionWindow;
     std::unique_ptr<juce::PopupMenu> trayMenu;
     std::unique_ptr<SessionMainComponent> mainComponent;
