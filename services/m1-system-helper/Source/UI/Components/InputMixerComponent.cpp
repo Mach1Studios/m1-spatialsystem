@@ -70,6 +70,40 @@ void PannerChannelStrip::paint(juce::Graphics& g)
     g.setFont(juce::Font(9.0f));
     juce::String displayName = currentPanner.name.empty() ? "---" : juce::String(currentPanner.name).substring(0, 8);
     g.drawText(displayName, nameArea, juce::Justification::centred, true);
+
+    // Make the audio ownership explicit in the Mixer view. Native
+    // multichannel panners remain visible through parameter keepalives, but
+    // their host carries the audio and the helper receives none.
+    auto sourceStatusArea = bounds.removeFromTop(20.0f);
+    juce::String sourceStatus;
+    if (currentPanner.isMemoryShareBased)
+    {
+        const bool blockFlowFresh = currentPanner.msSinceLastBlock >= 0
+                                 && currentPanner.msSinceLastBlock <= 4000;
+        if (!blockFlowFresh)
+        {
+            sourceStatus = "NO AUDIO";
+            g.setColour(HelperUIColours::error);
+        }
+        else if (!currentPanner.externalStreamingActive)
+        {
+            sourceStatus = "NATIVE\nNO HELPER AUDIO";
+            g.setColour(HelperUIColours::warning);
+        }
+        else
+        {
+            sourceStatus = "STREAMING";
+            g.setColour(HelperUIColours::active);
+        }
+    }
+    else
+    {
+        sourceStatus = "CONTROL ONLY";
+        g.setColour(HelperUIColours::osc);
+    }
+    g.setFont(juce::Font(7.5f, juce::Font::bold));
+    g.drawFittedText(sourceStatus, sourceStatusArea.toNearestInt(),
+                     juce::Justification::centred, 2, 0.7f);
     
     // Bottom area for gain readout
     auto gainReadout = bounds.removeFromBottom(16.0f);

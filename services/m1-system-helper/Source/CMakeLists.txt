@@ -16,6 +16,7 @@ set(COMMON_SOURCES
     Common/M1MemoryShare.cpp
     Common/SharedPathUtils.h
     Common/SharedPathUtils.cpp
+    Common/StaleMemoryPolicy.h
 )
 
 # Platform-specific files

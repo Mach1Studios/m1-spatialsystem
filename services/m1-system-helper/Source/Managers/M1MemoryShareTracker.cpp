@@ -2,6 +2,7 @@
 #include "../Common/Common.h"
 #include "../Common/TypesForDataExchange.h"
 #include "../Common/SharedPathUtils.h"
+#include "../Common/StaleMemoryPolicy.h"
 
 // Platform-specific includes for process checking
 #ifdef JUCE_MAC
@@ -606,41 +607,29 @@ void M1MemoryShareTracker::cleanupStaleMemoryFiles() {
         auto memoryFiles = dir.findChildFiles(juce::File::findFiles, false, "M1SpatialSystem_*.mem");
         
         for (const auto& file : memoryFiles) {
-            // The MixBus segment is owned by this helper process itself: it is
-            // recreated on startup and deleted on clean shutdown (non-persistent).
-            // mmap writes don't reliably bump the file mtime, so the age-based
-            // rules below would delete the live mix bus out from under us.
-            if (file.getFileNameWithoutExtension() == "M1SpatialSystem_MixBus")
-                continue;
+            const auto filename = file.getFileNameWithoutExtension();
+            const bool isMixBus = filename == "M1SpatialSystem_MixBus";
+            const auto fileAge = juce::Time::currentTimeMillis()
+                               - file.getLastModificationTime().toMilliseconds();
 
-            bool shouldDelete = false;
-            std::string reason;
-            
-                        // Check: File age (only delete very old files or old files from dead processes)
-            auto fileAge = juce::Time::currentTimeMillis() - file.getLastModificationTime().toMilliseconds();
-            
-            if (fileAge > 7200000) { // 2 hours = definitely stale
-                shouldDelete = true;
-                reason = "older than 2 hours (" + std::to_string(fileAge / 60000) + " minutes)";
-            }
-            else if (fileAge > 600000) { // 10 minutes = check if process is still running
-                std::string filename = file.getFileNameWithoutExtension().toStdString();
-                std::string name;
-                uint32_t processId;
-                uintptr_t memoryAddress;
-                uint64_t timestamp;
-                
-                if (parsePannerSegmentName(filename, name, processId, memoryAddress, timestamp)) {
-                    // Only delete if file is older than 10 minutes AND process is dead
-                    if (!isProcessRunning(processId)) {
-                        shouldDelete = true;
-                        reason = "older than 10 minutes and process " + std::to_string(processId) + " no longer running";
-                    }
-                }
-            }
-            // Files newer than 10 minutes are never cleaned up (allows for plugin reload cycles)
+            std::string name;
+            uint32_t processId = 0;
+            uintptr_t memoryAddress = 0;
+            uint64_t timestamp = 0;
+            const bool isPannerFile = parsePannerSegmentName(
+                filename.toStdString(), name, processId, memoryAddress, timestamp);
+            const bool ownerAlive = isPannerFile && isProcessRunning(processId);
+
+            // Never age-delete a segment owned by a live DAW process. Its
+            // mtime can stop moving while transport/message processing is
+            // paused, and deleting it would strand every mapped reader.
+            const bool shouldDelete = StaleMemoryPolicy::shouldDelete(
+                isMixBus, isPannerFile, ownerAlive, fileAge);
             
             if (shouldDelete) {
+                const std::string reason = isPannerFile
+                    ? "older than 10 minutes and process " + std::to_string(processId) + " no longer running"
+                    : "unrecognized segment older than 2 hours";
                 DBG("[M1MemoryShareTracker] Deleting stale file: " + file.getFullPathName() + " (reason: " + reason + ")");
                 if (!file.deleteFile()) {
                     DBG("[M1MemoryShareTracker] Failed to delete stale file: " + file.getFullPathName());

@@ -66,12 +66,13 @@ building any platform artifacts.
 ### Stale shared-memory policy
 
 Panner segments are deleted by their owning plugin instance on clean shutdown. The
-helper additionally sweeps the shared directory: segments older than 2 hours, or
-older than 10 minutes whose writing process is dead, are removed. The helper-owned
-MixBus segment is excluded from the sweep (it is recreated on startup and removed on
-clean shutdown). Captured session data on disk is governed separately by the
-StorageGovernor policies (never touches sessions with live writers or pinned
-projects).
+helper additionally sweeps the shared directory, but never age-deletes a segment
+whose DAW process is still alive. A dead process's panner files receive a ten-minute
+plugin/session-reload grace period; unrecognized Mach1 memory files are removed only
+after two hours. The helper-owned MixBus segment is always excluded from this sweep
+(it is recreated on startup and removed on clean shutdown). Captured session data
+on disk is governed separately by the StorageGovernor policies (never touches
+sessions with live writers or pinned projects).
 
 On macOS, CMake validates that the panner, monitor, and helper entitlement files all
 contain the same `group.com.mach1.spatial.shared` application group. At runtime the

@@ -17,6 +17,7 @@
 
 #include <JuceHeader.h>
 #include "Common/MonitorBroadcastThrottle.h"
+#include "Common/StaleMemoryPolicy.h"
 #include "Managers/ClientManager.h"
 #include "Managers/ServiceManager.h"
 #include "Managers/PluginManager.h"
@@ -331,6 +332,28 @@ void testMonitorBroadcastThrottleDedupesAndForces()
     CHECK(!throttle.shouldBroadcast(jitter, 3000));
 }
 
+void testStaleMemoryPolicyProtectsLiveSegments()
+{
+    using Mach1::StaleMemoryPolicy::shouldDelete;
+
+    // The helper's active MixBus is never owned by this collector.
+    CHECK(!shouldDelete(true, false, false, 24LL * 60 * 60 * 1000));
+
+    // A live DAW process always protects its panner segment, regardless of
+    // mtime. Hosts can pause transport/message delivery for arbitrarily long
+    // periods without consenting to destructive cleanup.
+    CHECK(!shouldDelete(false, true, true, 11LL * 60 * 1000));
+    CHECK(!shouldDelete(false, true, true, 24LL * 60 * 60 * 1000));
+
+    // Dead-process files get a ten-minute plugin-reload grace period.
+    CHECK(!shouldDelete(false, true, false, 9LL * 60 * 1000));
+    CHECK(shouldDelete(false, true, false, 11LL * 60 * 1000));
+
+    // Unknown Mach1 files are only swept after the conservative two-hour cap.
+    CHECK(!shouldDelete(false, false, false, 119LL * 60 * 1000));
+    CHECK(shouldDelete(false, false, false, 121LL * 60 * 1000));
+}
+
 } // namespace
 
 // Defined in MemoryShareRingTests.cpp; returns the number of failed checks.
@@ -350,6 +373,7 @@ int main()
     testSendToPluginTargetsSinglePlugin();
     testMonitorBroadcastThrottleRateLimitsStreams();
     testMonitorBroadcastThrottleDedupesAndForces();
+    testStaleMemoryPolicyProtectsLiveSegments();
     testManyPannersUnderOrientationStorm();
 
     failures += runMemoryShareRingTests();
