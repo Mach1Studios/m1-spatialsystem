@@ -185,6 +185,7 @@ void CaptureEngine::run()
     while (!threadShouldExit() && m_capturing.load())
     {
         processCapture();
+        flushPendingStreams();
 
         // Refresh the session manifest a few times a minute so the storage
         // panel sees near-live byte counts and a fresh lastWrittenMs even if
@@ -264,7 +265,8 @@ void CaptureEngine::processPannerData(const PannerInfo& panner)
     // Find the panner in the tracker. The memory address disambiguates
     // multiple plugin instances hosted in the same DAW process.
     auto* memPanner = tracker->findPanner(panner.processId, panner.memoryAddress);
-    if (!memPanner || !memPanner->memoryShare)
+    auto share = memPanner != nullptr ? memPanner->getShare() : nullptr;
+    if (!memPanner || !share)
     {
         // Reduced logging - only log occasionally
         static std::map<uint32_t, juce::int64> lastLogTime;
@@ -287,7 +289,7 @@ void CaptureEngine::processPannerData(const PannerInfo& panner)
     int blocksThisPass = 0;
     
     while (blocksThisPass < MAX_BLOCKS_PER_PASS
-           && memPanner->memoryShare->readNextBlockForConsumer(consumerId, block))
+           && share->readNextBlockForConsumer(consumerId, block))
     {
         ++blocksThisPass;
         ingestBlock(panner, pannerId, block);
@@ -352,6 +354,18 @@ void CaptureEngine::ingestBlock(const PannerInfo& panner, const PannerId& panner
         state.lastBufferId = block.bufferId;
         return;
     }
+
+    // Hosts like Reaper keep running processBlock while the transport is
+    // stopped, with the playhead frozen in place. Recording those blocks
+    // re-captures the same timeline position over and over (bloating the
+    // session and overwriting real takes with idle audio), so only capture
+    // a position once unless the transport is actually rolling.
+    if (!block.isPlaying && startSample == state.lastCapturedStartSample)
+    {
+        state.lastSequenceNumber = block.sequenceNumber;
+        state.lastBufferId = block.bufferId;
+        return;
+    }
     
     // Create chunk header
     ChunkHeader header;
@@ -392,6 +406,7 @@ void CaptureEngine::ingestBlock(const PannerInfo& panner, const PannerId& panner
     state.lastSequenceNumber = block.sequenceNumber;
     state.lastBufferId = block.bufferId;
     state.lastEndSample = startSample + numSamples;
+    state.lastCapturedStartSample = startSample;
 }
 
 void CaptureEngine::writeChunk(PannerCaptureState& state, const ChunkHeader& header,
@@ -414,11 +429,16 @@ void CaptureEngine::writeChunk(PannerCaptureState& state, const ChunkHeader& hea
         stream->write(audioData, header.audioDataSize);
     }
     
-    // Flush periodically (every 100 chunks)
+    // Batch flushes for throughput; flushPendingStreams() on the capture
+    // thread guarantees the buffered tail still reaches disk within ~250ms
+    // after writes stop (mid-capture exports index whatever is on disk).
     state.chunksWritten++;
+    state.needsFlush = true;
     if (state.chunksWritten % 100 == 0)
     {
         stream->flush();
+        state.lastFlushMs = juce::Time::currentTimeMillis();
+        state.needsFlush = false;
     }
     
     state.bytesWritten += ChunkHeader::SIZE + StateSnapshot::SIZE + header.audioDataSize;
@@ -433,6 +453,22 @@ void CaptureEngine::writeChunk(PannerCaptureState& state, const ChunkHeader& hea
         juce::MessageManager::callAsync([this]() {
             sendChangeMessage();
         });
+    }
+}
+
+void CaptureEngine::flushPendingStreams()
+{
+    const juce::ScopedLock lock(m_stateMutex);
+    const juce::int64 nowMs = juce::Time::currentTimeMillis();
+    for (auto& [key, state] : m_pannerStates)
+    {
+        juce::ignoreUnused(key);
+        if (state.needsFlush && state.isOpen() && nowMs - state.lastFlushMs > 250)
+        {
+            state.outputStream->flush();
+            state.lastFlushMs = nowMs;
+            state.needsFlush = false;
+        }
     }
 }
 

@@ -267,6 +267,8 @@ void PannerTrackingManager::mergeTrackingResults() {
                 if (foundPanner.isMemoryShareBased) {
                     existingPanner.channels = foundPanner.channels;
                     existingPanner.sampleRate = foundPanner.sampleRate;
+                    existingPanner.msSinceLastBlock = foundPanner.msSinceLastBlock;
+                    existingPanner.externalStreamingActive = foundPanner.externalStreamingActive;
                     // The port arrives via the block parameter payload and can
                     // lag discovery by a few blocks; adopt it as soon as it is
                     // known so this entry can be joined with its OSC twin.
@@ -507,7 +509,8 @@ bool PannerTrackingManager::sendParameterUpdate(const PannerInfo& panner, const 
 
     // Find the panner's M1MemoryShare instance via the tracker
     auto* pannerInfo = memoryShareTracker->findPanner(panner.processId, panner.memoryAddress);
-    if (!pannerInfo || !pannerInfo->memoryShare || !pannerInfo->memoryShare->isValid())
+    auto share = pannerInfo != nullptr ? pannerInfo->getShare() : nullptr;
+    if (!share || !share->isValid())
         return false;
 
     // The revision rides in the control message's intValue; the panner echoes
@@ -523,7 +526,7 @@ bool PannerTrackingManager::sendParameterUpdate(const PannerInfo& panner, const 
         pending.sentAtMs = juce::Time::currentTimeMillis();
     }
 
-    return pannerInfo->memoryShare->writeControlMessage(paramID, ParameterType::FLOAT, value, revision);
+    return share->writeControlMessage(paramID, ParameterType::FLOAT, value, revision);
 }
 
 bool PannerTrackingManager::sendParameterUpdate(const PannerInfo& panner, const std::string& parameterName, int value) {
@@ -611,6 +614,13 @@ PannerInfo PannerTrackingManager::convertFromMemoryShare(const MemorySharePanner
     panner.stereoSpread = info.getStereoSpread();
     panner.stereoInputBalance = info.getStereoInputBalance();
     panner.controlRevision = info.parameters.getInt(M1SystemHelperParameterIDs::CONTROL_REVISION, 0);
+
+    // Block-flow freshness + the plugin's own streaming-state report, so the
+    // UI can tell "streaming" / "alive but native multichannel" / "silent"
+    panner.msSinceLastBlock = info.lastDataTime > 0
+        ? juce::jmax<juce::int64>(0, juce::Time::currentTimeMillis() - info.lastDataTime)
+        : -1;
+    panner.externalStreamingActive = info.parameters.getBool(M1SystemHelperParameterIDs::EXTERNAL_ACTIVE, true);
     
     // DAW integration
     panner.dawTimestamp = info.dawTimestamp;

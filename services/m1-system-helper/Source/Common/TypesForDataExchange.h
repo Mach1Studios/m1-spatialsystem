@@ -40,6 +40,12 @@ struct M1SystemHelperParameterIDs
     // applied my edit yet" from "panner reverted / user changed it again".
     static constexpr uint32_t CONTROL_REVISION = 0x6A7B8C9D;
 
+    // Panner's own report of whether it is streaming audio to the helper
+    // (external renderer mode). False = processing natively (multichannel
+    // bus); keepalives still flow but no audio will arrive. Must match
+    // M1PannerParameterIDs.
+    static constexpr uint32_t EXTERNAL_ACTIVE = 0x7B8C9DAE;
+
     static constexpr uint32_t BUFFER_ID = 0x60718293;
     static constexpr uint32_t BUFFER_SEQUENCE = 0x71829304;
     static constexpr uint32_t BUFFER_TIMESTAMP = 0x82930415;

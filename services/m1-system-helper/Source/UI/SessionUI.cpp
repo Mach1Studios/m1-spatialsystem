@@ -7,6 +7,7 @@
 #include "SessionUI.h"
 #include "BinaryData.h"
 #include "../Core/ExportEngine.h"
+#include "../M1SystemHelperService.h"
 #include <Mach1Encode.h>
 
 namespace Mach1 {
@@ -227,6 +228,22 @@ void SessionMainComponent::runExport()
                                   + juce::String(static_cast<int>(result.sampleRate)) + " Hz",
                               HelperUIColours::text });
 
+            // The export rate comes from the captured plugin blocks, so an
+            // unexpected value here means the DAW itself ran the plugins at
+            // that rate (e.g. a Bluetooth headset forcing the device to 16/24
+            // kHz). Mixed rates mean the rate changed mid-session and the
+            // timeline positions are unreliable - tell the user to re-capture.
+            if (result.capturedSampleRates.size() > 1)
+            {
+                juce::String rateList;
+                for (const auto rate : result.capturedSampleRates)
+                    rateList += (rateList.isEmpty() ? "" : ", ") + juce::String(static_cast<int>(rate));
+                lines.push_back({ "Warning: mixed sample rates captured (" + rateList
+                                      + " Hz). The DAW rate changed mid-session; "
+                                        "clear the session data and re-capture.",
+                                  HelperUIColours::warning });
+            }
+
             const bool fullCoverage = result.allStreamsCoveragePercent > 99.9f;
             lines.push_back({ "Full coverage (all inputs): "
                                   + juce::String(result.allStreamsCoveragePercent, 1) + "%",
@@ -364,6 +381,8 @@ void SessionMainComponent::updateFromManager()
     monitorPanelState.pitch = activeMonitorSnapshot.masterPitch;
     monitorPanelState.roll = activeMonitorSnapshot.masterRoll;
     monitorPanelState.channelCount = activeMonitorSnapshot.systemChannelCount;
+    if (mixEngine != nullptr)
+        monitorPanelState.streamingPanners = mixEngine->getStatus().streamingFeeds;
     for (const auto& monitor : activeMonitorSnapshot.monitors)
     {
         monitorPanelState.monitors.push_back({ monitor.port, monitor.active });
@@ -527,6 +546,19 @@ void SessionUI::createMenu()
         showSessionWindow(); 
     });
     trayMenu->addSeparator();
+
+    // P4: user-facing external renderer toggle. Ticked = panners on
+    // mono/stereo-only buses stream audio here for mixing/capture/export.
+    const bool streamingEnabled = oscHandler.isExternalRendererEnabled();
+    trayMenu->addItem("Enable Audio Streaming (External Renderer)", true, streamingEnabled,
+                      [this, streamingEnabled]() {
+                          oscHandler.setExternalRendererEnabled(!streamingEnabled);
+                      });
+    if (!M1SystemHelperService::getInstance().isSharedMemoryDirWritable())
+    {
+        trayMenu->addItem("WARNING: shared memory dir not writable", false, false, []() {});
+    }
+    trayMenu->addSeparator();
     trayMenu->addItem("Copy Diagnostics", [this]() {
         DBG("[SessionUI] Copy Diagnostics callback triggered!");
         copyDiagnosticsToClipboard();
@@ -620,6 +652,17 @@ void SessionUI::updateStatus()
 
     if (statusChanged)
         updateTrayIcon();
+
+    // Reflect the renderer toggle in the status window title so its state is
+    // obvious even without opening the tray menu.
+    if (sessionWindow != nullptr)
+    {
+        const juce::String title = oscHandler.isExternalRendererEnabled()
+            ? "Mach1 Spatial System"
+            : "Mach1 Spatial System - AUDIO STREAMING DISABLED";
+        if (sessionWindow->getName() != title)
+            sessionWindow->setName(title);
+    }
 }
 
 void SessionUI::copyDiagnosticsToClipboard()
@@ -642,6 +685,10 @@ juce::String SessionUI::generateDiagnosticsText()
     text << "Connected Panners: " << juce::String(static_cast<int>(panners.size())) << juce::newLine;
     text << "MemoryShare Active: " << (lastMemoryShareStatus ? "Yes" : "No") << juce::newLine;
     text << "OSC Active: " << (lastOSCStatus ? "Yes" : "No") << juce::newLine;
+    text << "External Renderer Enabled: " << (oscHandler.isExternalRendererEnabled() ? "Yes" : "No") << juce::newLine;
+    auto& service = M1SystemHelperService::getInstance();
+    text << "Shared Memory Dir: " << service.getSharedMemoryDirPath()
+         << (service.isSharedMemoryDirWritable() ? " (writable)" : " (NOT WRITABLE)") << juce::newLine;
     text << juce::newLine;
     
     int index = 1;

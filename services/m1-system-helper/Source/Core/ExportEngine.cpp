@@ -194,10 +194,26 @@ ExportEngine::Result ExportEngine::exportSession(const Request& request, const P
         return result;
     }
 
-    uint32_t sampleRate = 0;
+    // The export rate is whatever the plugins ran at, taken from the captured
+    // block headers. Majority vote across all chunks so a stray rate change
+    // mid-session doesn't mislabel the bulk of the audio; every distinct rate
+    // is surfaced in the result so mixed-rate sessions are visible to the user.
+    std::map<uint32_t, int64_t> rateCounts;
     for (const auto& stream : streams)
-        if (!stream.chunks.empty())
-            sampleRate = std::max(sampleRate, stream.chunks.front().sampleRate);
+        for (const auto& chunk : stream.chunks)
+            rateCounts[chunk.sampleRate] += chunk.numSamples;
+
+    uint32_t sampleRate = 0;
+    int64_t bestCount = 0;
+    for (const auto& [rate, count] : rateCounts)
+    {
+        result.capturedSampleRates.push_back(rate);
+        if (count > bestCount)
+        {
+            bestCount = count;
+            sampleRate = rate;
+        }
+    }
     if (sampleRate == 0)
         sampleRate = 48000;
 
@@ -443,6 +459,11 @@ ExportEngine::Result ExportEngine::exportSession(const Request& request, const P
         root->setProperty("outputMode", request.outputMode);
         root->setProperty("channels", outputChannels);
         root->setProperty("sampleRate", static_cast<juce::int64>(sampleRate));
+
+        juce::Array<juce::var> ratesVar;
+        for (const auto rate : result.capturedSampleRates)
+            ratesVar.add(static_cast<juce::int64>(rate));
+        root->setProperty("capturedSampleRates", ratesVar);
         root->setProperty("startSample", static_cast<juce::int64>(rangeStart));
         root->setProperty("endSample", static_cast<juce::int64>(rangeEnd));
         root->setProperty("allStreamsCoveragePercent", result.allStreamsCoveragePercent);

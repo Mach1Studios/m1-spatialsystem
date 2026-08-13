@@ -42,6 +42,20 @@ public:
     // public so integration tests can trigger it without the timer.
     void broadcastStreamingStatusToMonitors();
 
+    // P4: user-facing external renderer toggle. When disabled, the live mix
+    // engine is stopped (which also removes the MixBus segment) and every
+    // registered panner is told via "/m1-external-renderer-enabled" to fall
+    // back to native processing and stop streaming audio blocks.
+    bool isExternalRendererEnabled() const { return externalRendererEnabled.load(); }
+    void setExternalRendererEnabled(bool enabled, bool notifyChange = true);
+    // Persistence hook (set by the service); invoked on user-driven changes.
+    std::function<void(bool)> onExternalRendererChanged;
+
+    // Invoked (from the OSC thread) when a plugin asks the helper to reveal
+    // its status window ("/m1-show-helper-ui"); the service hops to the
+    // message thread internally.
+    std::function<void()> onShowUIRequested;
+
 private:
     struct MonitorStateCache {
         float yaw = 0.0f;
@@ -100,11 +114,15 @@ private:
     using MessageHandler = std::function<void(const juce::OSCMessage&)>;
     std::unordered_map<juce::String, MessageHandler> messageHandlers;
     
+    void broadcastExternalRendererState();
+
     // Cached state
     mutable juce::CriticalSection stateMutex;
     std::unordered_map<int, MonitorStateCache> monitorStatesByPort;
     MonitorBroadcastThrottle monitorBroadcastThrottle; // guarded by stateMutex
     int playerLastUpdate = 0;
+
+    std::atomic<bool> externalRendererEnabled { true };
 
     static constexpr int KEEPALIVE_INTERVAL_MS = 1000;
 

@@ -62,7 +62,16 @@ void OSCHandler::setupMessageHandlers() {
         {"/setMonitorActiveReq", [this](const auto& m) { handleSetMonitorActiveRequest(m); }},
         {"/setPlayerFrameRate", [this](const auto& m) { handleSetPlayerFrameRate(m); }},
         {"/setPlayerPosition", [this](const auto& m) { handleSetPlayerPosition(m); }},
-        {"/setPlayerIsPlaying", [this](const auto& m) { handleSetPlayerIsPlaying(m); }}
+        {"/setPlayerIsPlaying", [this](const auto& m) { handleSetPlayerIsPlaying(m); }},
+
+        // Plugins (e.g. the monitor's "OPEN SESSION UI" button) ask the
+        // already-running helper to reveal its status window - more reliable
+        // than relaunching the app and relying on single-instance forwarding.
+        {"/m1-show-helper-ui", [this](const auto& m) {
+            juce::ignoreUnused(m);
+            if (onShowUIRequested)
+                onShowUIRequested();
+        }}
     };
 }
 
@@ -405,6 +414,13 @@ void OSCHandler::handleRegisterPlugin(const juce::OSCMessage& message) {
         // triggered N sends, and each "/m1-channel-config" delivery used to
         // cause a host-visible parameter change in every panner instance.
         sendCurrentMonitorStateToPlugin(plugin.port);
+
+        // Late-registering panners must learn the current renderer toggle,
+        // otherwise a plugin loaded while streaming is disabled would write
+        // audio into shared memory that nothing will ever consume.
+        juce::OSCMessage rendererMsg("/m1-external-renderer-enabled");
+        rendererMsg.addInt32(isExternalRendererEnabled() ? 1 : 0);
+        pluginManager->sendToPlugin(plugin.port, rendererMsg);
     }
 }
 
@@ -759,11 +775,20 @@ void OSCHandler::broadcastStreamingStatusToMonitors()
     if (monitors.empty())
         return;
 
+    // "Streaming" means audio blocks are actually arriving in the MixEngine.
+    // Do NOT count every memory-share panner: instances on multichannel buses
+    // keep writing parameter-only keepalive blocks (so the helper track list
+    // works), and counting those made monitors report streaming panners while
+    // the whole session was processing natively in the DAW.
     int streamingCount = 0;
-    for (const auto& panner : pannerTrackingManager->getActivePanners())
+    int busActive = 0;
+    int busChannels = 0;
+    if (mixEngine != nullptr)
     {
-        if (panner.isMemoryShareBased)
-            ++streamingCount;
+        const auto status = mixEngine->getStatus();
+        streamingCount = status.streamingFeeds;
+        busActive = status.busActive ? 1 : 0;
+        busChannels = status.busChannels;
     }
 
     juce::OSCMessage msg("/m1-streaming-panners");
@@ -775,14 +800,6 @@ void OSCHandler::broadcastStreamingStatusToMonitors()
     // is being written and in which spatial format, so a monitor on a
     // mono/stereo-only bus knows it can (and should) read the shared-memory
     // mix instead of its host input bus.
-    int busActive = 0;
-    int busChannels = 0;
-    if (mixEngine != nullptr)
-    {
-        const auto status = mixEngine->getStatus();
-        busActive = status.busActive ? 1 : 0;
-        busChannels = status.busChannels;
-    }
 
     juce::OSCMessage stateMsg("/m1-external-mixer-state");
     stateMsg.addInt32(busActive);
@@ -790,6 +807,39 @@ void OSCHandler::broadcastStreamingStatusToMonitors()
     stateMsg.addInt32(streamingCount);
     for (const auto& monitor : monitors)
         sendMessageToMonitorClient(monitor.port, stateMsg);
+}
+
+void OSCHandler::setExternalRendererEnabled(bool enabled, bool notifyChange)
+{
+    const bool wasEnabled = externalRendererEnabled.exchange(enabled);
+
+    if (mixEngine != nullptr)
+    {
+        // stopEngine() tears down the MixBus segment (non-persistent), so
+        // monitors immediately lose the shared mix and fall back to their
+        // host bus; the /m1-external-mixer-state heartbeat reports busActive=0.
+        if (enabled)
+            mixEngine->startEngine();
+        else
+            mixEngine->stopEngine();
+    }
+
+    broadcastExternalRendererState();
+
+    if (notifyChange && wasEnabled != enabled && onExternalRendererChanged)
+        onExternalRendererChanged(enabled);
+
+    DBG("[OSCHandler] External renderer " + juce::String(enabled ? "ENABLED" : "DISABLED"));
+}
+
+void OSCHandler::broadcastExternalRendererState()
+{
+    if (pluginManager == nullptr)
+        return;
+
+    juce::OSCMessage msg("/m1-external-renderer-enabled");
+    msg.addInt32(externalRendererEnabled.load() ? 1 : 0);
+    pluginManager->sendToAllPlugins(msg);
 }
 
 } // namespace Mach1

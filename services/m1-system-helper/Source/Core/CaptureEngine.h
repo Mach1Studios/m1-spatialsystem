@@ -24,9 +24,10 @@
 #include "../Managers/PannerTrackingManager.h"
 #include "../Common/TypesForDataExchange.h"
 #include <atomic>
+#include <functional>
+#include <limits>
 #include <map>
 #include <memory>
-#include <functional>
 
 namespace Mach1 {
 
@@ -112,6 +113,14 @@ struct PannerCaptureState
     uint32_t lastSequenceNumber = 0;
     uint64_t lastBufferId = 0;
     int64_t lastEndSample = 0;
+
+    // Timeline position of the most recently written chunk, used to skip
+    // duplicate blocks while the DAW transport is stopped (frozen playhead).
+    int64_t lastCapturedStartSample = std::numeric_limits<int64_t>::min();
+
+    // Wall clock of the last output-stream flush (time-bounded flushing)
+    juce::int64 lastFlushMs = 0;
+    bool needsFlush = false; // chunk data written since the last flush
     
     // Statistics
     uint32_t chunksWritten = 0;
@@ -247,6 +256,7 @@ private:
                      const M1MemoryShare::SharedBlock& block);
     void writeChunk(PannerCaptureState& state, const ChunkHeader& header,
                    const StateSnapshot& snapshot, const float* audioData);
+    void flushPendingStreams();
     
     // Panner state management
     PannerCaptureState& getOrCreatePannerState(const PannerId& pannerId);

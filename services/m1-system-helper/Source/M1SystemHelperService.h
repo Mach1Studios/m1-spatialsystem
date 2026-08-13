@@ -42,13 +42,26 @@ public:
 
     // Live mix render clock (P2)
     MixEngine& getMixEngine() { return *mixEngine; }
-    
+
+    // P4: true when the shared-memory directory accepted a probe write at
+    // startup. When false, streaming cannot work (entitlement/permission
+    // problem) and the UI should say so instead of showing empty coverage.
+    bool isSharedMemoryDirWritable() const { return sharedMemoryDirWritable; }
+    juce::String getSharedMemoryDirPath() const { return sharedMemoryDirPath; }
+
 private:
     M1SystemHelperService();
     ~M1SystemHelperService() override;
     
     void timerCallback() override;
     void ensureSessionUICreated();
+
+    // P4: user-facing external renderer toggle persistence (per-user file,
+    // the system-wide settings.json is root-owned and read-only for us)
+    static juce::File getUserSettingsFile();
+    bool loadExternalRendererSetting() const;
+    void saveExternalRendererSetting(bool enabled) const;
+    void checkSharedMemoryDirWritable();
     
 private:
     std::shared_ptr<EventSystem> eventSystem;
@@ -71,6 +84,9 @@ private:
     std::unique_ptr<SessionUI> sessionUI;
     bool showSessionUI = true;  // Default to showing UI for debugging
     bool debugFakeBlocks = false;  // Debug mode for fake capture blocks
+
+    bool sharedMemoryDirWritable = true;
+    juce::String sharedMemoryDirPath;
 
     static constexpr int TRACKING_UPDATE_INTERVAL_MS = 100;
     

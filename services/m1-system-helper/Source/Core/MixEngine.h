@@ -69,7 +69,8 @@ public:
         bool busActive = false;        // MixBus segment exists and is being written
         int busChannels = 0;
         uint32_t sampleRate = 0;
-        int liveFeeds = 0;             // feeds currently delivering audio
+        int liveFeeds = 0;             // feeds passing the render-pacing freshness gate
+        int streamingFeeds = 0;        // feeds with audio in the last 2s (heartbeat count)
         int totalFeeds = 0;
         uint64_t blocksPublished = 0;
     };

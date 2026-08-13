@@ -82,6 +82,12 @@ public:
         int64_t startSample = 0;
         int64_t endSample = 0;
 
+        // All distinct sample rates found in the captured chunks (sorted).
+        // More than one entry means the DAW rate changed mid-session; sample
+        // positions from different rates don't share a timeline, so the
+        // export is flagged for the user to re-capture.
+        std::vector<uint32_t> capturedSampleRates;
+
         // Percent of the export range where EVERY stream has coverage.
         float allStreamsCoveragePercent = 0.0f;
         std::vector<StreamReport> streams;

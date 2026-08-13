@@ -165,7 +165,7 @@ bool M1MemoryShareTracker::connectToPanner(MemorySharePannerInfo& panner) {
         DBG("[M1MemoryShareTracker] Connecting to panner at: " + juce::String(panner.memoryFilePath));
         
         // Create M1MemoryShare instance with explicit file path
-        panner.memoryShare = std::make_unique<M1MemoryShare>(
+        auto share = std::make_shared<M1MemoryShare>(
             panner.memorySegmentName, 
             1024 * 1024, // 1MB default size
             true,        // persistent
@@ -173,11 +173,15 @@ bool M1MemoryShareTracker::connectToPanner(MemorySharePannerInfo& panner) {
             panner.memoryFilePath  // Explicit file path (std::string)
         );
         
-        if (panner.memoryShare->isValid()) {
+        if (share->isValid()) {
             // Register as consumer
-            if (panner.memoryShare->registerConsumer(consumerId)) {
+            if (share->registerConsumer(consumerId)) {
+                // Publish the mapping only once fully set up; capture/mix
+                // threads read it concurrently via getShare().
+                std::atomic_store(&panner.memoryShare, std::move(share));
                 panner.isConnected = true;
                 panner.lastUpdateTime = juce::Time::currentTimeMillis();
+                panner.lastDataTime = panner.lastUpdateTime; // grace period before first block
                 DBG("[M1MemoryShareTracker] Successfully connected to panner: " + juce::String(panner.name));
                 return true;
             }
@@ -187,23 +191,24 @@ bool M1MemoryShareTracker::connectToPanner(MemorySharePannerInfo& panner) {
     } catch (const std::exception& e) {
         // Connection failed
         DBG("[M1MemoryShareTracker] Exception connecting to panner: " + juce::String(e.what()));
-        panner.memoryShare.reset();
     }
     
     return false;
 }
 
 void M1MemoryShareTracker::disconnectFromPanner(MemorySharePannerInfo& panner) {
-    if (panner.isConnected && panner.memoryShare) {
-        // Unregister as consumer
-        panner.memoryShare->unregisterConsumer(consumerId);
-        panner.memoryShare.reset();
+    if (panner.isConnected) {
+        if (auto share = panner.getShare()) {
+            // Unregister as consumer (no-op on an orphaned mapping)
+            share->unregisterConsumer(consumerId);
+        }
+        std::atomic_store(&panner.memoryShare, std::shared_ptr<M1MemoryShare>());
         panner.isConnected = false;
     }
 }
 
 bool M1MemoryShareTracker::updatePannerData(MemorySharePannerInfo& panner) {
-    if (!panner.isConnected || !panner.memoryShare) {
+    if (!panner.isConnected || panner.getShare() == nullptr) {
         return false;
     }
     
@@ -211,6 +216,7 @@ bool M1MemoryShareTracker::updatePannerData(MemorySharePannerInfo& panner) {
         // Read latest audio buffer data
         if (readAudioBufferData(panner)) {
             panner.lastUpdateTime = juce::Time::currentTimeMillis();
+            panner.lastDataTime = panner.lastUpdateTime;
             panner.isActive = true;
             return true;
         }
@@ -234,14 +240,15 @@ void M1MemoryShareTracker::extractParametersFromBuffer(MemorySharePannerInfo& pa
 }
 
 bool M1MemoryShareTracker::readAudioBufferData(MemorySharePannerInfo& panner) {
-    if (!panner.memoryShare || !panner.memoryShare->isValid()) {
+    auto share = panner.getShare();
+    if (share == nullptr || !share->isValid()) {
         return false;
     }
     
     // Poll the most recently published block (non-consuming; the capture
     // engine reads sequentially through its own consumer cursor).
     M1MemoryShare::SharedBlock block;
-    if (!panner.memoryShare->readLatestBlock(block)) {
+    if (!share->readLatestBlock(block)) {
         return false;
     }
     
@@ -405,6 +412,10 @@ void M1MemoryShareTracker::scanForMemorySegments()
                     // Also try to read latest data
                     if (existing->isConnected) {
                         updatePannerData(*existing);
+                        // The plugin may have replaced its segment (bus-width
+                        // change, plugin reload) - our mapping would then point
+                        // at an orphaned inode and read nothing forever.
+                        maybeRemapPanner(*existing, file, timestamp);
                     }
                 }
             }
@@ -492,6 +503,47 @@ bool M1MemoryShareTracker::parsePannerSegmentName(const std::string& filename,
     return true;
 }
 
+void M1MemoryShareTracker::maybeRemapPanner(MemorySharePannerInfo& panner, const juce::File& file, uint64_t creationTimestamp) {
+    const auto nowMs = juce::Time::currentTimeMillis();
+    const std::string discoveredPath = file.getFullPathName().toStdString();
+
+    bool needsRemap = false;
+    if (discoveredPath != panner.memoryFilePath) {
+        // Same pid+address but a different file: the plugin instance published a
+        // brand-new segment (e.g. a reload reusing the same heap address). Only
+        // follow forward in time, never back to an older leftover file.
+        needsRemap = creationTimestamp > panner.creationTimestamp;
+    } else {
+        // Same path: detect recreate-in-place (delete + new inode). Our mapping
+        // still points at the orphaned old inode, so no new blocks arrive even
+        // though the producer keeps touching the file on disk. The mtime window
+        // is twice the data-staleness window because both clocks start at the
+        // recreate moment - equal windows would let them just miss each other.
+        // A false positive only re-registers on the same live inode (harmless).
+        const auto sinceData = nowMs - panner.lastDataTime;
+        const auto mtimeAge = nowMs - file.getLastModificationTime().toMilliseconds();
+        needsRemap = sinceData > REMAP_STALE_MS && mtimeAge < REMAP_STALE_MS * 2;
+    }
+
+    if (!needsRemap || nowMs - panner.lastRemapAttemptTime < REMAP_STALE_MS)
+        return;
+
+    panner.lastRemapAttemptTime = nowMs;
+    DBG("[M1MemoryShareTracker] Segment replaced behind mapping - remapping: " + juce::String(discoveredPath));
+
+    disconnectFromPanner(panner);
+    panner.memorySegmentName = file.getFileNameWithoutExtension().toStdString();
+    panner.memoryFilePath = discoveredPath;
+    panner.creationTimestamp = creationTimestamp;
+    panner.currentBufferId = 0;
+
+    if (!connectToPanner(panner)) {
+        // Stay disconnected; cleanupInactivePanners() drops the entry and the
+        // next scan re-adopts the file from scratch.
+        DBG("[M1MemoryShareTracker] Remap failed for: " + juce::String(discoveredPath));
+    }
+}
+
 void M1MemoryShareTracker::updateExistingPanners() {
     for (auto& panner : activePanners) {
         if (panner.isConnected) {
@@ -554,6 +606,13 @@ void M1MemoryShareTracker::cleanupStaleMemoryFiles() {
         auto memoryFiles = dir.findChildFiles(juce::File::findFiles, false, "M1SpatialSystem_*.mem");
         
         for (const auto& file : memoryFiles) {
+            // The MixBus segment is owned by this helper process itself: it is
+            // recreated on startup and deleted on clean shutdown (non-persistent).
+            // mmap writes don't reliably bump the file mtime, so the age-based
+            // rules below would delete the live mix bus out from under us.
+            if (file.getFileNameWithoutExtension() == "M1SpatialSystem_MixBus")
+                continue;
+
             bool shouldDelete = false;
             std::string reason;
             

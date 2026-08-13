@@ -36,8 +36,14 @@ struct MemorySharePannerInfo {
     // Connection
     std::string memorySegmentName;
     std::string memoryFilePath;  // Full file path for direct opening
-    std::unique_ptr<M1MemoryShare> memoryShare;
+    // shared_ptr so a remap (plugin recreated its segment) can swap the mapping
+    // while the capture/mix threads still hold the old one; access via getShare().
+    std::shared_ptr<M1MemoryShare> memoryShare;
     bool isConnected = false;
+
+    /** Thread-safe snapshot of the current mapping. Callers must copy the
+        returned shared_ptr once and use that copy for the whole operation. */
+    std::shared_ptr<M1MemoryShare> getShare() const { return std::atomic_load(&memoryShare); }
     
     // Audio format
     uint32_t sampleRate = 44100;
@@ -62,6 +68,8 @@ struct MemorySharePannerInfo {
     bool isActive = false;
     bool isStale = false;  // True if timed out but process still running
     juce::int64 lastUpdateTime = 0;
+    juce::int64 lastDataTime = 0;          // last time a NEW block arrived through our mapping
+    juce::int64 lastRemapAttemptTime = 0;  // rate-limits reconnect attempts
     
     // Default constructor
     MemorySharePannerInfo() = default;
@@ -149,6 +157,7 @@ private:
     bool connectToPanner(MemorySharePannerInfo& panner);
     void disconnectFromPanner(MemorySharePannerInfo& panner);
     bool updatePannerData(MemorySharePannerInfo& panner);
+    void maybeRemapPanner(MemorySharePannerInfo& panner, const juce::File& file, uint64_t creationTimestamp);
     
     // Memory segment discovery
     std::vector<std::string> findPannerMemorySegments();
@@ -180,6 +189,10 @@ private:
     static constexpr int SCAN_INTERVAL_MS = 250;     // Scan for new panners at 4 Hz
     static constexpr int UPDATE_INTERVAL_MS = 100;   // Update existing panners every 100ms
     static constexpr int PANNER_TIMEOUT_MS = 30000;  // Consider inactive after 30 seconds (process-based check is more reliable)
+    // Remap detection: no new blocks through our mapping for this long, while
+    // the file on disk is being actively touched, means the producer recreated
+    // the segment (new inode) behind our back and we must remap.
+    static constexpr int REMAP_STALE_MS = 2500;
     
     // Search paths for M1MemoryShare files
     static const std::vector<std::string> MEMORY_SEARCH_PATHS;

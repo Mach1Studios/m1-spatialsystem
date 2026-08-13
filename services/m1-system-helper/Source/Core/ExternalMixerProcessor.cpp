@@ -83,8 +83,6 @@ PerPannerEncoder& ExternalMixerProcessor::getOrCreateEncoder(uint64_t instanceKe
 }
 
 void ExternalMixerProcessor::configureEncoder(PerPannerEncoder& enc, const MemorySharePannerInfo& panner, int numSamples) {
-    auto& e = *enc.m1Encode;
-    
     int inputMode  = panner.getInputMode();
     int outputMode = panner.getOutputMode();
     int pannerMode = 0; // default IsotropicLinear
@@ -95,12 +93,26 @@ void ExternalMixerProcessor::configureEncoder(PerPannerEncoder& enc, const Memor
         bool equalpower = false;
         if (panner.parameters.boolParams.count(M1SystemHelperParameterIDs::EQUALPOWER_MODE))
             equalpower = panner.parameters.boolParams.at(M1SystemHelperParameterIDs::EQUALPOWER_MODE);
-        
+
         if (equalpower)       pannerMode = IsotropicEqualPower;
         else if (isotropic)   pannerMode = IsotropicLinear;
         else                  pannerMode = PeriphonicLinear;
     }
-    
+
+    // Mode changes resize the SDK's gain matrix, but encodeBuffer's crossfade
+    // history (last_gains) only re-seeds when the point count changes; an
+    // output-mode switch with an unchanged point count reads past the old
+    // inner vectors and crashes. Rebuild for a clean history instead.
+    if ((enc.lastInputMode != -1 && inputMode != enc.lastInputMode)
+        || (enc.lastOutputMode != -1 && outputMode != enc.lastOutputMode)) {
+        enc.m1Encode = std::make_unique<Mach1Encode<float>>();
+        enc.lastInputMode = -1;
+        enc.lastOutputMode = -1;
+        enc.lastPannerMode = -1;
+    }
+
+    auto& e = *enc.m1Encode;
+
     // Only reconfigure modes when they change to avoid unnecessary recalculation
     if (inputMode != enc.lastInputMode) {
         e.setInputMode(static_cast<Mach1EncodeInputMode>(inputMode));
@@ -176,7 +188,8 @@ void ExternalMixerProcessor::processMemorySharePanners(int numSamples) {
         streamingReadBuffer.setSize(spatialChannelCount, numSamples, false, true, false);
     
     for (const auto& pannerInfo : panners) {
-        if (!pannerInfo.isConnected || !pannerInfo.memoryShare || !pannerInfo.memoryShare->isValid())
+        auto share = pannerInfo.getShare();
+        if (!pannerInfo.isConnected || !share || !share->isValid())
             continue;
         
         streamingReadBuffer.clear();
@@ -185,7 +198,7 @@ void ExternalMixerProcessor::processMemorySharePanners(int numSamples) {
         // always wants the freshest audio; sequential draining is the capture
         // engine's job.
         M1MemoryShare::SharedBlock block;
-        if (!pannerInfo.memoryShare->readLatestBlock(block))
+        if (!share->readLatestBlock(block))
             continue;
         
         const int blockChannels = block.audio.getNumChannels();

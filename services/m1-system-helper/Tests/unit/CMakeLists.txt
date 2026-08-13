@@ -27,6 +27,8 @@ target_sources(m1-system-helper-tests PRIVATE
         ${CMAKE_SOURCE_DIR}/Source/Core/CoverageModel.cpp
         ${CMAKE_SOURCE_DIR}/Source/Core/ExportEngine.cpp
         ${CMAKE_SOURCE_DIR}/Source/Core/StorageGovernor.cpp
+        # Frozen-transport capture dedup: exercised by the capture integration test
+        ${CMAKE_SOURCE_DIR}/Source/Core/CaptureEngine.cpp
         # Live mix render clock (P2): exercised by the MixBus integration test
         ${CMAKE_SOURCE_DIR}/Source/Core/MixEngine.cpp)
 

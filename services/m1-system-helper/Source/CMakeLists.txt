@@ -30,8 +30,6 @@ set(CORE_SOURCES
     Core/EventSystem.h
     Core/ConfigManager.h
     Core/ConfigManager.cpp
-    Core/AudioStreaming.h
-    Core/AudioStreaming.cpp
     Core/ExternalMixerProcessor.h
     Core/ExternalMixerProcessor.cpp
     Core/CoverageModel.h

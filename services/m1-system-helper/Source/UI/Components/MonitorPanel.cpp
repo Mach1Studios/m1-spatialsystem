@@ -577,12 +577,17 @@ void MonitorPanel::paint(juce::Graphics& g)
 
     if (currentState.monitors.empty())
     {
-        g.setColour(textColour.withAlpha(0.5f));
-        g.setFont(juce::Font(10.0f));
-        g.drawText("No active monitor instances connected",
-                   footer,
-                   juce::Justification::centred,
-                   true);
+        // Streaming-with-no-monitor gets a full overlay in paintOverChildren();
+        // here just handle the idle case with an actionable footer note.
+        if (currentState.streamingPanners == 0)
+        {
+            g.setColour(textColour.withAlpha(0.5f));
+            g.setFont(juce::Font(10.0f));
+            g.drawText("No M1-Monitor connected - add one to a stereo track in your DAW",
+                       footer,
+                       juce::Justification::centred,
+                       true);
+        }
         return;
     }
 
@@ -597,6 +602,51 @@ void MonitorPanel::paint(juce::Graphics& g)
         line += formatChannelCountLabel(currentState.channelCount);
         g.drawText(line, footer, juce::Justification::centred, true);
     }
+}
+
+void MonitorPanel::paintOverChildren(juce::Graphics& g)
+{
+    // The audible path always ends at an M1-Monitor plugin inside the DAW
+    // (the helper never opens an audio device). With panners streaming and no
+    // monitor connected, a mix is being produced that nobody can hear - scrim
+    // the disabled controls and say exactly what to do about it.
+    if (embeddedMonitor != nullptr
+        || !currentState.monitors.empty()
+        || currentState.streamingPanners == 0)
+        return;
+
+    auto body = getLocalBounds();
+    g.setColour(HelperUIColours::background.withAlpha(0.8f));
+    g.fillRect(body);
+
+    body = body.reduced(10, 6);
+    body.removeFromBottom(BOTTOM_BAR_HEIGHT);
+
+    const bool compact = body.getHeight() < 64;
+    const int headlineHeight = compact ? body.getHeight() : 20;
+
+    g.setColour(HelperUIColours::warning);
+    g.setFont(juce::Font(12.0f, juce::Font::bold));
+    g.drawText("NO M1-MONITOR IN THE DAW SESSION",
+               compact ? body : body.removeFromTop(body.getHeight() / 2).removeFromBottom(headlineHeight),
+               juce::Justification::centred,
+               true);
+    if (compact)
+        return;
+
+    g.setFont(juce::Font(10.0f));
+    g.setColour(HelperUIColours::warning.withAlpha(0.85f));
+    g.drawText("Receiving audio from " + juce::String(currentState.streamingPanners)
+                   + (currentState.streamingPanners == 1 ? " panner" : " panners")
+                   + ", but nothing can play the spatial mix.",
+               body.removeFromTop(16),
+               juce::Justification::centred,
+               true);
+    g.setColour(textColour.withAlpha(0.9f));
+    g.drawText("Add an M1-Monitor to a stereo track (e.g. the master bus) in your DAW to hear it.",
+               body.removeFromTop(16),
+               juce::Justification::centred,
+               true);
 }
 
 void MonitorPanel::resized()

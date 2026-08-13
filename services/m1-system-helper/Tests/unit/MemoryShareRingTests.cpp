@@ -420,6 +420,78 @@ void testOversizedBlockIsRefusedNotCorrupted()
     RCHECK(!seg.reader->readNextBlockForConsumer(kConsumerId, block));
 }
 
+// Recreating a segment over a leftover file (crashed writer) must start from
+// a fresh, correctly-sized file: FileOutputStream appends to existing files,
+// so without the delete-first behavior the file doubled in size and the new
+// ring geometry landed after 1MB of stale bytes.
+void testRecreateOverLeftoverFileStartsFresh()
+{
+    const juce::File path = makeTempSegmentPath("recreate");
+
+    {
+        // "Crashed" writer: persistent=true leaves the file behind
+        M1MemoryShare first("ring-test", 1024 * 1024, /*persistent*/ true,
+                            /*createMode*/ true, path.getFullPathName().toStdString());
+        RCHECK(first.isValid());
+        RCHECK(first.initializeForAudio(kSampleRate, 2, kBlockSamples));
+        RCHECK(writeMarkedBlock(first, 1.0) == 1);
+    }
+    RCHECK(path.exists());
+    const juce::int64 firstSize = path.getSize();
+
+    // New writer over the leftover: same size, fresh ring (write cursor reset)
+    M1MemoryShare second("ring-test", 1024 * 1024, /*persistent*/ false,
+                         /*createMode*/ true, path.getFullPathName().toStdString());
+    RCHECK(second.isValid());
+    RCHECK(second.initializeForAudio(kSampleRate, 2, kBlockSamples));
+    RCHECK(path.getSize() == firstSize);
+    RCHECK(second.getWriteCursor() == 0);
+
+    RCHECK(second.registerConsumer(kConsumerId));
+    RCHECK(writeMarkedBlock(second, 7.0) == 1);
+    M1MemoryShare::SharedBlock block;
+    RCHECK(second.readNextBlockForConsumer(kConsumerId, block));
+    RCHECK(block.audio.getSample(0, 0) == 7.0f);
+}
+
+// Sample-accurate start positions: when the writer supplies the host's
+// timeInSamples it must round-trip exactly, and the seconds*rate fallback
+// must round (not truncate). A truncated fallback drifted +/-1 sample per
+// block, which put an audible click at nearly every block boundary of an
+// exported capture.
+void testStartSamplePositionIsSampleAccurate()
+{
+    Segment seg("samplepos");
+    RCHECK(seg.reader->registerConsumer(kConsumerId));
+
+    juce::AudioBuffer<float> audio(2, kBlockSamples);
+    audio.clear();
+    ParameterMap params;
+    params.addFloat(M1SystemHelperParameterIDs::AZIMUTH, 0.0f);
+
+    // Explicit sample position wins over the seconds-derived one
+    const int64_t exactPos = 123456789;
+    RCHECK(seg.writer->writeAudioBufferWithGenericParameters(
+               audio, params, 1, /*playheadSeconds*/ 0.999, /*isPlaying*/ true,
+               /*blockWhenBehind*/ false, /*updateSource*/ 1, kSampleRate,
+               exactPos) != 0);
+
+    // Fallback: seconds chosen so seconds*rate lands at 511.99999...; the old
+    // truncation produced 511 (one sample early = seam), rounding gives 512.
+    const double seconds = static_cast<double>(kBlockSamples) / kSampleRate;
+    RCHECK(seg.writer->writeAudioBufferWithGenericParameters(
+               audio, params, 2, seconds * 0.9999999999, /*isPlaying*/ true,
+               /*blockWhenBehind*/ false, /*updateSource*/ 1, kSampleRate,
+               /*playheadPositionSamples*/ -1) != 0);
+
+    M1MemoryShare::SharedBlock block;
+    RCHECK(seg.reader->readNextBlockForConsumer(kConsumerId, block));
+    RCHECK(block.startSamplePosition == exactPos);
+
+    RCHECK(seg.reader->readNextBlockForConsumer(kConsumerId, block));
+    RCHECK(block.startSamplePosition == kBlockSamples);
+}
+
 } // namespace
 
 int runMemoryShareRingTests()
@@ -434,6 +506,8 @@ int runMemoryShareRingTests()
     testGarbageSegmentIsRejected();
     testGeometryReinitResetsRing();
     testOversizedBlockIsRefusedNotCorrupted();
+    testRecreateOverLeftoverFileStartsFresh();
+    testStartSamplePositionIsSampleAccurate();
 
     return ringFailures;
 }

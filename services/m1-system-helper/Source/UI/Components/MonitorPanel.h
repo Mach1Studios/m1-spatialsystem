@@ -18,6 +18,10 @@ struct MonitorPanelState {
     float pitch = 0.0f;
     float roll = 0.0f;
     int channelCount = 8;
+
+    // Panner feeds with audio arriving right now (MixEngine heartbeat count).
+    // Used to warn when a mix is being produced but no monitor can play it.
+    int streamingPanners = 0;
 };
 
 class MonitorPanel : public juce::Component {
@@ -26,6 +30,7 @@ public:
     ~MonitorPanel() override;
     
     void paint(juce::Graphics& g) override;
+    void paintOverChildren(juce::Graphics& g) override;
     void resized() override;
 
     void updateState(const MonitorPanelState& state);

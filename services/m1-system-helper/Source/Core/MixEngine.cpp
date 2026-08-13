@@ -51,6 +51,16 @@ MixEngine::Status MixEngine::getStatus() const
     {
         const juce::ScopedLock lock(m_feedsMutex);
         status.totalFeeds = static_cast<int>(m_feeds.size());
+
+        // Heartbeat count with a wider window than the render-pacing gate
+        // (STALL_TIMEOUT_MS) so momentary scheduling hiccups don't make the
+        // monitors' "streaming panners" report flap to zero and back.
+        const auto nowMs = juce::Time::currentTimeMillis();
+        for (const auto& [key, feed] : m_feeds)
+        {
+            if (feed->everReceived && (nowMs - feed->lastBlockWallMs) < 2000)
+                ++status.streamingFeeds;
+        }
     }
     return status;
 }
@@ -135,17 +145,20 @@ void MixEngine::syncFeedsWithTracker()
     // Add feeds for newly connected panners
     for (const auto& panner : tracker->getActivePanners())
     {
-        if (!panner.isConnected || panner.memoryShare == nullptr || !panner.memoryShare->isValid())
+        auto share = panner.getShare();
+        if (!panner.isConnected || share == nullptr || !share->isValid())
             continue;
+
+        // Dedicated consumer: the capture engine sequentially drains the same
+        // ring with its own cursor; the two must never share one. Checked for
+        // existing feeds too: a remapped segment (plugin recreated its .mem
+        // after a bus-width change) comes back without our registration.
+        if (!share->isConsumerRegistered(MIX_CONSUMER_ID))
+            share->registerConsumer(MIX_CONSUMER_ID);
 
         const uint64_t key = feedKey(panner.processId, panner.memoryAddress);
         if (m_feeds.count(key) != 0)
             continue;
-
-        // Dedicated consumer: the capture engine sequentially drains the same
-        // ring with its own cursor; the two must never share one.
-        if (!panner.memoryShare->isConsumerRegistered(MIX_CONSUMER_ID))
-            panner.memoryShare->registerConsumer(MIX_CONSUMER_ID);
 
         auto feed = std::make_unique<Feed>();
         feed->processId = panner.processId;
@@ -186,13 +199,16 @@ void MixEngine::drainFeeds()
     for (auto& [key, feed] : m_feeds)
     {
         auto* panner = tracker->findPanner(feed->processId, feed->memoryAddress);
-        if (panner == nullptr || panner->memoryShare == nullptr || !panner->memoryShare->isValid())
+        if (panner == nullptr)
+            continue;
+        auto share = panner->getShare();
+        if (share == nullptr || !share->isValid())
             continue;
 
         M1MemoryShare::SharedBlock block;
         int drained = 0;
         // Bounded drain so one chatty feed cannot monopolise the tick
-        while (drained < 64 && panner->memoryShare->readNextBlockForConsumer(MIX_CONSUMER_ID, block))
+        while (drained < 64 && share->readNextBlockForConsumer(MIX_CONSUMER_ID, block))
         {
             ++drained;
 
@@ -356,7 +372,6 @@ void MixEngine::renderOneBlock(uint32_t sampleRate)
 
 void MixEngine::configureFeedEncoder(Feed& feed)
 {
-    auto& e = *feed.encode;
     const auto& p = feed.params;
 
     const int inputMode = p.getInt(M1SystemHelperParameterIDs::INPUT_MODE, 0);
@@ -374,6 +389,23 @@ void MixEngine::configureFeedEncoder(Feed& feed)
     if (equalPower)      pannerMode = IsotropicEqualPower;
     else if (isotropic)  pannerMode = IsotropicLinear;
     else                 pannerMode = PeriphonicLinear;
+
+    // Mode changes resize the SDK's gain matrix, but encodeBuffer's internal
+    // crossfade history (last_gains) only re-seeds when the POINT count
+    // changes; an output switch with an unchanged point count (e.g. the
+    // helper's 8 -> 14 channel-config change) reads past the old inner
+    // vectors and crashes. A fresh encoder starts with empty history and
+    // re-seeds safely, at the cost of one un-smoothed block on a mode switch.
+    if ((feed.lastInputMode != -1 && inputMode != feed.lastInputMode)
+        || (feed.lastOutputMode != -1 && outputMode != feed.lastOutputMode))
+    {
+        feed.encode = std::make_unique<Mach1Encode<float>>();
+        feed.lastInputMode = -1;
+        feed.lastOutputMode = -1;
+        feed.lastPannerMode = -1;
+    }
+
+    auto& e = *feed.encode;
 
     if (inputMode != feed.lastInputMode)
     {

@@ -1,4 +1,5 @@
 #include "M1SystemHelperService.h"
+#include "Common/SharedPathUtils.h"
 
 namespace Mach1 {
 
@@ -61,7 +62,24 @@ M1SystemHelperService::M1SystemHelperService() {
     }
     
     DBG("Helper listening to port: " + juce::String(configManager->getHelperPort()));
-    
+
+    // P4: user-facing external renderer toggle. Load the persisted choice and
+    // wire persistence for future changes (tray menu / status window).
+    oscHandler->onExternalRendererChanged = [this](bool enabled) {
+        saveExternalRendererSetting(enabled);
+    };
+    oscHandler->setExternalRendererEnabled(loadExternalRendererSetting(), /*notifyChange*/ false);
+
+    // Plugins can ask us to reveal the status window over OSC (safe from the
+    // OSC thread: revealSessionWindow dispatches to the message thread).
+    oscHandler->onShowUIRequested = [this]() {
+        revealSessionWindow();
+    };
+
+    // P4: entitlement/permission sanity check - if we can't write the shared
+    // memory directory, no panner audio can ever reach us.
+    checkSharedMemoryDirWritable();
+
     // Register service for dependency injection
     Mach1::ServiceLocator::getInstance().registerService(eventSystem);
 }
@@ -91,7 +109,7 @@ void M1SystemHelperService::initialise() {
         DBG("[M1SystemHelperService] Started panner tracking manager");
     }
 
-    if (mixEngine) {
+    if (mixEngine && oscHandler->isExternalRendererEnabled()) {
         mixEngine->startEngine();
         DBG("[M1SystemHelperService] Started mix engine");
     }
@@ -194,6 +212,61 @@ void M1SystemHelperService::shutdown() {
 
 M1SystemHelperService::~M1SystemHelperService() {
     shutdown();
+}
+
+//==============================================================================
+// P4: external renderer toggle persistence + shared-dir sanity check
+
+juce::File M1SystemHelperService::getUserSettingsFile() {
+    // Per-user (writable) - the system-wide settings.json under
+    // commonApplicationDataDirectory is installed root-owned.
+    juce::File base = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory);
+    if ((juce::SystemStats::getOperatingSystemType() & juce::SystemStats::MacOSX) != 0)
+        base = base.getChildFile("Application Support");
+    return base.getChildFile("Mach1").getChildFile("helper-settings.json");
+}
+
+bool M1SystemHelperService::loadExternalRendererSetting() const {
+    const juce::File file = getUserSettingsFile();
+    if (!file.existsAsFile())
+        return true; // default: feature enabled
+
+    const auto json = juce::JSON::parse(file);
+    if (auto* obj = json.getDynamicObject())
+        return static_cast<bool>(obj->getProperty("externalRendererEnabled"));
+
+    return true;
+}
+
+void M1SystemHelperService::saveExternalRendererSetting(bool enabled) const {
+    const juce::File file = getUserSettingsFile();
+    file.getParentDirectory().createDirectory();
+
+    // Preserve any other keys already in the file
+    juce::var json = file.existsAsFile() ? juce::JSON::parse(file) : juce::var();
+    auto* obj = json.getDynamicObject();
+    if (obj == nullptr) {
+        json = juce::var(new juce::DynamicObject());
+        obj = json.getDynamicObject();
+    }
+    obj->setProperty("externalRendererEnabled", enabled);
+
+    if (!file.replaceWithText(juce::JSON::toString(json)))
+        DBG("[M1SystemHelperService] Failed to persist helper-settings.json");
+}
+
+void M1SystemHelperService::checkSharedMemoryDirWritable() {
+    const juce::File dir { juce::String(SharedPathUtils::getSharedMemoryDirectory()) };
+    sharedMemoryDirPath = dir.getFullPathName();
+    dir.createDirectory();
+
+    juce::File probe = dir.getChildFile(".m1-helper-write-probe");
+    sharedMemoryDirWritable = probe.replaceWithText("ok");
+    probe.deleteFile();
+
+    if (!sharedMemoryDirWritable)
+        DBG("[M1SystemHelperService] WARNING: shared memory directory is not writable: "
+            + sharedMemoryDirPath + " - streaming/capture cannot work");
 }
 
 } // namespace Mach1

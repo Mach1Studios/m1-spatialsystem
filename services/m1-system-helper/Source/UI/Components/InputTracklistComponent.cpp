@@ -150,14 +150,18 @@ void InputTracklistComponent::paintCell(juce::Graphics& g, int rowNumber, int co
     {
         juce::String statusText = getModeStatusText(panner);
         
-        // Set color based on status
-        if (statusText.containsIgnoreCase("streaming"))
-            g.setColour(streamingColour);
-        else if (statusText.containsIgnoreCase("native") || statusText.containsIgnoreCase("active"))
+        // Set color based on status. Order matters: "Multichannel (not
+        // streaming)" and "No audio received" must not match the generic
+        // "streaming" keyword below.
+        if (statusText.startsWithIgnoreCase("Multichannel"))
             g.setColour(nativeColour);
-        else if (statusText.containsIgnoreCase("stale"))
+        else if (statusText.startsWithIgnoreCase("No audio") || statusText.containsIgnoreCase("stale"))
             g.setColour(staleColour);
-        else if (statusText.containsIgnoreCase("offline"))
+        else if (statusText.containsIgnoreCase("streaming"))
+            g.setColour(streamingColour);
+        else if (statusText.startsWithIgnoreCase("Ready") || statusText.containsIgnoreCase("native") || statusText.containsIgnoreCase("active"))
+            g.setColour(nativeColour);
+        else if (statusText.containsIgnoreCase("offline") || statusText.containsIgnoreCase("disconnected"))
             g.setColour(offlineColour);
         else if (statusText.containsIgnoreCase("expired"))
             g.setColour(expiredColour);
@@ -336,13 +340,34 @@ juce::String InputTracklistComponent::getModeStatusText(const PannerInfo& panner
         {
             return "Offline";
         }
-        
+
+        // Block flow (audio or keepalive) is the real liveness signal: the
+        // scan bumps lastUpdateTime while the segment file merely exists, so
+        // it stays "fresh" even after the plugin stopped writing entirely.
+        if (panner.msSinceLastBlock < 0 || panner.msSinceLastBlock > 4000)
+        {
+            return "No audio received";
+        }
+
+        // The plugin reports it processes natively (multichannel bus) - it is
+        // alive and controllable, but audio is not expected to stream here.
+        if (!panner.externalStreamingActive)
+        {
+            return "Multichannel (not streaming)";
+        }
+
+        // Show the host's actual rate so an unexpected one (e.g. a Bluetooth
+        // headset dragging the DAW to 16/24 kHz) is visible before exporting.
+        const juce::String rateSuffix = panner.sampleRate > 0
+            ? " @ " + juce::String(panner.sampleRate / 1000.0, 1) + "k"
+            : juce::String();
+
         if (panner.isPlaying)
         {
-            return "Streaming";
+            return "Streaming" + rateSuffix;
         }
-        
-        return "Native";
+
+        return "Ready" + rateSuffix;
     }
     else
     {

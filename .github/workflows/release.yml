@@ -281,7 +281,7 @@ jobs:
             echo "Building without VST2 (SDK not available)"
             # Configure each project manually without VST2
             cmake m1-monitor -Bm1-monitor/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_AU=ON -DBUILD_VST=OFF -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF
-            cmake m1-panner -Bm1-panner/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_AU=ON -DBUILD_VST=OFF -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF
+            cmake m1-panner -Bm1-panner/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_AU=ON -DBUILD_VST=OFF -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF -DENABLE_EXTERNAL_RENDERER=ON
             cmake m1-player -Bm1-player/build -G "Xcode" -DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF || true
             cmake m1-orientationmanager -Bm1-orientationmanager/build
             cmake services/m1-system-helper -Bservices/m1-system-helper/build
@@ -597,7 +597,7 @@ jobs:
           else
             echo "Building without VST2 (SDK not available)"
             cmake m1-monitor -Bm1-monitor/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_AU=ON -DBUILD_VST=OFF -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF
-            cmake m1-panner -Bm1-panner/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_AU=ON -DBUILD_VST=OFF -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF
+            cmake m1-panner -Bm1-panner/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DBUILD_AU=ON -DBUILD_VST=OFF -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF -DENABLE_EXTERNAL_RENDERER=ON
             cmake m1-player -Bm1-player/build -G "Xcode" -DLIBVLC_BUILD_FROM_SOURCE=ON -DLIBVLC_STATIC=OFF || true
             cmake m1-orientationmanager -Bm1-orientationmanager/build
             cmake services/m1-system-helper -Bservices/m1-system-helper/build
@@ -956,7 +956,7 @@ jobs:
         shell: bash
         run: |
           cmake m1-monitor -Bm1-monitor/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF
-          cmake m1-panner -Bm1-panner/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF
+          cmake m1-panner -Bm1-panner/build -DBUILD_VST3=ON -DBUILD_AAX=ON -DJUCE_COPY_PLUGIN_AFTER_BUILD=OFF -DENABLE_EXTERNAL_RENDERER=ON
           
           # Only configure m1-player if VLC is available
           if [ -f "m1-player/build/vlc-install/lib/libvlc.lib" ]; then

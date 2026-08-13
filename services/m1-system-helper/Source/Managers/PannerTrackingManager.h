@@ -93,6 +93,17 @@ struct PannerInfo {
     // back through its block parameters (0 = never received an edit).
     int32_t controlRevision = 0;
 
+    // Milliseconds since the last block (audio or keepalive) arrived through
+    // the shared-memory mapping; -1 = OSC-only/unknown. The tracker bumps
+    // lastUpdateTime while the segment FILE merely exists, so only this can
+    // distinguish an alive plugin from one that stopped writing.
+    juce::int64 msSinceLastBlock = -1;
+
+    // The plugin's own report of whether it is streaming audio to the helper
+    // (external renderer mode). False = processing natively on a multichannel
+    // bus: keepalives still flow but no audio will arrive.
+    bool externalStreamingActive = true;
+
     bool operator==(const PannerInfo& other) const {
         return port == other.port && processId == other.processId;
     }
