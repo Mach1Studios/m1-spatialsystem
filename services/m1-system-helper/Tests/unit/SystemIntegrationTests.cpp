@@ -797,6 +797,73 @@ void testMixEngineEndToEnd()
            + std::to_string(engine.getStatus().blocksPublished - publishedBeforeFormatChange)
            + " blocks)");
 
+    // Re-open like a monitor reconnect and verify the published payload, not
+    // just the engine's status counter, really changed to 14 channels.
+    {
+        M1MemoryShare reader14(busName.toStdString(), 16 * 1024 * 1024,
+                               /*persistent*/ true, /*createMode*/ false,
+                               busFile.getFullPathName().toStdString());
+        const uint32_t consumer14 = 0x4D4F4E0E;
+        ICHECK(reader14.isValid() && reader14.isRingConfigured(),
+               "monitor reconnects after the 14-channel ring reconfiguration");
+        ICHECK(reader14.registerConsumer(consumer14),
+               "monitor consumer registers on the 14-channel bus");
+
+        bool saw14 = false;
+        const auto read14Deadline = juce::Time::currentTimeMillis() + 4000;
+        while (juce::Time::currentTimeMillis() < read14Deadline && !saw14)
+        {
+            M1MemoryShare::SharedBlock block;
+            while (reader14.readNextBlockForConsumer(consumer14, block))
+                saw14 |= block.audio.getNumChannels() == 14
+                      && block.audio.getNumSamples() == Mach1::MixEngine::MIX_BLOCK_SIZE;
+            manager.update();
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        }
+        ICHECK(saw14, "monitor receives real 14-channel blocks after 8 -> 14");
+        reader14.unregisterConsumer(consumer14);
+    }
+
+    // Exercise the reverse/downsizing path too. This catches stale encoder
+    // gain history and stale shared-memory ring geometry in either direction.
+    engine.setOutputFormat(4);
+    const uint64_t publishedBeforeDownsize = engine.getStatus().blocksPublished;
+    const auto downsizeDeadline = juce::Time::currentTimeMillis() + 6000;
+    while (juce::Time::currentTimeMillis() < downsizeDeadline
+           && !(engine.getStatus().busChannels == 4
+                && engine.getStatus().blocksPublished >= publishedBeforeDownsize + 20))
+    {
+        manager.update();
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
+    ICHECK(engine.getStatus().blocksPublished >= publishedBeforeDownsize + 20,
+           "bus keeps publishing after a live 14 -> 4 format change");
+
+    {
+        M1MemoryShare reader4(busName.toStdString(), 16 * 1024 * 1024,
+                              /*persistent*/ true, /*createMode*/ false,
+                              busFile.getFullPathName().toStdString());
+        const uint32_t consumer4 = 0x4D4F4E04;
+        ICHECK(reader4.isValid() && reader4.isRingConfigured(),
+               "monitor reconnects after the 4-channel ring reconfiguration");
+        ICHECK(reader4.registerConsumer(consumer4),
+               "monitor consumer registers on the 4-channel bus");
+
+        bool saw4 = false;
+        const auto read4Deadline = juce::Time::currentTimeMillis() + 4000;
+        while (juce::Time::currentTimeMillis() < read4Deadline && !saw4)
+        {
+            M1MemoryShare::SharedBlock block;
+            while (reader4.readNextBlockForConsumer(consumer4, block))
+                saw4 |= block.audio.getNumChannels() == 4
+                     && block.audio.getNumSamples() == Mach1::MixEngine::MIX_BLOCK_SIZE;
+            manager.update();
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        }
+        ICHECK(saw4, "monitor receives real 4-channel blocks after 14 -> 4");
+        reader4.unregisterConsumer(consumer4);
+    }
+
     keepStreaming.store(false);
     streamThread.join();
     engine.stopEngine();

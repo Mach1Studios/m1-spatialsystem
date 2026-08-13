@@ -44,9 +44,41 @@ env:
 
 jobs:
   # =============================================================================
+  # External Renderer / Native Host-Mode Regression Gate
+  # =============================================================================
+  renderer-mode-tests:
+    runs-on: macos-15
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 0
+
+      - name: Initialize build submodules
+        run: |
+          chmod +x .github/scripts/init-submodules.sh 2>/dev/null || true
+          .github/scripts/init-submodules.sh || \
+            git submodule update --init --recursive --depth 1
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Install Ninja
+        run: brew install ninja
+
+      - name: Test external renderer and native host modes
+        run: make test-external-renderer
+
+  # =============================================================================
   # macOS ARM64 Build (Apple Silicon)
   # =============================================================================
   build-macos-arm64:
+    needs: renderer-mode-tests
     if: ${{ github.event.inputs.build_macos_arm64 != 'false' }}
     runs-on: macos-15  # ARM64 runner
     timeout-minutes: 180
@@ -384,6 +416,7 @@ jobs:
   # macOS x86_64 Build (Intel) - for m1-player only
   # =============================================================================
   build-macos-x86:
+    needs: renderer-mode-tests
     if: ${{ github.event.inputs.build_macos_x86 != 'false' }}
     runs-on: macos-15-intel  # Intel runner
     timeout-minutes: 180
@@ -682,6 +715,7 @@ jobs:
   # Windows Build
   # =============================================================================
   build-windows:
+    needs: renderer-mode-tests
     if: ${{ github.event.inputs.build_windows != 'false' }}
     # Pin until SimpleBLE is updated for the VS 2026 toolchain used by windows-latest.
     runs-on: windows-2022

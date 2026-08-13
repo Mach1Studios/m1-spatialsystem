@@ -1,0 +1,55 @@
+name: External Renderer Tests
+
+on:
+  pull_request:
+    paths:
+      - "Makefile"
+      - ".github/workflows/external-renderer-tests.yml"
+      - "m1-monitor"
+      - "m1-panner"
+      - "services/m1-system-helper/**"
+  push:
+    branches:
+      - main
+      - master
+      - "feature/**"
+    paths:
+      - "Makefile"
+      - ".github/workflows/external-renderer-tests.yml"
+      - "m1-monitor"
+      - "m1-panner"
+      - "services/m1-system-helper/**"
+  workflow_dispatch:
+
+concurrency:
+  group: external-renderer-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  host-mode-regressions:
+    runs-on: macos-15
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 0
+
+      - name: Initialize build submodules
+        run: |
+          chmod +x .github/scripts/init-submodules.sh 2>/dev/null || true
+          .github/scripts/init-submodules.sh || \
+            git submodule update --init --recursive --depth 1
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Install Ninja
+        run: brew install ninja
+
+      - name: Test streaming and native multichannel modes
+        run: make test-external-renderer

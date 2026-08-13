@@ -1471,16 +1471,27 @@ test-plugins: test-monitor test-panner
 #  - m1-system-helper: TCP-based orientation-manager detection + targeted
 #    plugin registration replies (no O(N^2) broadcast)
 #  - m1-orientationmanager: device reconnect + drop-detection state handling
-.PHONY: test-unit
-test-unit:
-	@echo "=== m1-panner unit tests ==="
+.PHONY: test-external-renderer test-unit
+test-external-renderer:
+	@echo "=== m1-monitor host-mode unit tests ==="
+	cmake m1-monitor -Bm1-monitor/build-tests -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBUILD_UNIT_TESTS=ON -DBUILD_VST3=ON -DBUILD_AAX=OFF -DBUILD_AU=OFF -DBUILD_VST=OFF -DBUILD_STANDALONE=OFF -DENABLE_VST2_COMPATIBILITY=OFF
+	cmake --build m1-monitor/build-tests --target M1-Monitor_VST3 m1-monitor-mode-tests
+	cd m1-monitor/build-tests && ctest --output-on-failure -R m1-monitor-mode
+	@echo "=== m1-panner unit tests (external renderer enabled) ==="
 	cmake m1-panner -Bm1-panner/build-tests -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBUILD_UNIT_TESTS=ON -DBUILD_VST3=ON -DBUILD_AAX=OFF -DBUILD_AU=OFF -DBUILD_VST=OFF -DBUILD_STANDALONE=OFF -DENABLE_VST2_COMPATIBILITY=OFF -DENABLE_EXTERNAL_RENDERER=ON
-	cmake --build m1-panner/build-tests --target m1-panner-policy-tests
+	cmake --build m1-panner/build-tests --target M1-Panner_VST3 m1-panner-policy-tests
 	cd m1-panner/build-tests && ctest --output-on-failure -R m1-panner-policy
+	@echo "=== m1-panner unit tests (native multichannel build) ==="
+	cmake m1-panner -Bm1-panner/build-tests-native -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBUILD_UNIT_TESTS=ON -DBUILD_VST3=ON -DBUILD_AAX=OFF -DBUILD_AU=OFF -DBUILD_VST=OFF -DBUILD_STANDALONE=OFF -DENABLE_VST2_COMPATIBILITY=OFF -DENABLE_EXTERNAL_RENDERER=OFF
+	cmake --build m1-panner/build-tests-native --target M1-Panner_VST3 m1-panner-policy-tests
+	cd m1-panner/build-tests-native && ctest --output-on-failure -R m1-panner-policy
 	@echo "=== m1-system-helper unit tests ==="
 	cmake services/m1-system-helper -Bservices/m1-system-helper/build-tests -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBUILD_UNIT_TESTS=ON
-	cmake --build services/m1-system-helper/build-tests --target m1-system-helper-tests
+	cmake --build services/m1-system-helper/build-tests --target m1-system-helper m1-system-helper-tests
 	cd services/m1-system-helper/build-tests && ctest --output-on-failure -R m1-system-helper-unit
+	@echo "External renderer and native host-mode tests passed!"
+
+test-unit: test-external-renderer
 	@echo "=== m1-orientationmanager unit tests ==="
 	cmake m1-orientationmanager -Bm1-orientationmanager/build-tests -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBUILD_UNIT_TESTS=ON
 	cmake --build m1-orientationmanager/build-tests --target m1-orientationmanager-tests

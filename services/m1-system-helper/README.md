@@ -45,6 +45,23 @@ title. When disabled:
 
 The compile-time gate for the plugin side is the `ENABLE_EXTERNAL_RENDERER` CMake
 option in `m1-panner` (defaults ON; passed explicitly by the Makefile and CI).
+`make test-external-renderer` builds the panner policy tests with that option both
+ON and OFF, tests the monitor's host-vs-MixBus selection, and runs the helper's
+shared-memory/live-mix integration suite. Release CI must pass this gate before
+building any platform artifacts.
+
+### Host-mode behavior
+
+- **Mono/stereo panner + narrow monitor bus:** the panner streams source audio,
+  the helper encodes and publishes the MixBus, and the monitor decodes it.
+- **4/8/14-channel host buses:** panner and monitor process the host's native
+  multichannel audio. The panner keeps a parameter-only heartbeat so it remains
+  visible and controllable in the helper; its status reads
+  `Multichannel (not streaming)` to make clear that helper capture/export is not
+  receiving that track's audio.
+- A live format change (4/8/14) rebuilds each helper feed encoder before the next
+  block, then reconfigures the MixBus ring. Regression tests exercise real
+  8-to-14 and 14-to-4 payloads, not only status values.
 
 ### Stale shared-memory policy
 
@@ -55,6 +72,11 @@ MixBus segment is excluded from the sweep (it is recreated on startup and remove
 clean shutdown). Captured session data on disk is governed separately by the
 StorageGovernor policies (never touches sessions with live writers or pinned
 projects).
+
+On macOS, CMake validates that the panner, monitor, and helper entitlement files all
+contain the same `group.com.mach1.spatial.shared` application group. At runtime the
+helper also creates and removes a write probe in the resolved shared-memory
+directory; failures appear in diagnostics and the tray menu.
 
 ## Setup
 

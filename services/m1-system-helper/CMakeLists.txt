@@ -141,12 +141,25 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ../../m1-player/Modules
 
 ### setup info.plist and entitlements for macos
 if(APPLE)
+    set(MACH1_ENTITLEMENTS_FILE "${CMAKE_CURRENT_SOURCE_DIR}/Resources/macos/entitlements.mac.plist")
+    if(NOT EXISTS "${MACH1_ENTITLEMENTS_FILE}")
+        message(FATAL_ERROR "External renderer requires ${MACH1_ENTITLEMENTS_FILE}")
+    endif()
+    file(READ "${MACH1_ENTITLEMENTS_FILE}" MACH1_ENTITLEMENTS_CONTENT)
+    string(FIND "${MACH1_ENTITLEMENTS_CONTENT}"
+                "<string>${MACH1_SHARED_APP_GROUP_ID}</string>"
+                MACH1_APP_GROUP_MATCH)
+    if(MACH1_APP_GROUP_MATCH EQUAL -1)
+        message(FATAL_ERROR
+            "m1-system-helper entitlement must include app group ${MACH1_SHARED_APP_GROUP_ID}")
+    endif()
+
     set_target_properties("${CMAKE_PROJECT_NAME}" PROPERTIES
         MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Resources/macos/Info.plist"
         MACOSX_BUNDLE_BUNDLE_NAME ${CMAKE_PROJECT_NAME}
         MACOSX_FRAMEWORK_IDENTIFIER ${CUSTOM_BUNDLE_ID}
         XCODE_ATTRIBUTE_ENABLE_HARDENED_RUNTIME YES
-        XCODE_ATTRIBUTE_CODE_SIGN_ENTITLEMENTS "${CMAKE_CURRENT_SOURCE_DIR}/Resources/macos/entitlements.mac.plist"
+        XCODE_ATTRIBUTE_CODE_SIGN_ENTITLEMENTS "${MACH1_ENTITLEMENTS_FILE}"
         XCODE_ATTRIBUTE_INFOPLIST_KEY_LSApplicationCategoryType "public.app-category.utilities"
     )
     message(STATUS "Attaching Info.plist found at ${CMAKE_CURRENT_SOURCE_DIR}/Resources/macos/Info.plist")
