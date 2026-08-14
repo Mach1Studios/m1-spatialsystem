@@ -54,6 +54,7 @@ int runProjectPairingManagerTests()
         CHECK(named.displayName == "Feature Film: Final / Mix");
         CHECK(named.sessionId.startsWith("Feature_Film_Final_Mix_"));
         CHECK(!named.sessionId.containsAnyOf("\\/:*?\"<>|"));
+        manager.updateHostPannerCount(1001, 7);
 
         const auto other = manager.registerHostClaim(1002, secondId, "Trailer");
         CHECK(other.isNamed());
@@ -75,6 +76,11 @@ int runProjectPairingManagerTests()
         Mach1::ProjectPairingManager reloaded(registryFile);
         const auto bindings = reloaded.getKnownBindings();
         CHECK(bindings.size() == 2);
+        bool restoredPannerCount = false;
+        for (const auto& binding : bindings)
+            if (binding.bindingId == firstId && binding.pannerCount == 7)
+                restoredPannerCount = true;
+        CHECK(restoredPannerCount);
 
         // A restored named claim outranks a fresh generated ID after restart.
         CHECK(!reloaded.registerHostClaim(2001,

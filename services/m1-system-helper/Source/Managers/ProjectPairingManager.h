@@ -14,6 +14,7 @@ struct ProjectBinding
     juce::String displayName;
     juce::String sessionId;
     juce::int64 lastUsedMs = 0;
+    int pannerCount = -1; // unknown until the session has streamed in this helper version
 
     bool isValid() const { return bindingId.isNotEmpty(); }
     bool isNamed() const { return isValid() && displayName.isNotEmpty() && sessionId.isNotEmpty(); }
@@ -52,6 +53,7 @@ public:
     ProjectBinding getHostBinding(uint32_t hostProcessId) const;
     std::vector<ProjectBinding> getKnownBindings() const;
     bool isHostAmbiguous(uint32_t hostProcessId) const;
+    void updateHostPannerCount(uint32_t hostProcessId, int pannerCount);
 
     /** Writes a dirty registry. Call from a non-audio/message-service thread. */
     void flushIfNeeded();

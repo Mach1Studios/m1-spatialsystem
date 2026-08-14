@@ -432,6 +432,8 @@ std::vector<ProjectSessionOverlay::HostOption> SessionMainComponent::getStreamin
     std::vector<ProjectSessionOverlay::HostOption> hosts;
     for (const auto& [processId, count] : countsByProcess)
     {
+        projectPairingManager.updateHostPannerCount(processId, count);
+
         ProjectSessionOverlay::HostOption option;
         option.processId = processId;
         option.streamingPanners = count;

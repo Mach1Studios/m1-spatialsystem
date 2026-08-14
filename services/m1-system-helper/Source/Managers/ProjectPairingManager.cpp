@@ -92,6 +92,8 @@ ProjectBinding& ProjectPairingManager::ensureBindingLocked(const juce::String& b
     }
 
     binding.lastUsedMs = juce::Time::currentTimeMillis();
+    if (binding.isNamed())
+        dirty = true;
     return binding;
 }
 
@@ -225,6 +227,28 @@ bool ProjectPairingManager::isHostAmbiguous(uint32_t hostProcessId) const
     return ambiguousHostProcesses.count(hostProcessId) != 0;
 }
 
+void ProjectPairingManager::updateHostPannerCount(uint32_t hostProcessId, int pannerCount)
+{
+    if (hostProcessId == 0)
+        return;
+
+    const juce::ScopedLock lock(mutex);
+    const auto host = bindingIdByHostProcess.find(hostProcessId);
+    if (host == bindingIdByHostProcess.end())
+        return;
+
+    const auto binding = bindingsById.find(host->second);
+    if (binding == bindingsById.end())
+        return;
+
+    const int count = juce::jmax(0, pannerCount);
+    if (binding->second.pannerCount != count)
+    {
+        binding->second.pannerCount = count;
+        dirty = binding->second.isNamed() || dirty;
+    }
+}
+
 void ProjectPairingManager::load()
 {
     if (!registryFile.existsAsFile())
@@ -252,6 +276,9 @@ void ProjectPairingManager::load()
         binding.sessionId = object->getProperty("sessionId").toString();
         binding.lastUsedMs = static_cast<juce::int64>(
             static_cast<juce::int64>(object->getProperty("lastUsedMs")));
+        binding.pannerCount = object->hasProperty("pannerCount")
+            ? juce::jmax(0, static_cast<int>(object->getProperty("pannerCount")))
+            : -1;
 
         if (binding.bindingId.isEmpty() || binding.displayName.isEmpty())
             continue;
@@ -285,6 +312,7 @@ void ProjectPairingManager::flushIfNeeded()
             object->setProperty("displayName", binding.displayName);
             object->setProperty("sessionId", binding.sessionId);
             object->setProperty("lastUsedMs", binding.lastUsedMs);
+            object->setProperty("pannerCount", binding.pannerCount);
             entries.add(juce::var(object));
         }
         root->setProperty("bindings", entries);
