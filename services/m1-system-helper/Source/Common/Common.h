@@ -1,11 +1,11 @@
 #pragma once
 
 #include <JuceHeader.h>
-#include <string>
-#include <vector>
-#include <memory>
 #include <functional>
+#include <memory>
+#include <string>
 #include <unordered_map>
+#include <vector>
 
 namespace Mach1 {
 
@@ -98,10 +98,16 @@ struct M1RegisteredPlugin {
     // receiving every broadcast. High-rate cosmetic updates (monitor
     // orientation for the UI overlay) are skipped when this is false.
     bool hasEditorOpen = true;
+    // Backward-compatible registration metadata used to pair every plugin in
+    // one DAW project with the same helper capture session.
+    uint32_t hostProcessId = 0;
+    juce::String projectBindingId;
+    juce::String projectDisplayName;
+    juce::String pluginInstanceId;
     juce::int64 time = 0;
-    
+
     std::shared_ptr<juce::OSCSender> messageSender;
-    
+
     bool operator==(const M1RegisteredPlugin& other) const {
         return port == other.port;
     }
@@ -111,8 +117,12 @@ struct M1OrientationClientConnection {
     int port = 0;
     ClientType type = ClientType::Unknown;
     bool active = false;
+    uint32_t hostProcessId = 0;
+    juce::String projectBindingId;
+    juce::String projectDisplayName;
+    juce::String pluginInstanceId;
     juce::int64 time = 0;
-    
+
     bool operator==(const M1OrientationClientConnection& other) const {
         return port == other.port;
     }

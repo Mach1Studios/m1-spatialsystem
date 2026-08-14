@@ -193,6 +193,11 @@ const std::vector<M1RegisteredPlugin>& PluginManager::getPlugins() const {
     return plugins;
 }
 
+std::vector<M1RegisteredPlugin> PluginManager::getPluginsSnapshot() const {
+    const juce::ScopedLock lock(mutex);
+    return plugins;
+}
+
 bool PluginManager::hasActivePlugins() const {
     const juce::ScopedLock lock(mutex);
     return !plugins.empty();

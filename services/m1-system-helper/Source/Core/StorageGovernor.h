@@ -48,6 +48,7 @@ public:
     {
         juce::File directory;
         juce::String sessionId;          // directory name
+        juce::String displayName;        // project name from manifest, if available
         juce::int64 sizeBytes = 0;       // recursive size (chunks + exports)
         juce::int64 lastWrittenMs = 0;   // manifest lastWrittenMs, else dir mtime
         int streamCount = 0;

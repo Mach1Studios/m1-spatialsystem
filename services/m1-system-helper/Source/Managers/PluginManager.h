@@ -39,6 +39,7 @@ public:
     void cleanupInactivePlugins();
     
     const std::vector<M1RegisteredPlugin>& getPlugins() const;
+    std::vector<M1RegisteredPlugin> getPluginsSnapshot() const;
     bool hasActivePlugin(int port) const;
     void updatePluginTime(int port);
     size_t getPluginCount() const { return plugins.size(); }

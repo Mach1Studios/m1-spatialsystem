@@ -28,11 +28,13 @@ public:
     
     bool sendToAllClients(const juce::OSCMessage& msg);
     bool sendToClientsOfType(const juce::OSCMessage& msg, ClientType type);
+    bool sendToClient(int port, const juce::OSCMessage& msg);
     void activateClients();
     
     bool hasActiveClientOfType(int port, const juce::String& type) const;
     bool rotateMonitorToActive(int port);
     size_t getClientCount() const;
+    std::vector<M1OrientationClientConnection> getAllClientsSnapshot() const;
 
 private:
     std::vector<M1OrientationClientConnection> clients;

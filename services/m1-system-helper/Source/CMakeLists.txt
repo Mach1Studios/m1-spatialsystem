@@ -17,6 +17,7 @@ set(COMMON_SOURCES
     Common/SharedPathUtils.h
     Common/SharedPathUtils.cpp
     Common/StaleMemoryPolicy.h
+    Common/ProjectSessionPolicy.h
 )
 
 # Platform-specific files
@@ -65,6 +66,8 @@ set(MANAGER_SOURCES
     Managers/M1MemoryShareTracker.cpp
     Managers/OSCPannerTracker.h
     Managers/OSCPannerTracker.cpp
+    Managers/ProjectPairingManager.h
+    Managers/ProjectPairingManager.cpp
 )
 
 # UI files
@@ -89,6 +92,7 @@ set(UI_COMPONENT_SOURCES
     UI/Components/Panner3DViewPanel.cpp
     UI/Components/MonitorPanel.h
     UI/Components/MonitorPanel.cpp
+    UI/Components/ProjectSessionOverlay.h
 )
 
 # Combine all source files

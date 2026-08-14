@@ -7,6 +7,7 @@
 #include "Core/MixEngine.h"
 #include "Managers/ClientManager.h"
 #include "Managers/PluginManager.h"
+#include "Managers/ProjectPairingManager.h"
 #include "Managers/ServiceManager.h"
 #include "Managers/PannerTrackingManager.h"
 #include "Network/OSCHandler.h"
@@ -33,6 +34,7 @@ public:
     PluginManager& getPluginManager() { return *pluginManager; }
     ServiceManager& getServiceManager() { return *serviceManager; }
     OSCHandler& getOSCHandler() { return *oscHandler; }
+    ProjectPairingManager& getProjectPairingManager() { return *projectPairingManager; }
     
     // Panner tracking
     PannerTrackingManager& getPannerTrackingManager() { return *pannerTrackingManager; }
@@ -67,6 +69,7 @@ private:
     std::shared_ptr<EventSystem> eventSystem;
     std::unique_ptr<ClientManager> clientManager;
     std::unique_ptr<PluginManager> pluginManager;
+    std::unique_ptr<ProjectPairingManager> projectPairingManager;
     std::unique_ptr<ServiceManager> serviceManager;
     std::unique_ptr<ConfigManager> configManager;
     std::unique_ptr<OSCHandler> oscHandler;

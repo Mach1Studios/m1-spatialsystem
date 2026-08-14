@@ -185,6 +185,122 @@ struct MonitorSettingsCountingListener : public juce::OSCReceiver::Listener<juce
     }
 };
 
+struct ProjectBindingListener : public juce::OSCReceiver::Listener<juce::OSCReceiver::RealtimeCallback> {
+    std::atomic<int> receivedCount { 0 };
+    juce::CriticalSection mutex;
+    juce::String bindingId;
+    juce::String displayName;
+
+    void oscMessageReceived(const juce::OSCMessage& msg) override
+    {
+        if (msg.getAddressPattern() != "/m1-project-binding"
+            || msg.size() < 2 || !msg[0].isString() || !msg[1].isString())
+            return;
+
+        const juce::ScopedLock lock(mutex);
+        bindingId = msg[0].getString();
+        displayName = msg[1].getString();
+        ++receivedCount;
+    }
+};
+
+void testProjectBindingIsSharedWithinHostProcess()
+{
+    const auto testRoot = juce::File::getSpecialLocation(juce::File::tempDirectory)
+        .getChildFile("m1-project-osc-" + juce::Uuid().toString());
+    CHECK(testRoot.createDirectory());
+
+    auto eventSystem = std::make_shared<Mach1::EventSystem>();
+    Mach1::PluginManager pluginManager(eventSystem);
+    Mach1::ClientManager clientManager(eventSystem);
+    Mach1::ProjectPairingManager pairingManager(testRoot.getChildFile("bindings.json"));
+    auto* serviceManager = new Mach1::ServiceManager(46347);
+    Mach1::OSCHandler oscHandler(&clientManager, &pluginManager, serviceManager,
+                                 nullptr, nullptr, nullptr, &pairingManager);
+
+    int helperPort = 0;
+    for (int candidate = 46600; candidate < 46700; ++candidate)
+        if (oscHandler.startListening(candidate)) {
+            helperPort = candidate;
+            break;
+        }
+    CHECK(helperPort != 0);
+
+    juce::OSCReceiver receiverA, receiverB;
+    ProjectBindingListener listenerA, listenerB;
+    int portA = 0, portB = 0;
+    for (int candidate = 46700; candidate < 46800 && (portA == 0 || portB == 0); ++candidate) {
+        if (portA == 0 && receiverA.connect(candidate)) {
+            portA = candidate;
+            continue;
+        }
+        if (portB == 0 && receiverB.connect(candidate))
+            portB = candidate;
+    }
+    CHECK(portA != 0 && portB != 0);
+    receiverA.addListener(&listenerA);
+    receiverB.addListener(&listenerB);
+
+    juce::OSCSender sender;
+    CHECK(sender.connect("127.0.0.1", helperPort));
+    const juce::String firstId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const juce::String secondId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    constexpr int hostProcessId = 42424;
+
+    juce::OSCMessage registerA("/m1-register-plugin");
+    registerA.addInt32(portA);
+    registerA.addInt32(hostProcessId);
+    registerA.addString(firstId);
+    registerA.addString("");
+    registerA.addString("instance-a");
+    CHECK(sender.send(registerA));
+
+    juce::OSCMessage registerB("/m1-register-plugin");
+    registerB.addInt32(portB);
+    registerB.addInt32(hostProcessId);
+    registerB.addString(secondId);
+    registerB.addString("");
+    registerB.addString("instance-b");
+    CHECK(sender.send(registerB));
+
+    for (int i = 0; i < 100 && listenerB.receivedCount.load() < 1; ++i)
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+    {
+        const juce::ScopedLock lock(listenerB.mutex);
+        CHECK(listenerB.bindingId == firstId);
+    }
+
+    const int countABeforeName = listenerA.receivedCount.load();
+    const int countBBeforeName = listenerB.receivedCount.load();
+    const auto named = oscHandler.nameProjectForHost(hostProcessId, "Shared Session");
+    CHECK(named.bindingId == firstId);
+
+    for (int i = 0; i < 100
+         && (listenerA.receivedCount.load() <= countABeforeName
+             || listenerB.receivedCount.load() <= countBBeforeName); ++i)
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+    {
+        const juce::ScopedLock lockA(listenerA.mutex);
+        CHECK(listenerA.bindingId == firstId);
+        CHECK(listenerA.displayName == "Shared Session");
+    }
+    {
+        const juce::ScopedLock lockB(listenerB.mutex);
+        CHECK(listenerB.bindingId == firstId);
+        CHECK(listenerB.displayName == "Shared Session");
+    }
+
+    receiverA.removeListener(&listenerA);
+    receiverB.removeListener(&listenerB);
+    receiverA.disconnect();
+    receiverB.disconnect();
+    oscHandler.stopListening();
+    pairingManager.flushIfNeeded();
+    CHECK(testRoot.deleteRecursively());
+}
+
 // End-to-end stress test against the real OSCHandler over real UDP: many
 // registered panner instances while a monitor streams head-tracker
 // orientation. Guards the failure mode where every "/setMasterYPR" was
@@ -364,6 +480,8 @@ int runExportEngineTests();
 int runStorageGovernorTests();
 // Defined in SystemIntegrationTests.cpp; returns the number of failed checks.
 int runSystemIntegrationTests();
+// Defined in ProjectPairingManagerTests.cpp.
+int runProjectPairingManagerTests();
 
 int main()
 {
@@ -374,11 +492,13 @@ int main()
     testMonitorBroadcastThrottleRateLimitsStreams();
     testMonitorBroadcastThrottleDedupesAndForces();
     testStaleMemoryPolicyProtectsLiveSegments();
+    testProjectBindingIsSharedWithinHostProcess();
     testManyPannersUnderOrientationStorm();
 
     failures += runMemoryShareRingTests();
     failures += runExportEngineTests();
     failures += runStorageGovernorTests();
+    failures += runProjectPairingManagerTests();
     failures += runSystemIntegrationTests();
 
     if (failures == 0) {

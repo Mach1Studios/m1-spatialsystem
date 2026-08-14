@@ -12,7 +12,23 @@ juce::Result ClientManager::addClient(const M1OrientationClientConnection& clien
         [&client](const auto& existing) { return existing.port == client.port; });
         
     if (it != clients.end()) {
+        const bool wasActive = it->active;
+        *it = client;
+        it->active = wasActive;
         it->time = juce::Time::currentTimeMillis();
+
+        auto updateTypedClient = [&client, wasActive](auto& typedClients) {
+            auto typed = std::find_if(typedClients.begin(), typedClients.end(),
+                                      [&client](const auto& existing) {
+                                          return existing.port == client.port;
+                                      });
+            if (typed != typedClients.end()) {
+                *typed = client;
+                typed->active = wasActive;
+            }
+        };
+        updateTypedClient(monitors);
+        updateTypedClient(players);
         return juce::Result::ok();
     }
 
@@ -253,6 +269,17 @@ bool ClientManager::sendToClientsOfType(const juce::OSCMessage& msg, ClientType 
     return success;
 }
 
+bool ClientManager::sendToClient(int port, const juce::OSCMessage& msg) {
+    const juce::ScopedLock lock(mutex);
+    const auto it = std::find_if(clients.begin(), clients.end(),
+                                 [port](const auto& client) { return client.port == port; });
+    if (it == clients.end())
+        return false;
+
+    juce::OSCSender sender;
+    return sender.connect("127.0.0.1", port) && sender.send(msg);
+}
+
 std::vector<M1OrientationClientConnection> ClientManager::getClientsByType(ClientType type) const {
     const juce::ScopedLock lock(mutex);
     switch (type) {
@@ -263,6 +290,11 @@ std::vector<M1OrientationClientConnection> ClientManager::getClientsByType(Clien
 }
 
 const std::vector<M1OrientationClientConnection>& ClientManager::getAllClients() const {
+    return clients;
+}
+
+std::vector<M1OrientationClientConnection> ClientManager::getAllClientsSnapshot() const {
+    const juce::ScopedLock lock(mutex);
     return clients;
 }
 

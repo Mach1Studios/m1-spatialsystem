@@ -224,8 +224,11 @@ void PannerTrackingManager::mergeTrackingResults() {
             
             // Skip if a MemoryShare panner already covers this port
             bool alreadyCovered = false;
-            for (const auto& existing : foundPanners) {
+            for (auto& existing : foundPanners) {
                 if (existing.port == oscPanner.port && existing.isMemoryShareBased) {
+                    existing.pluginInstanceId = oscPanner.pluginInstanceId;
+                    existing.projectBindingId = oscPanner.projectBindingId;
+                    existing.projectDisplayName = oscPanner.projectDisplayName;
                     alreadyCovered = true;
                     break;
                 }
@@ -294,6 +297,12 @@ void PannerTrackingManager::mergeTrackingResults() {
                 existingPanner.controlRevision = foundPanner.controlRevision;
                 existingPanner.state = foundPanner.state;
                 existingPanner.color = foundPanner.color;
+                if (!foundPanner.pluginInstanceId.empty())
+                    existingPanner.pluginInstanceId = foundPanner.pluginInstanceId;
+                if (!foundPanner.projectBindingId.empty())
+                    existingPanner.projectBindingId = foundPanner.projectBindingId;
+                if (!foundPanner.projectDisplayName.empty())
+                    existingPanner.projectDisplayName = foundPanner.projectDisplayName;
                 existingPanner.lastUpdateTime = currentTime;
                 existingPanner.isActive = true;
                 existingPanner.connectionStatus = PannerConnectionStatus::Active;
@@ -655,7 +664,10 @@ PannerInfo PannerTrackingManager::convertFromOSC(const M1RegisteredPlugin& plugi
     // Identity
     panner.port = plugin.port;
     panner.name = plugin.name.empty() ? ("OSC Panner " + std::to_string(plugin.port)) : plugin.name;
-    panner.processId = 0;  // OSC doesn't provide process ID
+    panner.processId = plugin.hostProcessId;
+    panner.pluginInstanceId = plugin.pluginInstanceId.toStdString();
+    panner.projectBindingId = plugin.projectBindingId.toStdString();
+    panner.projectDisplayName = plugin.projectDisplayName.toStdString();
     
     // State
     panner.isActive = true;

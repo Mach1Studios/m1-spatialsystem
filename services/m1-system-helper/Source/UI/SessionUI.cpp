@@ -6,9 +6,12 @@
 
 #include "SessionUI.h"
 #include "BinaryData.h"
+#include "../Common/ProjectSessionPolicy.h"
 #include "../Core/ExportEngine.h"
 #include "../M1SystemHelperService.h"
 #include <Mach1Encode.h>
+#include <algorithm>
+#include <map>
 
 namespace Mach1 {
 
@@ -21,10 +24,16 @@ constexpr int kTrayMenuDelayMs = 50;
 // SessionMainComponent
 //==============================================================================
 
-SessionMainComponent::SessionMainComponent(PannerTrackingManager& manager, ClientManager& clientManagerRef, OSCHandler& oscHandlerRef, bool debugFakeBlocks, MixEngine* mixEngineRef)
+SessionMainComponent::SessionMainComponent(PannerTrackingManager& manager,
+                                           ClientManager& clientManagerRef,
+                                           OSCHandler& oscHandlerRef,
+                                           ProjectPairingManager& projectPairingManagerRef,
+                                           bool debugFakeBlocks,
+                                           MixEngine* mixEngineRef)
     : pannerManager(manager)
     , clientManager(clientManagerRef)
     , oscHandler(oscHandlerRef)
+    , projectPairingManager(projectPairingManagerRef)
     , mixEngine(mixEngineRef)
     , m_debugFakeBlocks(debugFakeBlocks)
 {
@@ -89,6 +98,30 @@ SessionMainComponent::SessionMainComponent(PannerTrackingManager& manager, Clien
             ? captureEngine->getSessionId() : juce::String();
     };
     addChildComponent(storageOverlay.get());
+
+    projectSessionOverlay = std::make_unique<ProjectSessionOverlay>();
+    projectSessionOverlay->onNameProject = [this](uint32_t hostProcessId,
+                                                  const juce::String& displayName) {
+        const auto binding = oscHandler.nameProjectForHost(hostProcessId, displayName);
+        if (binding.isNamed())
+        {
+            projectSessionOverlay->setVisible(false);
+            startCaptureForBinding(hostProcessId, binding);
+        }
+    };
+    projectSessionOverlay->onSelectProject = [this](uint32_t hostProcessId,
+                                                    const juce::String& bindingId) {
+        const auto binding = oscHandler.selectProjectForHost(hostProcessId, bindingId);
+        if (binding.isNamed())
+        {
+            projectSessionOverlay->setVisible(false);
+            startCaptureForBinding(hostProcessId, binding);
+        }
+    };
+    projectSessionOverlay->onDismiss = [this]() {
+        promptDismissedForThisWindowOpen = true;
+    };
+    addChildComponent(projectSessionOverlay.get());
     
     // Set up layout
     setupLayout();
@@ -128,8 +161,8 @@ void SessionMainComponent::setupCaptureEngine(bool debugFakeBlocks)
     // Connect to capture timeline panel
     captureTimelinePanel->setCaptureEngine(captureEngine.get());
     
-    // Auto-start capture with default session
-    startCapture();
+    // Capture starts only after a streaming host has a stable project binding.
+    // This prevents a new timestamp-named orphan every time the UI is opened.
 }
 
 bool SessionMainComponent::startCapture(const juce::String& sessionId)
@@ -151,6 +184,28 @@ bool SessionMainComponent::startCapture(const juce::String& sessionId)
     const juce::File captureRoot = StorageGovernor::getDefaultCaptureRoot();
     
     return captureEngine->startCapture(actualSessionId, captureRoot);
+}
+
+void SessionMainComponent::startCaptureForBinding(uint32_t hostProcessId,
+                                                  const ProjectBinding& binding)
+{
+    if (!captureEngine || !binding.isNamed() || hostProcessId == 0)
+        return;
+
+    if (captureEngine->isCapturing())
+        captureEngine->stopCapture();
+
+    StorageGovernor::migrateLegacyCaptures();
+    if (captureEngine->startCapture(binding.sessionId,
+                                    StorageGovernor::getDefaultCaptureRoot(),
+                                    hostProcessId,
+                                    binding.bindingId,
+                                    binding.displayName))
+    {
+        selectedHostProcessId = hostProcessId;
+        activeProjectBindingId = binding.bindingId;
+        promptDismissedForThisWindowOpen = false;
+    }
 }
 
 void SessionMainComponent::stopCapture()
@@ -345,6 +400,8 @@ void SessionMainComponent::resized()
         exportResultOverlay->setBounds(getLocalBounds());
     if (storageOverlay)
         storageOverlay->setBounds(getLocalBounds());
+    if (projectSessionOverlay)
+        projectSessionOverlay->setBounds(getLocalBounds());
 }
 
 void SessionMainComponent::paint(juce::Graphics& g)
@@ -356,6 +413,106 @@ void SessionMainComponent::timerCallback()
 {
     // Poll panner data regularly
     updateFromManager();
+    maybeResolveCaptureSession();
+}
+
+std::vector<ProjectSessionOverlay::HostOption> SessionMainComponent::getStreamingHosts() const
+{
+    std::map<uint32_t, int> countsByProcess;
+    for (const auto& panner : pannerManager.getActivePanners())
+    {
+        const bool isStreaming = m_debugFakeBlocks
+            || (panner.isMemoryShareBased
+                && panner.externalStreamingActive
+                && panner.connectionStatus != PannerConnectionStatus::Disconnected);
+        if (isStreaming && panner.processId != 0)
+            ++countsByProcess[panner.processId];
+    }
+
+    std::vector<ProjectSessionOverlay::HostOption> hosts;
+    for (const auto& [processId, count] : countsByProcess)
+    {
+        ProjectSessionOverlay::HostOption option;
+        option.processId = processId;
+        option.streamingPanners = count;
+        option.currentBinding = projectPairingManager.getHostBinding(processId);
+        option.ambiguous = projectPairingManager.isHostAmbiguous(processId);
+        hosts.push_back(std::move(option));
+    }
+    return hosts;
+}
+
+void SessionMainComponent::maybeResolveCaptureSession()
+{
+    if (!sessionWindowHasBeenShown || !captureEngine)
+        return;
+
+    const auto hosts = getStreamingHosts();
+    if (captureEngine->isCapturing())
+    {
+        const auto selected = std::find_if(hosts.begin(), hosts.end(), [this](const auto& host) {
+            return host.processId == selectedHostProcessId;
+        });
+        if (selected != hosts.end())
+            return;
+
+        // The same saved project can reopen under a new DAW PID. Rebind the
+        // capture filter to that process and continue in the same directory.
+        const auto reopened = std::find_if(hosts.begin(), hosts.end(), [this](const auto& host) {
+            return !host.ambiguous
+                && host.currentBinding.bindingId == activeProjectBindingId
+                && host.currentBinding.isNamed();
+        });
+        if (reopened != hosts.end())
+        {
+            startCaptureForBinding(reopened->processId, reopened->currentBinding);
+            return;
+        }
+
+        if (hosts.empty())
+            return; // host may be restarting; keep the session available to resume
+
+        captureEngine->stopCapture();
+        selectedHostProcessId = 0;
+        activeProjectBindingId.clear();
+    }
+
+    const auto action = ProjectSessionPolicy::chooseAction(
+        hosts.size(),
+        hosts.size() == 1 && hosts.front().currentBinding.isNamed(),
+        hosts.size() == 1 && hosts.front().ambiguous,
+        captureEngine->isCapturing());
+
+    if (action == ProjectSessionPolicy::Action::AutoStart)
+    {
+        startCaptureForBinding(hosts.front().processId, hosts.front().currentBinding);
+        return;
+    }
+
+    if (action == ProjectSessionPolicy::Action::Prompt
+        && !promptDismissedForThisWindowOpen
+        && projectSessionOverlay
+        && !projectSessionOverlay->isVisible())
+    {
+        projectSessionOverlay->open(hosts, projectPairingManager.getKnownBindings());
+    }
+}
+
+void SessionMainComponent::sessionWindowShown()
+{
+    sessionWindowHasBeenShown = true;
+    promptDismissedForThisWindowOpen = false;
+    maybeResolveCaptureSession();
+}
+
+void SessionMainComponent::showProjectSessionChooser()
+{
+    const auto hosts = getStreamingHosts();
+    if (hosts.empty() || !projectSessionOverlay)
+        return;
+
+    promptDismissedForThisWindowOpen = false;
+    projectSessionOverlay->open(hosts, projectPairingManager.getKnownBindings());
 }
 
 void SessionMainComponent::updateFromManager()
@@ -417,10 +574,13 @@ SessionUI::MyMenuBarModel::~MyMenuBarModel()
 // SessionUI
 //==============================================================================
 
-SessionUI::SessionUI(PannerTrackingManager& manager, ClientManager& clientManagerRef, OSCHandler& oscHandlerRef, bool debugFakeBlocks, MixEngine* mixEngineRef)
+SessionUI::SessionUI(PannerTrackingManager& manager, ClientManager& clientManagerRef,
+                     OSCHandler& oscHandlerRef, ProjectPairingManager& projectPairingManagerRef,
+                     bool debugFakeBlocks, MixEngine* mixEngineRef)
     : pannerManager(manager),
       clientManager(clientManagerRef),
       oscHandler(oscHandlerRef),
+      projectPairingManager(projectPairingManagerRef),
       mixEngine(mixEngineRef),
       lastPannerCount(-1),
       lastMemoryShareStatus(false),
@@ -545,6 +705,11 @@ void SessionUI::createMenu()
         DBG("[SessionUI] Open Status Window callback triggered!");
         showSessionWindow(); 
     });
+    trayMenu->addItem("Choose Streaming Session...", [this]() {
+        showSessionWindow();
+        if (mainComponent)
+            mainComponent->showProjectSessionChooser();
+    });
     trayMenu->addSeparator();
 
     // P4: user-facing external renderer toggle. Ticked = panners on
@@ -612,7 +777,9 @@ void SessionUI::showSessionWindow()
     if (!sessionWindow)
     {
         // Create the main component with debug flag
-        mainComponent = std::make_unique<SessionMainComponent>(pannerManager, clientManager, oscHandler, m_debugFakeBlocks, mixEngine);
+        mainComponent = std::make_unique<SessionMainComponent>(
+            pannerManager, clientManager, oscHandler, projectPairingManager,
+            m_debugFakeBlocks, mixEngine);
         
         // Create the window with darker background matching reference
         sessionWindow = std::make_unique<SessionDocumentWindow>(
@@ -633,6 +800,7 @@ void SessionUI::showSessionWindow()
     if (mainComponent)
     {
         mainComponent->updateFromManager();
+        mainComponent->sessionWindowShown();
     }
 }
 

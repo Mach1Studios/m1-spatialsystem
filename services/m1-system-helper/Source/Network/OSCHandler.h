@@ -4,6 +4,7 @@
 #include "../Common/MonitorBroadcastThrottle.h"
 #include "../Managers/ClientManager.h"
 #include "../Managers/PluginManager.h"
+#include "../Managers/ProjectPairingManager.h"
 #include "../Managers/ServiceManager.h"
 #include "../Managers/PannerTrackingManager.h"
 
@@ -26,7 +27,9 @@ class OSCHandler : public juce::OSCReceiver::Listener<juce::OSCReceiver::Realtim
                   public juce::Timer  // Add Timer
 {
 public:
-    OSCHandler(ClientManager* clientManager, PluginManager* pluginManager, ServiceManager* serviceManager, PannerTrackingManager* pannerTrackingManager, ExternalMixerProcessor* externalMixer, MixEngine* mixEngine = nullptr);
+    OSCHandler(ClientManager* clientManager, PluginManager* pluginManager, ServiceManager* serviceManager,
+               PannerTrackingManager* pannerTrackingManager, ExternalMixerProcessor* externalMixer,
+               MixEngine* mixEngine = nullptr, ProjectPairingManager* projectPairingManager = nullptr);
     ~OSCHandler() override;
 
     bool startListening(int port);
@@ -35,6 +38,8 @@ public:
     void applyMonitorOrientationFromUi(float yaw, float pitch, float roll);
     void applyMonitorModeFromUi(int mode);
     void applyChannelConfigFromUi(int channelCount);
+    ProjectBinding nameProjectForHost(uint32_t hostProcessId, const juce::String& displayName);
+    ProjectBinding selectProjectForHost(uint32_t hostProcessId, const juce::String& bindingId);
 
     // Tells every monitor client how many panner instances are currently
     // streaming audio into the helper (memory-share based). Called once per
@@ -81,6 +86,9 @@ private:
     // editor-reopen refresh).
     void sendCurrentMonitorStateToPlugin(int port);
     bool sendMessageToMonitorClient(int port, const juce::OSCMessage& message) const;
+    void broadcastProjectBinding(uint32_t hostProcessId, const ProjectBinding& binding);
+    void sendProjectBindingToPlugin(int port, const ProjectBinding& binding);
+    void sendProjectBindingToClient(int port, const ProjectBinding& binding);
     void pruneInactiveMonitorStates();
     
     // Message handlers
@@ -109,6 +117,7 @@ private:
     PannerTrackingManager* pannerTrackingManager;
     ExternalMixerProcessor* externalMixer;
     MixEngine* mixEngine;
+    ProjectPairingManager* projectPairingManager;
     
     juce::OSCReceiver receiver;
     using MessageHandler = std::function<void(const juce::OSCMessage&)>;

@@ -23,6 +23,29 @@ Inside the helper:
 - **MixEngine** is the live render clock: it re-encodes every streaming panner with
   its current parameters, sums the result into the configured spatial format, and
   publishes fixed-size blocks into the shared `M1SpatialSystem_MixBus.mem` segment.
+
+### Project pairing and session names
+
+M1-Panner and M1-Monitor each persist a `projectBindingId`, human-readable project
+name, and independent `pluginInstanceId` in the DAW plugin state. Registrations also
+include the current host process ID. The helper uses these signals as follows:
+
+- On a legacy/new project, the first plugin binding becomes a temporary host-process
+  anchor. Opening the helper while audio is streaming shows a custom prompt to name
+  that session or select a recent named session.
+- The selected binding is sent to every registered Panner and Monitor in that host
+  process. Saving the DAW project then persists the same binding in every instance.
+- Reopening the project under a new process ID resumes its stable capture directory
+  instead of creating another timestamp-named orphan.
+- Capture is filtered to the selected host process, so two simultaneously running
+  DAWs cannot write into one session. If one host process reports two different
+  named projects (for example multiple REAPER project tabs), the helper refuses to
+  merge them and asks the user to choose.
+
+Host process IDs are live leases only and are never used as persistent identity.
+The registry is stored per user in
+`Mach1/m1-system-helper/project-bindings.json`; capture manifests record the binding
+ID, display name, and current host-process lease for diagnostics.
   M1-Monitor instances on stereo-only buses read that segment (advertised via the
   `/m1-external-mixer-state` OSC heartbeat) and decode it with head-tracked
   orientation even though their host bus never carried the multichannel mix.

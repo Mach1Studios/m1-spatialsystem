@@ -95,6 +95,7 @@ StorageGovernor::Report StorageGovernor::scan(const juce::File& captureRoot,
         if (usage.hasManifest)
         {
             const auto manifest = juce::JSON::parse(manifestFile.loadFileAsString());
+            usage.displayName = manifest.getProperty("projectDisplayName", juce::var()).toString();
             usage.lastWrittenMs = static_cast<juce::int64>(manifest.getProperty("lastWrittenMs", 0.0));
             if (const auto* streams = manifest.getProperty("streams", juce::var()).getArray())
                 usage.streamCount = streams->size();

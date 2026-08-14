@@ -31,6 +31,7 @@ M1SystemHelperService::M1SystemHelperService() {
     // Initialize managers with configured ports
     clientManager = std::make_unique<ClientManager>(eventSystem);
     pluginManager = std::make_unique<PluginManager>(eventSystem);
+    projectPairingManager = std::make_unique<ProjectPairingManager>();
     serviceManager = std::make_unique<ServiceManager>(configManager->getServerPort());
     
     // Initialize new panner tracking manager
@@ -53,7 +54,8 @@ M1SystemHelperService::M1SystemHelperService() {
                                             serviceManager.get(),
                                             pannerTrackingManager.get(),
                                             externalMixer.get(),
-                                            mixEngine.get());
+                                            mixEngine.get(),
+                                            projectPairingManager.get());
     
     // Start listening on helper port
     if (!oscHandler->startListening(configManager->getHelperPort())) {
@@ -94,7 +96,8 @@ void M1SystemHelperService::ensureSessionUICreated()
     if (!showSessionUI || sessionUI || !pannerTrackingManager || !clientManager || !oscHandler)
         return;
 
-    sessionUI = std::make_unique<SessionUI>(*pannerTrackingManager, *clientManager, *oscHandler, debugFakeBlocks, mixEngine.get());
+    sessionUI = std::make_unique<SessionUI>(*pannerTrackingManager, *clientManager, *oscHandler,
+                                            *projectPairingManager, debugFakeBlocks, mixEngine.get());
     sessionUI->setVisible(true);
     DBG("[M1SystemHelperService] Created system tray icon on main thread");
 
@@ -145,6 +148,9 @@ void M1SystemHelperService::timerCallback() {
     if (pannerTrackingManager) {
         pannerTrackingManager->update();
     }
+
+    if (projectPairingManager)
+        projectPairingManager->flushIfNeeded();
     
     // Check for inactive clients
     const auto lastOrientationPulseTime = serviceManager->getLastOrientationManagerClientPulseTime();

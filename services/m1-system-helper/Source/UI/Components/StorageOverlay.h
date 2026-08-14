@@ -290,7 +290,8 @@ private:
 
             g.setColour(session.state == StorageGovernor::SessionState::Active
                             ? HelperUIColours::accentText : HelperUIColours::text);
-            g.drawText(session.sessionId, row.removeFromLeft(kNameColWidth), juce::Justification::centredLeft);
+            g.drawText(session.displayName.isNotEmpty() ? session.displayName : session.sessionId,
+                       row.removeFromLeft(kNameColWidth), juce::Justification::centredLeft);
 
             g.setColour(HelperUIColours::textDim);
             g.drawText(formatAge(session.lastWrittenMs), row.removeFromLeft(kAgeColWidth), juce::Justification::centredLeft);
@@ -334,7 +335,8 @@ private:
 
             auto row = content.removeFromTop(kLineHeight);
             g.setColour(HelperUIColours::text);
-            g.drawText(session.sessionId, row.removeFromLeft(kNameColWidth), juce::Justification::centredLeft);
+            g.drawText(session.displayName.isNotEmpty() ? session.displayName : session.sessionId,
+                       row.removeFromLeft(kNameColWidth), juce::Justification::centredLeft);
             g.setColour(HelperUIColours::textDim);
             g.drawText(formatAge(session.lastWrittenMs), row.removeFromLeft(kAgeColWidth), juce::Justification::centredLeft);
             g.setColour(HelperUIColours::text);

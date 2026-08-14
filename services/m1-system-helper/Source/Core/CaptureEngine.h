@@ -151,7 +151,10 @@ public:
      * @param sessionId Unique session identifier (e.g., project name + timestamp)
      * @param captureRoot Root directory for capture storage
      */
-    bool startCapture(const juce::String& sessionId, const juce::File& captureRoot);
+    bool startCapture(const juce::String& sessionId, const juce::File& captureRoot,
+                      uint32_t hostProcessId = 0,
+                      const juce::String& projectBindingId = {},
+                      const juce::String& projectDisplayName = {});
     
     /**
      * Stop capturing
@@ -167,6 +170,7 @@ public:
      * Get the current session ID
      */
     juce::String getSessionId() const { return m_sessionId; }
+    juce::String getProjectDisplayName() const { return m_projectDisplayName; }
     
     /**
      * Get the capture root directory
@@ -230,6 +234,9 @@ private:
     juce::String m_sessionId;
     juce::File m_captureRoot;
     juce::Time m_startTime;
+    uint32_t m_hostProcessId = 0;
+    juce::String m_projectBindingId;
+    juce::String m_projectDisplayName;
     
     // Per-panner capture state
     juce::CriticalSection m_stateMutex;

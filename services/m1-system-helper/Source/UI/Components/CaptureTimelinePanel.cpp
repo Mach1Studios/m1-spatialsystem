@@ -293,7 +293,10 @@ void CaptureTimelinePanel::drawHeader(juce::Graphics& g)
     {
         g.setFont(juce::Font(10.0f));
         g.setColour(m_textColour.withAlpha(0.7f));
-        g.drawText(m_engine->getSessionId(), m_headerBounds.reduced(10, 0).withRight(m_headerBounds.getRight() - 30), 
+        const auto sessionLabel = m_engine->getProjectDisplayName().isNotEmpty()
+            ? m_engine->getProjectDisplayName()
+            : m_engine->getSessionId();
+        g.drawText(sessionLabel, m_headerBounds.reduced(10, 0).withRight(m_headerBounds.getRight() - 30),
                    juce::Justification::centredRight);
         
         // Draw capture indicator (red dot when capturing - like a record indicator)

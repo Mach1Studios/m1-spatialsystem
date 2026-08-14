@@ -16,6 +16,7 @@
 #include <JuceHeader.h>
 #include "../Managers/PannerTrackingManager.h"
 #include "../Managers/ClientManager.h"
+#include "../Managers/ProjectPairingManager.h"
 #include "../Network/OSCHandler.h"
 #include "../Core/CaptureEngine.h"
 #include "../Core/MixEngine.h"
@@ -26,6 +27,7 @@
 #include "Components/MonitorPanel.h"
 #include "Components/ExportResultOverlay.h"
 #include "Components/StorageOverlay.h"
+#include "Components/ProjectSessionOverlay.h"
 
 namespace Mach1 {
 
@@ -59,7 +61,9 @@ class SessionMainComponent : public juce::Component,
                              private juce::Timer
 {
 public:
-    SessionMainComponent(PannerTrackingManager& manager, ClientManager& clientManager, OSCHandler& oscHandler, bool debugFakeBlocks = false, MixEngine* mixEngine = nullptr);
+    SessionMainComponent(PannerTrackingManager& manager, ClientManager& clientManager,
+                         OSCHandler& oscHandler, ProjectPairingManager& projectPairingManager,
+                         bool debugFakeBlocks = false, MixEngine* mixEngine = nullptr);
     ~SessionMainComponent() override;
     
     void resized() override;
@@ -81,6 +85,8 @@ public:
     bool startCapture(const juce::String& sessionId = "");
     void stopCapture();
     bool isCapturing() const;
+    void sessionWindowShown();
+    void showProjectSessionChooser();
 
     // Offline export of the current capture session (runs on a worker thread)
     void runExport();
@@ -88,6 +94,9 @@ public:
 private:
     void setupLayout();
     void setupCaptureEngine(bool debugFakeBlocks);
+    void maybeResolveCaptureSession();
+    void startCaptureForBinding(uint32_t hostProcessId, const ProjectBinding& binding);
+    std::vector<ProjectSessionOverlay::HostOption> getStreamingHosts() const;
 
     std::atomic<bool> exportInProgress { false };
     
@@ -95,6 +104,7 @@ private:
     PannerTrackingManager& pannerManager;
     ClientManager& clientManager;
     OSCHandler& oscHandler;
+    ProjectPairingManager& projectPairingManager;
     MixEngine* mixEngine = nullptr; // live meters source (P2), may be null in tests
     
     // Capture Engine (background thread)
@@ -107,6 +117,12 @@ private:
     std::unique_ptr<CaptureTimelinePanel> captureTimelinePanel;
     std::unique_ptr<ExportResultOverlay> exportResultOverlay;
     std::unique_ptr<StorageOverlay> storageOverlay;
+    std::unique_ptr<ProjectSessionOverlay> projectSessionOverlay;
+
+    uint32_t selectedHostProcessId = 0;
+    juce::String activeProjectBindingId;
+    bool sessionWindowHasBeenShown = false;
+    bool promptDismissedForThisWindowOpen = false;
     
     // Layout managers
     juce::StretchableLayoutManager verticalLayout;   // Main vs Timeline
@@ -136,7 +152,9 @@ class SessionUI : public juce::SystemTrayIconComponent,
                   private juce::Timer
 {
 public:
-    SessionUI(PannerTrackingManager& manager, ClientManager& clientManager, OSCHandler& oscHandler, bool debugFakeBlocks = false, MixEngine* mixEngine = nullptr);
+    SessionUI(PannerTrackingManager& manager, ClientManager& clientManager, OSCHandler& oscHandler,
+              ProjectPairingManager& projectPairingManager,
+              bool debugFakeBlocks = false, MixEngine* mixEngine = nullptr);
     ~SessionUI() override;
     
     // Debug mode
@@ -166,6 +184,7 @@ private:
     PannerTrackingManager& pannerManager;
     ClientManager& clientManager;
     OSCHandler& oscHandler;
+    ProjectPairingManager& projectPairingManager;
     MixEngine* mixEngine = nullptr;
     std::unique_ptr<SessionDocumentWindow> sessionWindow;
     std::unique_ptr<juce::PopupMenu> trayMenu;

@@ -11,6 +11,7 @@ target_sources(m1-system-helper-tests PRIVATE
         MemoryShareRingTests.cpp
         ExportEngineTests.cpp
         StorageGovernorTests.cpp
+        ProjectPairingManagerTests.cpp
         SystemIntegrationTests.cpp
         TestStubs.cpp
         ${CMAKE_SOURCE_DIR}/Source/Managers/ServiceManager.cpp
@@ -21,6 +22,7 @@ target_sources(m1-system-helper-tests PRIVATE
         ${CMAKE_SOURCE_DIR}/Source/Managers/PannerTrackingManager.cpp
         ${CMAKE_SOURCE_DIR}/Source/Managers/M1MemoryShareTracker.cpp
         ${CMAKE_SOURCE_DIR}/Source/Managers/OSCPannerTracker.cpp
+        ${CMAKE_SOURCE_DIR}/Source/Managers/ProjectPairingManager.cpp
         ${CMAKE_SOURCE_DIR}/Source/Network/OSCHandler.cpp
         ${CMAKE_SOURCE_DIR}/Source/Common/M1MemoryShare.cpp
         ${CMAKE_SOURCE_DIR}/Source/Common/SharedPathUtils.cpp

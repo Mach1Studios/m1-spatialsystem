@@ -5,17 +5,87 @@
 
 namespace Mach1 {
 
-OSCHandler::OSCHandler(ClientManager* clientManager, PluginManager* pluginManager, ServiceManager* serviceManager, PannerTrackingManager* pannerTrackingManager, ExternalMixerProcessor* externalMixer, MixEngine* mixEngine)
+OSCHandler::OSCHandler(ClientManager* clientManager, PluginManager* pluginManager, ServiceManager* serviceManager,
+                       PannerTrackingManager* pannerTrackingManager, ExternalMixerProcessor* externalMixer,
+                       MixEngine* mixEngine, ProjectPairingManager* projectPairingManager)
     : clientManager(clientManager)
     , pluginManager(pluginManager)
     , serviceManager(serviceManager)
     , pannerTrackingManager(pannerTrackingManager)
     , externalMixer(externalMixer)
     , mixEngine(mixEngine)
+    , projectPairingManager(projectPairingManager)
 {
     setupMessageHandlers();
     // Keepalive and stale-client cleanup do not need to run on a 20ms message-thread loop.
     startTimer(KEEPALIVE_INTERVAL_MS);
+}
+
+ProjectBinding OSCHandler::nameProjectForHost(uint32_t hostProcessId,
+                                             const juce::String& displayName)
+{
+    if (projectPairingManager == nullptr)
+        return {};
+
+    const auto binding = projectPairingManager->nameHostProject(hostProcessId, displayName);
+    if (binding.isValid())
+        broadcastProjectBinding(hostProcessId, binding);
+    return binding;
+}
+
+ProjectBinding OSCHandler::selectProjectForHost(uint32_t hostProcessId,
+                                               const juce::String& bindingId)
+{
+    if (projectPairingManager == nullptr)
+        return {};
+
+    const auto binding = projectPairingManager->selectProject(hostProcessId, bindingId);
+    if (binding.isValid())
+        broadcastProjectBinding(hostProcessId, binding);
+    return binding;
+}
+
+void OSCHandler::sendProjectBindingToPlugin(int port, const ProjectBinding& binding)
+{
+    if (pluginManager == nullptr || !binding.isValid())
+        return;
+
+    juce::OSCMessage message("/m1-project-binding");
+    message.addString(binding.bindingId);
+    message.addString(binding.displayName);
+    pluginManager->sendToPlugin(port, message);
+}
+
+void OSCHandler::sendProjectBindingToClient(int port, const ProjectBinding& binding)
+{
+    if (clientManager == nullptr || !binding.isValid())
+        return;
+
+    juce::OSCMessage message("/m1-project-binding");
+    message.addString(binding.bindingId);
+    message.addString(binding.displayName);
+    clientManager->sendToClient(port, message);
+}
+
+void OSCHandler::broadcastProjectBinding(uint32_t hostProcessId,
+                                        const ProjectBinding& binding)
+{
+    if (!binding.isValid() || hostProcessId == 0)
+        return;
+
+    if (pluginManager != nullptr)
+    {
+        for (const auto& plugin : pluginManager->getPluginsSnapshot())
+            if (plugin.hostProcessId == hostProcessId)
+                sendProjectBindingToPlugin(plugin.port, binding);
+    }
+
+    if (clientManager != nullptr)
+    {
+        for (const auto& client : clientManager->getAllClientsSnapshot())
+            if (client.hostProcessId == hostProcessId)
+                sendProjectBindingToClient(client.port, binding);
+    }
 }
 
 OSCHandler::~OSCHandler() {
@@ -240,6 +310,28 @@ void OSCHandler::handleAddClient(const juce::OSCMessage& message) {
                      message[1].getString() == "player" ? ClientType::Player : 
                      ClientType::Unknown;
         client.time = juce::Time::currentTimeMillis();
+        if (message.size() >= 3 && message[2].isInt32())
+            client.hostProcessId = static_cast<uint32_t>(message[2].getInt32());
+        if (message.size() >= 4 && message[3].isString())
+            client.projectBindingId = message[3].getString();
+        if (message.size() >= 5 && message[4].isString())
+            client.projectDisplayName = message[4].getString();
+        if (message.size() >= 6 && message[5].isString())
+            client.pluginInstanceId = message[5].getString();
+
+        ProjectBinding canonicalBinding;
+        ProjectBinding previousBinding;
+        if (projectPairingManager != nullptr && client.hostProcessId != 0)
+        {
+            previousBinding = projectPairingManager->getHostBinding(client.hostProcessId);
+            canonicalBinding = projectPairingManager->registerHostClaim(
+                client.hostProcessId, client.projectBindingId, client.projectDisplayName);
+            if (canonicalBinding.isValid())
+            {
+                client.projectBindingId = canonicalBinding.bindingId;
+                client.projectDisplayName = canonicalBinding.displayName;
+            }
+        }
 
         if (client.type == ClientType::Monitor)
         {
@@ -265,6 +357,14 @@ void OSCHandler::handleAddClient(const juce::OSCMessage& message) {
                     std::to_string(client.port));
             }
         }
+
+        const bool bindingChanged = previousBinding.isValid()
+            && canonicalBinding.isValid()
+            && previousBinding.bindingId != canonicalBinding.bindingId;
+        if (bindingChanged)
+            broadcastProjectBinding(client.hostProcessId, canonicalBinding);
+        else if (canonicalBinding.isValid())
+            sendProjectBindingToClient(client.port, canonicalBinding);
     }
 }
 
@@ -400,6 +500,28 @@ void OSCHandler::handleRegisterPlugin(const juce::OSCMessage& message) {
         M1RegisteredPlugin plugin;
         plugin.port = message[0].getInt32();
         plugin.time = juce::Time::currentTimeMillis();
+        if (message.size() >= 2 && message[1].isInt32())
+            plugin.hostProcessId = static_cast<uint32_t>(message[1].getInt32());
+        if (message.size() >= 3 && message[2].isString())
+            plugin.projectBindingId = message[2].getString();
+        if (message.size() >= 4 && message[3].isString())
+            plugin.projectDisplayName = message[3].getString();
+        if (message.size() >= 5 && message[4].isString())
+            plugin.pluginInstanceId = message[4].getString();
+
+        ProjectBinding canonicalBinding;
+        ProjectBinding previousBinding;
+        if (projectPairingManager != nullptr && plugin.hostProcessId != 0)
+        {
+            previousBinding = projectPairingManager->getHostBinding(plugin.hostProcessId);
+            canonicalBinding = projectPairingManager->registerHostClaim(
+                plugin.hostProcessId, plugin.projectBindingId, plugin.projectDisplayName);
+            if (canonicalBinding.isValid())
+            {
+                plugin.projectBindingId = canonicalBinding.bindingId;
+                plugin.projectDisplayName = canonicalBinding.displayName;
+            }
+        }
         pluginManager->registerPlugin(plugin);
         
         // Also register with the panner tracking manager for unified tracking
@@ -421,6 +543,14 @@ void OSCHandler::handleRegisterPlugin(const juce::OSCMessage& message) {
         juce::OSCMessage rendererMsg("/m1-external-renderer-enabled");
         rendererMsg.addInt32(isExternalRendererEnabled() ? 1 : 0);
         pluginManager->sendToPlugin(plugin.port, rendererMsg);
+
+        const bool bindingChanged = previousBinding.isValid()
+            && canonicalBinding.isValid()
+            && previousBinding.bindingId != canonicalBinding.bindingId;
+        if (bindingChanged)
+            broadcastProjectBinding(plugin.hostProcessId, canonicalBinding);
+        else if (canonicalBinding.isValid())
+            sendProjectBindingToPlugin(plugin.port, canonicalBinding);
     }
 }
 

@@ -24,7 +24,10 @@ CaptureEngine::~CaptureEngine()
 }
 
 //==============================================================================
-bool CaptureEngine::startCapture(const juce::String& sessionId, const juce::File& captureRoot)
+bool CaptureEngine::startCapture(const juce::String& sessionId, const juce::File& captureRoot,
+                                 uint32_t hostProcessId,
+                                 const juce::String& projectBindingId,
+                                 const juce::String& projectDisplayName)
 {
     if (m_capturing.load())
     {
@@ -63,6 +66,9 @@ bool CaptureEngine::startCapture(const juce::String& sessionId, const juce::File
     m_sessionId = sessionId;
     m_captureRoot = captureRoot;
     m_startTime = juce::Time::getCurrentTime();
+    m_hostProcessId = hostProcessId;
+    m_projectBindingId = projectBindingId;
+    m_projectDisplayName = projectDisplayName;
     m_capturing.store(true);
 
     // Manifest identifies this directory as an attributable capture session;
@@ -114,6 +120,9 @@ void CaptureEngine::writeSessionManifest()
 
     auto* root = new juce::DynamicObject();
     root->setProperty("sessionId", m_sessionId);
+    root->setProperty("projectBindingId", m_projectBindingId);
+    root->setProperty("projectDisplayName", m_projectDisplayName);
+    root->setProperty("hostProcessId", static_cast<juce::int64>(m_hostProcessId));
     root->setProperty("createdMs", m_startTime.toMilliseconds());
     root->setProperty("lastWrittenMs", juce::Time::currentTimeMillis());
     root->setProperty("totalBytes", static_cast<juce::int64>(m_totalBytesWritten.load()));
@@ -244,6 +253,8 @@ void CaptureEngine::processCapture()
     {
         if (!panner.isMemoryShareBased)
             continue;  // Only capture from memory share panners
+        if (m_hostProcessId != 0 && panner.processId != m_hostProcessId)
+            continue;  // Never mix capture data from two simultaneously open DAWs.
         
         processPannerData(panner);
     }
@@ -535,25 +546,33 @@ void CaptureEngine::closeAllPannerStates()
 //==============================================================================
 PannerId CaptureEngine::createPannerId(const PannerInfo& panner) const
 {
-    // The instance uuid must be unique per plugin instance AND stable for
-    // the instance's lifetime. Display names are neither: the default
-    // "M1-Panner (PID x)" flips to the DAW track name as soon as the host
-    // reports it, which used to split one instance's capture into two
-    // streams mid-session. Identity therefore comes from the memory address
-    // (unique per instance within a process); the human-readable name is
-    // stored separately (name.txt in the capture directory).
+    // Prefer the UUID persisted in plugin state. Unlike the memory transport's
+    // PID/pointer name, it survives reopening the DAW project and lets capture
+    // append the same logical track stream instead of creating an orphan.
     std::string instanceUuid;
-    if (panner.memoryAddress != 0)
+    uint32_t identityProcessId = 0;
+    if (!panner.pluginInstanceId.empty())
+        instanceUuid = panner.pluginInstanceId;
+    else if (panner.memoryAddress != 0)
+    {
         instanceUuid = "PTR" + juce::String::toHexString(static_cast<juce::int64>(panner.memoryAddress)).toStdString();
+        identityProcessId = panner.processId;
+    }
     else if (panner.port != 0)
+    {
         instanceUuid = "PORT" + std::to_string(panner.port);
+        identityProcessId = panner.processId;
+    }
     else
+    {
         instanceUuid = panner.name;
+        identityProcessId = panner.processId;
+    }
 
     return PannerId(
         m_sessionId.toStdString(),
         instanceUuid,
-        panner.processId
+        identityProcessId
     );
 }
 

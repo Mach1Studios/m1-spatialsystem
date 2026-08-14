@@ -48,6 +48,11 @@ struct PannerInfo {
     // address from its memory segment name). DAWs host every plugin instance
     // in one process, so processId alone cannot identify an instance.
     uintptr_t memoryAddress = 0;
+    // Stable plugin-state identity, independent from the ephemeral
+    // PID/pointer memory transport name.
+    std::string pluginInstanceId;
+    std::string projectBindingId;
+    std::string projectDisplayName;
     
     // State
     bool isActive = false;
