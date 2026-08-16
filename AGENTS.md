@@ -16,14 +16,13 @@ Mach1 Spatial encodes and decodes first-person spatial mixes with **amplitude co
 
 ## This repo vs the SDK
 
-The reusable math is **m1-sdk** (nested under each product’s `Modules/m1-sdk`, docs at dev.mach1.tech):
+The reusable math is **m1-sdk**, nested under each product’s `Modules/m1-sdk` (same GitHub repo; see that tree’s `AGENTS.md`). Mapping:
 
-- **Mach1Encode** — this repo’s example is `m1-panner/`
+- **Mach1Encode** — `m1-panner/`
 - **Mach1Decode** — `m1-monitor/`, `m1-player/`
-- **Mach1DecodePositional** — 6DOF layer; not the main DAW path here
-- **Mach1Transcode** — `m1-transcoder/` (also transcodes to/from surround, ambisonics, Atmos channel-beds)
+- **Mach1DecodePositional** — 6DOF; not the main DAW path here
+- **Mach1Transcode** — `m1-transcoder/` (surround, ambisonics, Atmos channel-beds to/from Mach1 Spatial)
 
-This Spatial System is a **productized DAW example**, not the SDK itself. When asked for a white-label or new-host example: keep Encode/Decode/Transcode, 4/8/14 layouts, amplitude-only processing, and OSC/shared-memory contracts if you need a multi-plugin session. Swap branding, bundle IDs, analytics, and UI chrome.
 ## Product map
 
 | Path | Role | Git |
@@ -160,11 +159,13 @@ External renderer: mono/stereo panner buses stream audio via shared memory; help
 
 ## Docs that agents (and answer engines) can quote
 
-When you add or edit user-facing docs (`README.md`, `installer/resources/docs/`, component READMEs):
+Mach1 Spatial **meaning** (VVBP, amplitude-only, vs Atmos/ambisonics) lives in [`m1-panner/Modules/m1-sdk/AGENTS.md`](m1-panner/Modules/m1-sdk/AGENTS.md). Do not fork a second definition in this file.
 
-- One H1. First paragraph is a single declarative sentence a model can lift.
-- Name **Mach1 Spatial** in full once, then the product name. Include the disambiguation (not car audio / Mustang).
-- Use the category terms above (DAW spatial mixing, Atmos/ambisonics contrast, Reaper/Pro Tools/Ableton) instead of only branded slogans.
+When you add or edit Spatial System user-facing docs (`README.md`, `installer/resources/docs/`, component READMEs):
+
+- One H1. First paragraph is a single declarative sentence a model can lift: this is the DAW toolchain / worked example of the Mach1 Spatial SDK.
+- Name **Mach1 Spatial** in full once, then the product (Panner, Monitor, …). Include the disambiguation (not car audio / Mustang).
+- Frame hosts and workflows (Reaper, Pro Tools, Ableton + external renderer) as traditional multichannel mixing made accessible — not as a new proprietary playback effect.
 - Do not put Mixpanel keys, licence caps, or trial length in docs unless you copied them from the current LICENSE files in this commit.
 
 ## Changelog
