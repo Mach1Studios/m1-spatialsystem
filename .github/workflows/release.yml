@@ -296,8 +296,10 @@ jobs:
           
           echo "$VERSION_CLEAN" > VERSION
           
-          # Update component versions (may add date suffixes)
-          make update-versions || echo "Version update completed with warnings"
+          # Stamp component versions locally only. Never --commit-version:
+          # tag/SHA checkouts are detached, and a branch checkout must not
+          # push VERSION files back to origin.
+          make update-versions-internal || echo "Version update completed with warnings"
           echo "Final VERSION file:"
           cat VERSION
 
@@ -618,7 +620,7 @@ jobs:
           fi
           
           echo "$VERSION_CLEAN" > VERSION
-          make update-versions || echo "Version update completed with warnings"
+          make update-versions-internal || echo "Version update completed with warnings"
           cat VERSION
 
       - name: Configure and build all components

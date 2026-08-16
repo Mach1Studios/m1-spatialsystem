@@ -179,7 +179,8 @@ User-facing Mach1 Spatial System changes go in [`CHANGELOG.md`](CHANGELOG.md) in
 ## Versioning, CI, secrets
 
 - Central version is `VERSION`. `make update-version VERSION=x.y` rewrites component `VERSION` files and installer metadata. Do not bump versions unless asked. Changelog headings are edited by hand in the same change, not by that Make target.
-- `make package-from-ci VERSION=x.y` only stamps installer metadata locally (`update-versions-internal`). It does not commit or push submodule `VERSION` files (submodules are detached `HEAD`).
+- `make package-from-ci VERSION=x.y` only stamps installer metadata locally (`update-versions-internal`). It does not commit or push submodule `VERSION` files.
+- Automatic VERSION commit/push (`--commit-version`) runs only when HEAD is a named branch (`refs/heads/<name>`, never `HEAD`) **and** that branch already exists on `origin`. Detached submodule checkouts, tags, and `git push origin HEAD` are skipped. Release CI uses `update-versions-internal` so it never commits or pushes VERSION files.
 - Release CI (`.github/workflows/release.yml`): `renderer-mode-tests` must pass before platform artifacts. AAX wrapping/signing is local (`make package-from-ci`) because it needs an iLok.
 - Never commit `Makefile.variables`, `.env`, `signing-metadata.json`, certs, Mixpanel keys, or Apple/Azure secrets.
 

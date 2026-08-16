@@ -145,6 +145,40 @@ update_installer_versions() {
     fi
 }
 
+# True only when HEAD is a named local branch (refs/heads/<name>), never a
+# detached commit, tag, or a branch literally named HEAD.
+on_named_branch() {
+    local repo_path="$1"
+    local full_ref
+    full_ref=$(git -C "$repo_path" symbolic-ref -q HEAD || true)
+    case "$full_ref" in
+        refs/heads/HEAD|refs/heads/head|"")
+            return 1
+            ;;
+        refs/heads/*)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+named_branch() {
+    local repo_path="$1"
+    local full_ref
+    full_ref=$(git -C "$repo_path" symbolic-ref -q HEAD || true)
+    echo "${full_ref#refs/heads/}"
+}
+
+# True when origin already has refs/heads/<branch> so a push updates an
+# existing remote-tracking branch instead of creating a headless/orphan ref.
+origin_has_branch() {
+    local repo_path="$1"
+    local branch="$2"
+    git -C "$repo_path" ls-remote --exit-code --heads origin "refs/heads/$branch" >/dev/null 2>&1
+}
+
 commit_and_push_version_in_repo() {
     local repo_path="$1"
     local version_path="$2"
@@ -165,10 +199,15 @@ commit_and_push_version_in_repo() {
         return 0
     fi
 
+    if ! on_named_branch "$repo_path"; then
+        echo "$label: HEAD is detached or not refs/heads/* (typical for submodules and tags); VERSION stays a working-tree change, skipping commit/push."
+        return 0
+    fi
+
     local branch
-    branch=$(git -C "$repo_path" symbolic-ref -q --short HEAD || true)
-    if [ -z "$branch" ]; then
-        echo "$label: detached HEAD (normal for submodules); VERSION is a local working-tree change, skipping commit/push."
+    branch=$(named_branch "$repo_path")
+    if [ -z "$branch" ] || [ "$branch" = "HEAD" ] || [ "$branch" = "head" ]; then
+        echo "$label: refused to commit/push on unusable branch name '$branch'."
         return 0
     fi
 
@@ -180,8 +219,15 @@ commit_and_push_version_in_repo() {
     fi
 
     git -C "$repo_path" commit -m "version bump"
-    if ! git -C "$repo_path" push origin "HEAD:refs/heads/$branch"; then
-        echo "$label: push to $branch failed (non-fatal). Commit is local."
+
+    if ! origin_has_branch "$repo_path" "$branch"; then
+        echo "$label: origin has no branch '$branch'; not creating a remote ref. Commit is local on $branch."
+        return 0
+    fi
+
+    # Fully qualified refspec only — never `git push origin HEAD`.
+    if ! git -C "$repo_path" push origin "refs/heads/$branch:refs/heads/$branch"; then
+        echo "$label: push to refs/heads/$branch failed (non-fatal). Commit is local on $branch."
         return 0
     fi
 }

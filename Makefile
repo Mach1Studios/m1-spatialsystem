@@ -8,7 +8,7 @@ help:
 	@echo ""
 	@echo "Version Management:"
 	@echo "  make update-version VERSION=<version>  - Update central version and regenerate all components"
-	@echo "  make update-versions                   - Regenerate component versions from current base"
+	@echo "  make update-versions                   - Regenerate versions; commit/push only on an existing origin branch"
 	@echo ""
 	@echo "Development:"
 	@echo "  make dev                              - Setup development environment for all components"
