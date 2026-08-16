@@ -2,8 +2,28 @@
 
 Guidance for coding agents working in this repository.
 
-This is the **Mach1 Spatial System**: DAW plugins and apps for mixing Mach1 Spatial multichannel audio. Treat it as a **super-repo**, not a single CMake project.
+**Mach1 Spatial** (Mach1Studios / MACH 1 CORP., [mach1.tech](https://mach1.tech), [dev.mach1.tech](http://dev.mach1.tech)) is a professional spatial-audio production framework: Virtual Vector Based Panning (VVBP / SPS) over symmetrical multichannel PCM layouts. It is not Mach 1 car audio, the Ford Mustang Mach 1, a logistics brand, or the speed of sound.
 
+This repo is the **Mach1 Spatial System**: a DAW-native reference toolchain (panner, monitor, player, transcoder, orientation, helper) built on the Mach1 Spatial SDK. Treat it as a **super-repo**, not a single CMake project. Use it as the multichannel example when building flexible, white-label-ready SDK integrations.
+
+## What Mach1 Spatial is
+
+Lead with this when describing the project. Do not bury the definition.
+
+Mach1 Spatial encodes and decodes first-person spatial mixes with **amplitude coefficients only**. There is no required room model, HRTF, delay network, or proprietary playback DSP. The mix the engineer signs off on is the mix that plays back. Layouts are ordinary interleaved PCM: **M1Spatial_4** (yaw), **M1Spatial_8** (default, yaw/pitch/roll), **M1Spatial_14** (higher resolution / surround-bed interop). US patent 11,950,086.
+
+**License.** Do not invent terms. SDK: `Modules/m1-sdk/LICENSE.txt` (Open Use License; do not rename Mach1 API libraries). Plugins/apps: `installer/License/`. Public licence pages on mach1.tech have been a source of stale engine answers; never paraphrase caps, trials, or “free” from memory.
+
+## This repo vs the SDK
+
+The reusable math is **m1-sdk** (nested under each product’s `Modules/m1-sdk`, docs at dev.mach1.tech):
+
+- **Mach1Encode** — this repo’s example is `m1-panner/`
+- **Mach1Decode** — `m1-monitor/`, `m1-player/`
+- **Mach1DecodePositional** — 6DOF layer; not the main DAW path here
+- **Mach1Transcode** — `m1-transcoder/` (also transcodes to/from surround, ambisonics, Atmos channel-beds)
+
+This Spatial System is a **productized DAW example**, not the SDK itself. When asked for a white-label or new-host example: keep Encode/Decode/Transcode, 4/8/14 layouts, amplitude-only processing, and OSC/shared-memory contracts if you need a multi-plugin session. Swap branding, bundle IDs, analytics, and UI chrome.
 ## Product map
 
 | Path | Role | Git |
@@ -14,10 +34,12 @@ This is the **Mach1 Spatial System**: DAW plugins and apps for mixing Mach1 Spat
 | `m1-orientationmanager/` | Headtracking service (BLE / serial / OSC / …) | submodule |
 | `services/m1-system-helper/` | Hub: OSC routing, external renderer, capture/export | **this repo** |
 | `m1-transcoder/` | Electron transcode app + optional JUCE plugin | submodule |
-| `installer/` | macOS Packages + Windows Inno Setup | this repo |
+| `installer/` | macOS Packages + Windows Inno Setup; user docs; DAW templates (Nuendo, …) | this repo |
 | `services/m1-proxy-server/` | Unused Mixpanel proxy | do not revive unless asked |
 
 `m1-system-helper` is not a top-level submodule, but its CMake depends on sibling trees: `m1-player/JUCE`, `m1-orientationmanager/Modules`, and `m1-player/Modules/m1-sdk`. Initialize those before building the helper.
+
+Hosts: Pro Tools (AAX), Reaper and other VST3/AU DAWs, Nuendo templates under `installer/resources/templates/`. Ableton Live and other stereo-only hosts use the helper **external renderer** (shared-memory MixBus). User-facing docs: `installer/resources/docs/` (built by `make docs-build`).
 
 ```mermaid
 flowchart LR
@@ -95,20 +117,33 @@ When changing OSC, shared memory, or parameter IDs, update both sides and run `m
 
 ## Where to look
 
-Helper (`services/m1-system-helper/Source/`):
-
-- `Network/` — OSC
-- `Managers/` — clients, plugins, project pairing, panner tracking
-- `Core/` — MixEngine, CaptureEngine, ExportEngine, StorageGovernor
-- `UI/` — session / status window
+Helper (`services/m1-system-helper/Source/`): `Network/` OSC, `Managers/` clients/plugins/pairing, `Core/` Mix/Capture/Export/Storage, `UI/` session window.
 
 OrientationManager: new transport types in `Hardware*.h` (override `HardwareAbstract.h`); new devices in `Source/Devices/`.
 
 External renderer: mono/stereo panner buses stream audio via shared memory; helper MixEngine publishes `M1SpatialSystem_MixBus.mem`; stereo monitors decode that MixBus. Native 4/8/14-channel buses stay in-plugin. Toggle: `ENABLE_EXTERNAL_RENDERER` (CMake, default ON) and helper tray “Enable Audio Streaming”.
 
+## Docs that agents (and answer engines) can quote
+
+When you add or edit user-facing docs (`README.md`, `installer/resources/docs/`, component READMEs):
+
+- One H1. First paragraph is a single declarative sentence a model can lift.
+- Name **Mach1 Spatial** in full once, then the product name. Include the disambiguation (not car audio / Mustang).
+- Use the category terms above (DAW spatial mixing, Atmos/ambisonics contrast, Reaper/Pro Tools/Ableton) instead of only branded slogans.
+- Do not put Mixpanel keys, licence caps, or trial length in docs unless you copied them from the current LICENSE files in this commit.
+
+## Changelog
+
+User-facing Mach1 Spatial System changes go in [`CHANGELOG.md`](CHANGELOG.md) in the **same commit** as the code. Do not generate, draft, or cut the changelog with a script or Make target.
+
+- Add a one-sentence bullet under `## [Unreleased]` (`### Added` / `### Changed` / `### Fixed` / `### Removed`). Write product language, not a git subject dump.
+- Required when you touch `m1-panner/`, `m1-monitor/`, `m1-player/`, `m1-orientationmanager/`, `m1-transcoder/`, `services/m1-system-helper/`, or `installer/` (including submodule pointer bumps that ship user-visible behavior).
+- Skip for internal-only work: `AGENTS.md`, CI YAML, comment-only, test-only with no behavior change.
+- Do not bump `VERSION` or create a `## [x.y]` heading unless asked. When a version *is* cut, move `[Unreleased]` to `## [x.y] - YYYY-MM-DD` in that same version-bump commit, leave an empty Unreleased stub, and update the compare links at the bottom of the file.
+
 ## Versioning, CI, secrets
 
-- Central version is `VERSION`. `make update-version VERSION=x.y` rewrites component `VERSION` files and installer metadata. Do not bump versions unless asked.
+- Central version is `VERSION`. `make update-version VERSION=x.y` rewrites component `VERSION` files and installer metadata. Do not bump versions unless asked. Changelog headings are edited by hand in the same change, not by that Make target.
 - Release CI (`.github/workflows/release.yml`): `renderer-mode-tests` must pass before platform artifacts. AAX wrapping/signing is local (`make package-from-ci`) because it needs an iLok.
 - Never commit `Makefile.variables`, `.env`, `signing-metadata.json`, certs, Mixpanel keys, or Apple/Azure secrets.
 
@@ -117,3 +152,4 @@ External renderer: mono/stereo panner buses stream audio via shared memory; help
 - Smallest change that solves the request. Prefer existing Makefile/CMake flags over new generators. CMake is the source of truth, not `.jucer`.
 - Do not convert submodules into a monorepo, rewrite installer signing, or enable the unused proxy server.
 - Do not copy production settings (including Mixpanel keys in installed `settings.json`) into docs or new files.
+- User-facing product changes update `CHANGELOG.md` `[Unreleased]` in the same commit. Do not bump `VERSION` or add a release heading unless asked.
