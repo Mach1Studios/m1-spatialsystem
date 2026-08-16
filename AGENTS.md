@@ -115,6 +115,41 @@ These must stay byte- and API-compatible. Changing one side without the other is
 
 When changing OSC, shared memory, or parameter IDs, update both sides and run `make test-external-renderer`.
 
+## Legacy sessions (AAX / Pro Tools and VST3 / Reaper)
+
+Multichannel M1-Panner and M1-Monitor on **Pro Tools AAX** and **Reaper VST3** are the production path for existing user sessions. Do not “simplify” host layout code, rename parameters, or change saved-state keys.
+
+Frozen contracts (edit the header and the tests together, never one side):
+
+- Panner: `m1-panner/Source/LegacyHostContract.h`
+- Monitor: `m1-monitor/Source/LegacyHostContract.h`
+
+Do not change without an explicit product decision:
+
+- Plugin codes `M1Pn` / `M1Mt`, manufacturer `Mac1`, ValueTree types `M1-Panner` / `M1-Monitor`
+- APVTS parameter **string IDs and constructor order** (automation lanes)
+- Saved-state keys: panner `project_binding_id` (snake_case) vs monitor `projectBindingId` (camelCase) — they are different on purpose
+- AAX named layouts: Quad = Spatial 4, 7.1 = Spatial 8, 7.1.6 = Spatial 14
+- Reaper `isBusesLayoutSupported` returns true for every enabled layout (sessions retarget 4/8/14 without reinstantiating)
+- Pro Tools 7.1 channel order `left, centre, right, Lss, Rss, Lsr, Rsr, LFE`
+
+### Tests agents must run
+
+After any change to panner, monitor, helper OSC/SHM, or those contract headers:
+
+```text
+make test-external-renderer
+```
+
+That builds both `ENABLE_EXTERNAL_RENDERER` ON and OFF for the panner and runs the layout/session-key tests. Broader: `make test-unit`. Optional VST3 pluginval: `make test-panner` / `make test-monitor` (not a substitute for the layout contract tests).
+
+### Manual host check (when layout or state recall changed)
+
+1. **Pro Tools AAX** — reopen a saved session with M1-Panner on Quad / 7.1 / 7.1.6 tracks and M1-Monitor on a stereo aux feeding those widths. Confirm instances recall, automation lanes still move the same parameters, and 7.1 channel order is not scrambled.
+2. **Reaper VST3** — reopen a saved session, change track channel count between 4, 8, and 14 without replacing the plugin, and confirm panner/monitor still process.
+
+Do not add `CUSTOM_CHANNEL_LAYOUT` to the shipping AAX/VST3 build; it drops `inputMode`/`outputMode` and `isBusesLayoutSupported`.
+
 ## Where to look
 
 Helper (`services/m1-system-helper/Source/`): `Network/` OSC, `Managers/` clients/plugins/pairing, `Core/` Mix/Capture/Export/Storage, `UI/` session window.
@@ -144,6 +179,7 @@ User-facing Mach1 Spatial System changes go in [`CHANGELOG.md`](CHANGELOG.md) in
 ## Versioning, CI, secrets
 
 - Central version is `VERSION`. `make update-version VERSION=x.y` rewrites component `VERSION` files and installer metadata. Do not bump versions unless asked. Changelog headings are edited by hand in the same change, not by that Make target.
+- `make package-from-ci VERSION=x.y` only stamps installer metadata locally (`update-versions-internal`). It does not commit or push submodule `VERSION` files (submodules are detached `HEAD`).
 - Release CI (`.github/workflows/release.yml`): `renderer-mode-tests` must pass before platform artifacts. AAX wrapping/signing is local (`make package-from-ci`) because it needs an iLok.
 - Never commit `Makefile.variables`, `.env`, `signing-metadata.json`, certs, Mixpanel keys, or Apple/Azure secrets.
 
@@ -153,3 +189,4 @@ User-facing Mach1 Spatial System changes go in [`CHANGELOG.md`](CHANGELOG.md) in
 - Do not convert submodules into a monorepo, rewrite installer signing, or enable the unused proxy server.
 - Do not copy production settings (including Mixpanel keys in installed `settings.json`) into docs or new files.
 - User-facing product changes update `CHANGELOG.md` `[Unreleased]` in the same commit. Do not bump `VERSION` or add a release heading unless asked.
+- After panner/monitor/helper contract changes, run `make test-external-renderer`. Do not rename parameter IDs, session XML keys, plugin codes, or the Pro Tools 7.1 channel order.

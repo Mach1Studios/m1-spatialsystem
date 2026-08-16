@@ -496,6 +496,12 @@ void testStartSamplePositionIsSampleAccurate()
 
 int runMemoryShareRingTests()
 {
+    RCHECK(M1SystemHelperParameterIDs::AZIMUTH == 0x1A2B3C4D);
+    RCHECK(M1SystemHelperParameterIDs::CONTROL_REVISION == 0x6A7B8C9D);
+    RCHECK(M1SystemHelperParameterIDs::EXTERNAL_ACTIVE == 0x7B8C9DAE);
+    RCHECK(M1MemoryShare::MEMORY_LAYOUT_MAGIC == 0x4D315348);
+    RCHECK(M1MemoryShare::MEMORY_LAYOUT_VERSION == 2);
+
     testSequentialReadDeliversEveryBlock();
     testLatestReadDoesNotConsume();
     testOverrunSkipsAndCountsDroppedBlocks();

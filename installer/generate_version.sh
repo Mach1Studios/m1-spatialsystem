@@ -165,6 +165,13 @@ commit_and_push_version_in_repo() {
         return 0
     fi
 
+    local branch
+    branch=$(git -C "$repo_path" symbolic-ref -q --short HEAD || true)
+    if [ -z "$branch" ]; then
+        echo "$label: detached HEAD (normal for submodules); VERSION is a local working-tree change, skipping commit/push."
+        return 0
+    fi
+
     git -C "$repo_path" add -- "$version_path"
 
     if git -C "$repo_path" diff --cached --quiet -- "$version_path"; then
@@ -173,7 +180,10 @@ commit_and_push_version_in_repo() {
     fi
 
     git -C "$repo_path" commit -m "version bump"
-    git -C "$repo_path" push origin HEAD
+    if ! git -C "$repo_path" push origin "HEAD:refs/heads/$branch"; then
+        echo "$label: push to $branch failed (non-fatal). Commit is local."
+        return 0
+    fi
 }
 
 commit_and_push_versions_if_requested() {

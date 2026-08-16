@@ -723,18 +723,22 @@ else ifeq ($(detected_OS),Windows)
 	@powershell -NoProfile -ExecutionPolicy Bypass -File installer\win\sign-aax.ps1
 endif
 
+# Stamp installer/component VERSION files locally. Do not commit or push:
+# submodules are detached HEAD, and packaging must not touch remotes.
 prepare-ci-installer-version:
 ifeq ($(detected_OS),Windows)
 	@if "$(VERSION)"=="" ( \
 		echo No VERSION supplied; using existing installer metadata version. \
 	) else ( \
 		echo Synchronizing installer metadata to VERSION=$(VERSION)... && \
-		$(MAKE) update-version VERSION=$(VERSION) \
+		echo $(VERSION)> VERSION && \
+		$(MAKE) update-versions-internal \
 	)
 else
 	@if [ -n "$(VERSION)" ]; then \
-		echo "Synchronizing installer metadata to VERSION=$(VERSION)..."; \
-		$(MAKE) update-version VERSION="$(VERSION)"; \
+		echo "Synchronizing installer metadata to VERSION=$(VERSION) (local files only, no git commit/push)..."; \
+		echo "$(VERSION)" > VERSION; \
+		$(MAKE) update-versions-internal; \
 	else \
 		echo "No VERSION supplied; using existing installer metadata version $$(cat VERSION)."; \
 	fi
@@ -1467,17 +1471,19 @@ test-plugins: test-monitor test-panner
 
 # C++ unit/regression tests (fast; no plugin formats built).
 # Covers the session-load / device-reconnect regressions:
-#  - m1-panner: /m1-channel-config policy (no redundant host notifications)
+#  - m1-panner: /m1-channel-config policy, Reaper/AAX layout matrix, frozen
+#    session XML keys and parameter IDs (legacy Pro Tools / Reaper sessions)
+#  - m1-monitor: host-vs-MixBus selection plus the same AAX/Reaper layout matrix
 #  - m1-system-helper: TCP-based orientation-manager detection + targeted
-#    plugin registration replies (no O(N^2) broadcast)
+#    plugin registration replies (no O(N^2) broadcast) + SHM ABI hashes
 #  - m1-orientationmanager: device reconnect + drop-detection state handling
 .PHONY: test-external-renderer test-unit
 test-external-renderer:
-	@echo "=== m1-monitor host-mode unit tests ==="
+	@echo "=== m1-monitor host-mode + AAX/Reaper layout contract tests ==="
 	cmake m1-monitor -Bm1-monitor/build-tests -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBUILD_UNIT_TESTS=ON -DBUILD_VST3=ON -DBUILD_AAX=OFF -DBUILD_AU=OFF -DBUILD_VST=OFF -DBUILD_STANDALONE=OFF -DENABLE_VST2_COMPATIBILITY=OFF
 	cmake --build m1-monitor/build-tests --target M1-Monitor_VST3 m1-monitor-mode-tests
 	cd m1-monitor/build-tests && ctest --output-on-failure -R m1-monitor-mode
-	@echo "=== m1-panner unit tests (external renderer enabled) ==="
+	@echo "=== m1-panner unit tests (external renderer enabled; AAX/Reaper contracts) ==="
 	cmake m1-panner -Bm1-panner/build-tests -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBUILD_UNIT_TESTS=ON -DBUILD_VST3=ON -DBUILD_AAX=OFF -DBUILD_AU=OFF -DBUILD_VST=OFF -DBUILD_STANDALONE=OFF -DENABLE_VST2_COMPATIBILITY=OFF -DENABLE_EXTERNAL_RENDERER=ON
 	cmake --build m1-panner/build-tests --target M1-Panner_VST3 m1-panner-policy-tests
 	cd m1-panner/build-tests && ctest --output-on-failure -R m1-panner-policy
