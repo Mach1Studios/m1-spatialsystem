@@ -47,20 +47,17 @@ void testOrientationManagerRunningDetection()
 {
     const int testPort = 46345; // stay clear of the real port (6345)
 
-    // Heap-allocate and deliberately leak: ~ServiceManager() issues real
-    // launchctl/sc kill commands against any installed orientation manager,
-    // which a unit test must never do on a developer machine.
-    auto* serviceManager = new Mach1::ServiceManager(testPort);
+    Mach1::ServiceManager serviceManager(testPort, false);
 
     // Nothing listening: must report not running.
-    CHECK(!serviceManager->isOrientationManagerRunning());
+    CHECK(!serviceManager.isOrientationManagerRunning());
 
     // TCP listener present (like the orientation manager's HTTP server):
     // must report running.
     {
         juce::StreamingSocket tcpListener;
         CHECK(tcpListener.createListener(testPort, "127.0.0.1"));
-        CHECK(serviceManager->isOrientationManagerRunning());
+        CHECK(serviceManager.isOrientationManagerRunning());
     }
 
     // Regression: a UDP socket on the same port must NOT count as running.
@@ -68,7 +65,7 @@ void testOrientationManagerRunningDetection()
     {
         juce::DatagramSocket udpSocket(false);
         CHECK(udpSocket.bindToPort(testPort));
-        CHECK(!serviceManager->isOrientationManagerRunning());
+        CHECK(!serviceManager.isOrientationManagerRunning());
     }
 }
 
@@ -214,8 +211,8 @@ void testProjectBindingIsSharedWithinHostProcess()
     Mach1::PluginManager pluginManager(eventSystem);
     Mach1::ClientManager clientManager(eventSystem);
     Mach1::ProjectPairingManager pairingManager(testRoot.getChildFile("bindings.json"));
-    auto* serviceManager = new Mach1::ServiceManager(46347);
-    Mach1::OSCHandler oscHandler(&clientManager, &pluginManager, serviceManager,
+    Mach1::ServiceManager serviceManager(46347, false);
+    Mach1::OSCHandler oscHandler(&clientManager, &pluginManager, &serviceManager,
                                  nullptr, nullptr, nullptr, &pairingManager);
 
     int helperPort = 0;
@@ -311,11 +308,9 @@ void testManyPannersUnderOrientationStorm()
     auto eventSystem = std::make_shared<Mach1::EventSystem>();
     Mach1::PluginManager pluginManager(eventSystem);
     Mach1::ClientManager clientManager(eventSystem);
-    // Leaked deliberately: ~ServiceManager() issues real launchctl/sc kill
-    // commands against any installed orientation manager.
-    auto* serviceManager = new Mach1::ServiceManager(46346);
+    Mach1::ServiceManager serviceManager(46346, false);
 
-    Mach1::OSCHandler oscHandler(&clientManager, &pluginManager, serviceManager,
+    Mach1::OSCHandler oscHandler(&clientManager, &pluginManager, &serviceManager,
                                  /*pannerTrackingManager*/ nullptr, /*externalMixer*/ nullptr);
 
     int helperPort = 0;

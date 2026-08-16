@@ -581,11 +581,9 @@ void testStreamingStatusReachesMonitorClients()
 
     Mach1::PluginManager pluginManager(eventSystem);
     Mach1::ClientManager clientManager(eventSystem);
-    // Leaked deliberately: ~ServiceManager() issues real launchctl/sc kill
-    // commands against any installed orientation manager.
-    auto* serviceManager = new Mach1::ServiceManager(46347);
+    Mach1::ServiceManager serviceManager(46347, false);
 
-    Mach1::OSCHandler oscHandler(&clientManager, &pluginManager, serviceManager,
+    Mach1::OSCHandler oscHandler(&clientManager, &pluginManager, &serviceManager,
                                  &manager, /*externalMixer*/ nullptr, &engine);
 
     int helperPort = 0;
@@ -1020,14 +1018,12 @@ void testExternalRendererToggle()
 
     Mach1::PluginManager pluginManager(eventSystem);
     Mach1::ClientManager clientManager(eventSystem);
-    // Leaked deliberately: ~ServiceManager() issues real launchctl/sc kill
-    // commands against any installed orientation manager.
-    auto* serviceManager = new Mach1::ServiceManager(46348);
+    Mach1::ServiceManager serviceManager(46348, false);
 
     const juce::String busName = "M1SpatialSystem_MixBus_toggle" + juce::String(static_cast<int>(currentPid()));
     Mach1::MixEngine engine(manager, busName);
 
-    Mach1::OSCHandler oscHandler(&clientManager, &pluginManager, serviceManager,
+    Mach1::OSCHandler oscHandler(&clientManager, &pluginManager, &serviceManager,
                                  &manager, /*externalMixer*/ nullptr, &engine);
 
     std::atomic<int> persistCalls { 0 };

@@ -5,14 +5,17 @@
 
 namespace Mach1 {
 
-ServiceManager::ServiceManager(int serverPort) : serverPort(serverPort) {
+ServiceManager::ServiceManager(int serverPort, bool stopOrientationManagerOnDestroy)
+    : serverPort(serverPort)
+    , stopOrientationManagerOnDestroy(stopOrientationManagerOnDestroy) {
 #if defined(__APPLE__)
     uid = getuid();
 #endif
 }
 
 ServiceManager::~ServiceManager() {
-    killOrientationManager();
+    if (stopOrientationManagerOnDestroy)
+        killOrientationManager();
 }
 
 Result ServiceManager::startOrientationManager() {

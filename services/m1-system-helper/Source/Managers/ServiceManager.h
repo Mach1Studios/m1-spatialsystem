@@ -16,7 +16,10 @@ namespace Mach1 {
 
 class ServiceManager {
 public:
-    explicit ServiceManager(int serverPort);
+    // stopOrientationManagerOnDestroy: production default true. Tests pass
+    // false so ~ServiceManager does not launchctl/sc kill a machine-local
+    // Orientation Manager (those tests never start the service).
+    explicit ServiceManager(int serverPort, bool stopOrientationManagerOnDestroy = true);
     ~ServiceManager();
 
     Result startOrientationManager();
@@ -36,6 +39,7 @@ private:
     juce::Result handleServiceOperation(ServiceOperation operation, int result);
     
     int serverPort;
+    bool stopOrientationManagerOnDestroy;
     juce::ChildProcess orientationManagerProcess;
     juce::int64 timeWhenWeLastStartedAManager = -10000;
     juce::int64 timeWhenWeLastAttemptedToStartAManager = -10000;
