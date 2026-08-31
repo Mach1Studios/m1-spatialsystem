@@ -10,7 +10,11 @@ Agents append bullets under `## [Unreleased]` in the **same commit** as the code
 
 ### Added
 
+- M1-Transcoder multi-mono exports, including Batch Convert jobs, can start channel filenames at 0 or 1 and optionally use destination-named folders.
+
 ### Changed
+
+- M1-Transcoder opens Batch Convert from the View menu.
 
 ### Fixed
 
